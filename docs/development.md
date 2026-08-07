@@ -29,7 +29,7 @@ npm run start:firefox
 Other scripts: `npm run typecheck`, `npm run lint:ext`, `npm run package`.
 
 The sidebar opens automatically on install (`open_at_install`); after that use
-`Ctrl+Shift+L`, the switcher in the sidebar header, or `View → Sidebar`.
+`Ctrl+Shift+Period`, the switcher in the sidebar header, or `View → Sidebar`.
 
 ## Icons
 
@@ -54,10 +54,20 @@ itself. That needs no background code and is not subject to the "`toggle()` must
 synchronously inside a user-gesture handler" restriction. A piece of unverifiable code was
 deleted in favour of a built-in mechanism that demonstrably works.
 
-The `Ctrl+Shift+L` shortcut is also a measured result. The original `Alt+Shift+B` collided
-with GTK menu-bar mnemonics on Linux — `Alt+B` opens Firefox's Bookmarks menu and the
-sidebar never appears. Users can rebind it under `about:addons` → gear → "Manage Extension
-Shortcuts".
+The `Ctrl+Shift+Period` shortcut is also a measured result, arrived at in two steps. The
+original `Alt+Shift+B` collided with GTK menu-bar mnemonics on Linux — `Alt+B` opens
+Firefox's Bookmarks menu and the sidebar never appears. Its replacement, `Ctrl+Shift+L`,
+works, but it is the default autofill shortcut for several password managers; when two
+extensions want the same combo Firefox gives it to whichever registered first and tells
+nobody, so for some users the shortcut simply did nothing. `Ctrl+Shift+Period` is not
+claimed by Firefox itself and is far less contested. Users can rebind it under
+`about:addons` → gear → "Manage Extension Shortcuts".
+
+**A changed `suggested_key` does not reach existing installations.** Firefox records the
+binding in the profile when the extension is first installed; editing the manifest
+afterwards leaves that profile on the old key. So this change only affects fresh installs,
+and testing it requires a fresh profile — on a kept profile the *old* shortcut keeps
+working and the new one appears dead, which looks exactly like the bug being fixed.
 
 ## Testing on Windows
 

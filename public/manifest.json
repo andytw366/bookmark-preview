@@ -42,7 +42,7 @@
   "commands": {
     "_execute_sidebar_action": {
       "suggested_key": {
-        "default": "Ctrl+Shift+L"
+        "default": "Ctrl+Shift+Period"
       },
       "description": "開啟書籤預覽側邊欄"
     }
