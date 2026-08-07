@@ -2,7 +2,9 @@
 
 最後更新：2026-08-07（**M5 全部完成，送審前的決定也都做完了**：名稱／ID／版本／授權／支援網址。剩下的是把版本庫推上 GitHub 並實際送審，見 [amo/README.md](amo/README.md)）
 
-給下一個 session 的交接文件。設計背景讀 [PLAN.md](PLAN.md)，操作與架構讀 [README.md](README.md)。
+給下一個 session 的交接文件。設計背景讀 [PLAN.md](PLAN.md)；操作與架構已拆成英文的
+[`docs/`](docs/)（architecture、vault、previews、interface、sync-and-backup、permissions、
+development 七份），[README.md](README.md) 只留簡介。
 
 **先認識這三個工具**（2026-08-05 加的，省下大量重複打字）：
 
@@ -48,7 +50,7 @@ M4 寫完之後跑了三輪 subagent 審查，每一輪都找到真的會弄丟�
 
 **2026-08-07 再追加**：M5-3 上架資料齊備 —— 隱私政策、權限說明、中英商店文案、審查備註、四張 1280×800 截圖與 PNG 圖示，全部在 [`amo/`](amo/) 目錄。
 
-**M5 結案，功能開發到此告一段落。** 送審前要處理的四個決定見 [amo/README.md](amo/README.md)。
+**M5 結案，功能開發到此告一段落。** 送審表單要填的值見 [amo/README.md](amo/README.md)。
 
 驗證指令（四個都必須綠燈才算沒壞）：
 
@@ -58,7 +60,7 @@ npm run verify
 
 （等於 `npm run typecheck && npm test && npm run package && npm run lint:ext`。另外掛了一個 Stop hook `scripts/hook-typecheck.sh`，回答結束前會自動跑一次 typecheck —— 掛在 Stop 而不是每次編輯之後，是因為重構途中本來就會有一段編不過的狀態。）
 
-目前基準：typecheck 0 錯誤、179 項測試全過、`web-ext lint` 0 errors / 3 warnings（三個警告已確認可接受，理由在 README「已知的 lint 警告」）。
+目前基準：typecheck 0 錯誤、179 項測試全過、`web-ext lint` 0 errors / 3 warnings（三個警告已確認可接受，理由在 [docs/permissions.md](docs/permissions.md)）。
 
 ---
 
@@ -86,7 +88,7 @@ npm run verify
 - `about:debugging` 的「背景指令碼」欄位在閒置一分鐘後顯示 **已停止**（平常是「執行中」）。背景頁停掉時 devtools 的 context 下拉選單裡連背景頁那一項都不見了，只剩 `Web Extension Fallback Document`。
 - 掛上 DevTools toolbox（Firefox 因此不終止事件頁）之後，同樣不動放 75 秒仍保持解鎖。
 
-`src/background/vault-lock.ts` 的註解與 README 都寫「側邊欄靠一條 `runtime.connect()` port 維持事件頁存活」—— **在 Firefox 153 上這個假設不成立**。還沒確定是「port 根本沒接上」還是「Firefox 不理會開著的 port」，但兩者的修法一樣：port 只能當偵測訊號，要另外用**定期活動**把閒置計時器推回去（側邊欄／全頁瀏覽在解鎖期間每 15～20 秒透過 port 送一次 ping，背景頁收到就算一次活動）。
+`src/background/vault-lock.ts` 的註解與當時的 README 都寫「側邊欄靠一條 `runtime.connect()` port 維持事件頁存活」—— **在 Firefox 153 上這個假設不成立**。還沒確定是「port 根本沒接上」還是「Firefox 不理會開著的 port」，但兩者的修法一樣：port 只能當偵測訊號，要另外用**定期活動**把閒置計時器推回去（側邊欄／全頁瀏覽在解鎖期間每 15～20 秒透過 port 送一次 ping，背景頁收到就算一次活動）。
 
 實際影響比「要重打密碼」嚴重：**它會在流程中間發生**。實測全頁瀏覽的「多選 → 移入隱私空間」時，光是挑書籤那 30 秒就足以讓它上鎖，按下「移入」得到的是「隱私空間尚未解鎖」。（好消息是那個失敗是安全的：訊息清楚，原生書籤一個都沒少。）
 
@@ -441,7 +443,7 @@ IndexedDB 讀取**一秒內就全部跑完**，而光是把 3000 張卡片畫出
 | `amo/reviewer-notes.md` | 原始碼提交理由與可重現的建置步驟 |
 | `amo/screenshots/` | 四張 1280×800 實機截圖 |
 
-**`amo/README.md` 是入口**，含送審檢查清單、截圖說明文字，以及下面那四個待決事項。
+**`amo/README.md` 是入口**，含送審檢查清單、截圖說明文字與表單各欄位要填的值。
 
 #### 圖示改成 PNG
 
@@ -459,12 +461,12 @@ IndexedDB 讀取**一秒內就全部跑完**，而光是把 3000 張卡片畫出
 #### 授權：MPL-2.0
 
 `LICENSE` 是官方全文（373 行，從 SPDX 的 license-list-data 取回，逐字未改）。選它而不是 MIT
-的理由寫在 README 的「授權」那一節。
+的理由寫在 README 的 License 那一節。
 
 **原始碼裡沒有逐檔的授權標頭，這是刻意的。** MPL-2.0 §1.4 用「有沒有附上 Exhibit A 通知」
 定義什麼是 Covered Software，看起來像是每個檔案都要加三行；但 Exhibit A 自己下一段就明文
 允許把通知放在「收件者會去找的地方（例如相關目錄下的 LICENSE 檔）」。根目錄的 `LICENSE`
-加上 README 那一節就滿足了，七十幾個檔案各加三行樣板是純粹的雜訊。
+加上 README 的 License 那一節就滿足了，七十幾個檔案各加三行樣板是純粹的雜訊。
 
 `package.json` 也補上了 `license` / `repository` / `homepage`。
 
@@ -487,7 +489,7 @@ IndexedDB 讀取**一秒內就全部跑完**，而光是把 3000 張卡片畫出
 #### 介面文案整輪精簡（同一天）
 
 設定頁與幾個提示原本把「為什麼這樣設計」整段寫在畫面上，讀起來像文件而不是介面。
-現在只留可操作的那一句，理由回到程式碼註解與 README。安全關鍵的警示（忘記主密碼救不回、
+現在只留可操作的那一句，理由回到程式碼註解與 `docs/`。安全關鍵的警示（忘記主密碼救不回、
 不要在新裝置另外建立）**保留原意但收緊字數**，沒有拿掉。
 
 同步那兩段「Firefox 自己的排程約 10 分鐘一次」與「不要在新裝置按建立」實際造成過誤解，
@@ -613,7 +615,7 @@ IndexedDB 讀取**一秒內就全部跑完**，而光是把 3000 張卡片畫出
 
 還沒清的 ⬜：全頁瀏覽「關掉分頁會上鎖」、無痕視窗的縮圖、跨頁面同步的複驗、設定頁其餘控制項（觸發字串、移出落點、黑名單、清除預覽圖）、以及 M4 那幾條刻意延後的（備份檔用救援金鑰還原、舊格式訊息、配額超出、刪除標記、salt 不同）。這些現在都測得動了 —— 隱私空間不會再自己鎖掉。
 
-**剩下的不是開發工作**：處理 `amo/README.md` 裡那四個待決事項，用真實的書籤重拍截圖（現在這幾張是測試 profile 的種子書籤），然後送審。
+**剩下的不是開發工作**：用真實的書籤重拍截圖（現在這幾張是測試 profile 的種子書籤），然後送審。
 
 ---
 

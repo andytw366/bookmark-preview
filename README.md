@@ -1,453 +1,101 @@
-# 書籤預覽
+# Bookmark Preview
 
-Firefox 側邊欄擴充套件：以縮圖預覽瀏覽書籤，並提供密碼加密的隱私書籤空間。
+A Firefox sidebar extension that browses bookmarks as **visual previews** instead of a wall
+of text, with a **password-encrypted vault** for the ones you would rather not have sitting
+in the bookmark menu.
 
-完整設計與分階段計畫見 [PLAN.md](PLAN.md)。**要接手繼續開發，先讀 [NEXT.md](NEXT.md)** —— 那裡有目前狀態、待辦、尚未驗證的部分，以及測試環境的陷阱。
+正體中文版：[README.zh-TW.md](README.zh-TW.md)
 
-**M0～M5 全部完成，並在 Firefox 153.0.1 實機驗證過。** M0 骨架、M1 預覽管線、M2 加密核心、M3 隱私空間、M4 加密備份與跨裝置同步、M5 打磨與上架準備（鍵盤操作與無障礙、虛擬滾動、AMO 上架資料）。加密格式為 version 2（開發期間的舊格式刻意不做遷移），目前 179 項單元測試。
+![The sidebar listing bookmarks with thumbnails next to an open page](amo/screenshots/01-sidebar.png)
 
-**送審資料在 [`amo/`](amo/)**：隱私政策、權限說明、中英商店文案、審查備註與四張截圖。名稱、ID 與版本已定案（`書籤預覽` / `bookmark-preview@andytw366.github.io` / `1.0.0`）；還差授權條款與支援網址，見 [amo/README.md](amo/README.md)。
+## What it does
 
-M1 實測通過：授予權限 → 擴充套件自動重啟 → 造訪已加入書籤的頁面 → 側邊欄出現預覽圖。三段密度切換、補抓、網域色卡墊底都可用。
+**Visual previews.** The sidebar lists bookmarks with thumbnails in three densities (card
+/ row / text-only). "Full page" lays them out as a grid across the whole window.
 
-**剛加入書籤時就會立刻擷取**，不必等到下次再造訪。只靠 `tabs.onUpdated` 是不夠的：把「正在看的這一頁」加入書籤時不會有任何分頁事件（頁面早就載入完成），於是新書籤會一直是色卡。因此另外監聽 `bookmarks.onCreated`。
+Previews prefer the page's **own cover art** — comic and book covers, video thumbnails —
+and fall back to a screenshot only when there isn't one. The heuristics never look at the
+domain, so there is no site list to maintain. When they get it wrong, right-click any
+image on any page and choose "Use as this bookmark's preview".
 
-這條路**只在該網址正開著某個分頁時才動作**，而且短時間內大量建立（超過 5 筆 / 2 秒）就整批跳過 —— 匯入書籤檔或 Firefox Sync 會一次建立上百筆，那時不該對上百個網域發請求，那是「補抓預覽圖」按鈕的工作。從隱私空間「移出」也會觸發 `onCreated`，但那條路已經把加密縮圖還原成明文了，既有縮圖存在就不重抓。
+**An encrypted vault.** Bookmarks moved into it are removed from Firefox's bookmark
+manager, toolbar and menu; they are only visible after you unlock, and their thumbnails
+are encrypted too (AES-256-GCM). Whole folders move in and out with their structure
+intact.
 
-**預覽圖以「內容封面」為優先**（漫畫／書籍封面、影片縮圖），找不到才用網頁截圖。對內容頁來說封面比截圖更能代表那個書籤 —— 截圖裡通常只看到導覽列。封面是從**已渲染的分頁 DOM** 擷取的，因此前端渲染的站台與有 Cloudflare 防護的站台也能取到（從背景頁重新 fetch 網址對這兩種情況都無效）。封面維持原始長寬比不裁切，截圖則裁成 16:9。可在側邊欄底部切換「封面優先／截圖優先」。
+The entrance is hidden by default — the sidebar shows no trace of it. You type a trigger
+string of your own choosing into the search box to bring up the password screen. It
+re-locks on an idle timeout or when you close the sidebar.
 
-判定**完全不看網域**，沒有站台清單也沒有專屬選擇器，因此不需要為每個網站個別處理。依可信度分層：嵌入式播放器 `src` 裡的封面參數（`?poster=` 等）→ 站方宣告的 `og:image` / `twitter:image` → JSON-LD（schema.org）→ `<video poster>` → 頁面上最像封面的圖。
+A forgotten master password **cannot be recovered**, so the vault hands you a recovery key
+when you create it, exports an encrypted backup file, and can optionally keep an encrypted
+copy in Firefox Sync for your own other devices.
 
-**播放器的 poster 參數排在 `og:image` 之上**，因為它更可信：`og:image` 常是整站共用的分享圖，而傳給播放器的 poster 必然是「這一頁這支影片」的封面 —— 沒有人會把站台 logo 當成影片 poster。這仍然是通用規則，只看參數名稱與值的形狀。
+**Everything stays on your device.** No server, no account, no telemetry of any kind. Data
+leaves the machine only if you opt into sync, and then only as ciphertext.
 
-最後一層是啟發式評分，`<img>` 與 CSS `background-image` **在同一個池子裡競爭**：顯示面積 × 直式加成 × 靠上加成 × 全寬懲罰，並排除圖示、橫幅與頁尾深處的圖；背景圖打七折（拿不到真實像素尺寸，也可能只是底紋）。兩者不能各給一個扁平分數 —— 那會讓「頁面最頂端、明顯是主體的背景封面」輸給「捲到一千多像素以下、推薦列表裡的一張小縮圖」。
+**Fully keyboard operable.** Arrow keys to move, Enter to open, Right Arrow to enter a
+folder, Backspace to go up, Menu key or `Shift+F10` for the context menu. Lists and grids
+are virtualised, so a folder of 3,000 bookmarks paints in about 8 ms.
 
-**全站共用的 og:image 會被自動降級。** 很多網站的 `og:image` 是整站共用的 logo，那種圖當預覽比截圖還糟 —— 一整排書籤全是同一個 logo。判定方式不看網域也不需要維護清單：**同一張圖在同一網域的兩個以上不同頁面出現過，就判定為全站共用並降到內容圖之下**。這會隨使用自動學習，所以某站的第一個書籤可能仍拿到 logo，第二個之後就正確了；第一個要在同網站的另一個頁面被擷取過之後，重抓才會修正 —— 也可以用下面的右鍵直接指定。
+## Install
 
-**注意計數的單位是「同網域下有幾個不同的頁面網址宣告過這張圖」，不是「抓過幾次」。** 對同一頁反覆重抓不會讓計數前進，因為那個頁面網址已經記錄過了 —— 要等同網站的**另一個頁面**被擷取過。
-
-三條取圖路徑（分頁擷取、補抓、頁面沒開著時的重新抓）都會記錄並套用降級。伺服器端那條原本是無條件採用第一個 `og:image`，於是整批補抓可能一排都是同一個 logo 且完全不累積學習；現在它會取出頁面宣告的**全部**預覽圖，把判定為全站共用的排到最後（不移除 —— 某些頁面真的只有那一張圖可用）。順帶修掉一個小缺口：有些站台的 `og:image` 是共用 logo 而 `twitter:image` 才是內容圖，只看第一個永遠拿不到。
-
-自動判定不可能對所有站台都準，所以有一個直接的出口：**在任何頁面對著圖片右鍵 →「設為這個書籤的預覽圖」**。這對隱私書籤也適用（縮圖會以主密碼加密）。
-
-`tests/fixtures/site/` 有五個測試頁對應五種情況，全部實機驗證過；用 `./scripts/serve-fixture.sh` 提供：
-
-| 測試頁 | 驗證的事 | 結果 |
-|---|---|---|
-| `/` | 無任何中介資料，直式封面要勝過橫幅廣告與小圖示 | ✅ |
-| `/video` | 橫式 `video poster` 要勝過顯示面積更大的全寬 hero | ✅ |
-| `/background` | 封面是 CSS `background-image`（`document.images` 看不到） | ✅ |
-| `/lazy` | 封面在頁面載入後才指定 `src`（SPA／延遲載入） | ✅ |
-| `/declared` | 宣告的 `og:image` 要勝過更大的無關圖片 | ✅ |
-| `/shared-a`、`/shared-b` | 兩頁共用同一張 `og:image`；造訪第二頁後該圖應被判定為全站共用而降級 | ✅ |
-| `/embed` | 封面只在 iframe 的 `?poster=` 參數裡，要勝過全站共用的 `og:image` logo | ✅ |
-| `/deep-thumbs` | 頂端的 CSS background 封面，要勝過頁面深處的推薦縮圖 | ✅ |
-
-目前有 179 項單元測試（`npm test`）：M2 涵蓋加解密往返、錯誤密碼、篡改偵測、分塊邊界、壓縮率與 storage.sync 容量估算；M4 涵蓋逐筆合併的每一條規則（較新者勝、墓碑優先、孤兒重掛、環狀打斷、墓碑過期、幂等）、外來資料的清洗、備份檔往返與各種損毀的錯誤訊息、內容指紋的穩定性與順序無關性，變更佇列的互斥性（其中兩項會在那個曾經上線過的「可重入」版本下失敗），金鑰環的兩把鑰匙、救援金鑰的編碼與寬鬆輸入，以及資料夾進出隱私空間的轉換規則（保留層級、空資料夾照建、`place:` 略過、父在子之前、環狀防護）。M5 涵蓋方向鍵巡覽的索引計算（單欄與網格的差異、兩端的邊界）、虛擬滾動的視窗計算（總高度守恆、不等高的列、捲過頭）與縮圖快取（正在顯示的項目不得被淘汰、內容更新時舊圖何時才撤銷）。
-
-另有兩項靜態檢查：一項掃 `vault.ts`，確認沒有任何取鎖的函式在鎖裡被呼叫 —— 那會讓整個 vault 佇列永久卡死，而型別檢查與一般測試都抓不到；另一項確認沒有人直接掛 DOM 的 `contextmenu`，因為那樣會漏掉鍵盤叫出選單時的座標處理，而**用滑鼠測完全看不出來**。
-
-M3 實測通過：建立主密碼（含不可救回的警示與確認勾選）→ 把書籤移入隱私空間 → **該書籤從原生書籤樹消失**（側邊欄搜尋從 1 筆變 0 筆）→ 隱私空間列出它 → 上鎖 → 重新輸入密碼解鎖 → 書籤完整回來。
-
-**進入方式是在搜尋框打一段觸發字串（預設 `###`），跳出獨立的密碼畫面。** 原本是把主密碼直接打進搜尋框，但搜尋框是明文顯示的，旁邊的人直接讀得到 —— 那比「被人知道有隱私空間」嚴重得多，因為密碼外洩不可挽回（對方之後隨時能開，而且目前還沒有備份出口）。改成觸發字串之後，進搜尋框的只有觸發字串本身，密碼走真正的 `type="password"` 欄位，全程不進入搜尋狀態。
-
-尚未建立隱私空間時，同一個觸發字串跳出的是**建立**畫面（密碼 + 再次輸入 + 不可救回的確認勾選）；已建立則是**解鎖**畫面。內容直接重用 `VaultGate`，不另寫一份 —— 那個不可救回的警示不能因為多一份實作而弱化。
-
-**觸發字串可在設定頁改成任何文字，而且建議改。** 可調整不只是方便，它本身就是安全性的一部分：預設值是公開的，知道它的人打一次就能從跳出的畫面看出這台裝置有沒有隱私空間（「解鎖」或「建立」）。換成只有自己知道的字串之後，那個推測就無從下手。設成空字串等於停用這個入口。
-
-比對用**完全相等**而不是「開頭符合」，否則任何以觸發字串起頭的正常搜尋會在打到一半時就把畫面叫出來；大小寫也不做寬鬆比對，因為觸發字串可能被設成一般單字。
-
-實作上有個必須避開的坑：**`type="password"` 的輸入框不能包在 `<form>` 裡** —— 表單送出會觸發 Firefox 的「要儲存密碼嗎？」提示，那既在畫面上洩漏，又會把主密碼存進密碼管理員。搜尋框因此不再用 form，Enter 由 `onKeyDown` 處理。
-
-密碼錯誤時**會顯示錯誤訊息**，這與原本的靜默失敗不同：以前的沉默是掩護（看起來就是一次搜不到東西的搜尋），但使用者主動打開密碼畫面之後已經沒有什麼要掩護的，沉默只會讓人不知道到底成功了沒。
-
-**隱私空間的入口預設是隱藏的。** 一個看得見的「隱私空間」分頁本身就洩漏了「這個人有東西要藏」，那違背了整個功能的目的。預設狀態下側邊欄完全沒有相關痕跡 —— 沒有分頁、沒有按鈕。要進去就**在搜尋框輸入主密碼再按 Enter**；密碼錯誤時的反應與「搜尋不到東西」一模一樣。建立隱私空間與切換入口方式在設定頁（`about:addons` → 這個擴充套件 → 選項），側邊欄裡看不到。
-
-**可以新增資料夾**：側邊欄在麵包屑那一列（建在目前所在的資料夾裡，放那裡才看得出「目前」是哪裡；底部工具列在 320px 下也已經滿了），全頁瀏覽在第二列。
-
-原生書籤的**最上層不能直接建資料夾** —— Firefox 需要一個 parent，而根層顯示的是「書籤選單／書籤工具列／其他書籤」這些根資料夾本身。這時省略 `parentId` 交給 Firefox 的預設位置（其他書籤），並在表單裡說明；寫死 `unfiled_____` 這類內部 id 比省略它更脆弱。
-
-三處（側邊欄、全頁瀏覽、隱私空間）共用同一個 `NewFolderForm` —— 各寫一次的話「Escape 取消」「空白名稱不送出」這類細節遲早會有一處漏掉。
-
-**書籤列支援右鍵選單**：在新分頁開啟、複製網址、重新抓預覽圖、重新命名、移動到…（列出所有資料夾）、刪除、移入隱私空間（解鎖時才出現）。
-
-隱私空間那一頁**也有底部工具列，而且它的動作都作用在隱私空間上**：
-
-- **補抓預覽圖抓的是隱私書籤**。工具列雖然與書籤頁共用同一個元件，但補抓的訊息類型是傳進去的參數（`backfillKind`）—— 若固定送 `thumbs/backfill`，站在隱私空間按下去只會去抓一般書籤，按了像沒反應。隱私空間那條路還必須加密寫入，所以是另一個實作（只有 og:image 這條路可用：隱私書籤沒有開啟中的分頁可以擷取封面，而為了補縮圖去逐一開啟它們既慢又會留下瀏覽痕跡）。
-- **也能多選**：批量「移動到…」隱私空間內的其他資料夾，或「移出到…」原生書籤的某個資料夾。
-
-多選的動作是以**資料**傳進工具列的（`selectionActions`），不是一堆布林旗標 —— 兩個畫面要的動作根本不同（書籤頁是「移動到…／移入隱私空間」，隱私空間是「移動到…／移出到…」）。
-
-隱私空間的資料夾選擇器是獨立的元件（`VaultFolderPicker`），不是把原生那個加參數：兩者的 id 空間不同，混用會搬到錯的地方。
-
-**隱私書籤也有自己的右鍵選單**：在新分頁開啟、複製網址、重新抓預覽圖、重新命名、移動到…、移出隱私空間、移出到…、刪除。
-
-「移出隱私空間」放進設定頁指定的**預設資料夾**（預設是 Firefox 的「其他書籤」）；「移出到…」每次讓你自己選。那個預設資料夾若日後被刪掉，移出時會自動退回 Firefox 的預設位置 —— 書籤已經要離開隱私空間了，那時候丟錯會讓它卡在兩邊都沒有的狀態。這是一組獨立的實作而不是共用同一個選單 —— 隱私書籤不在 Firefox 的書籤樹裡，`bookmarks/*` 那些訊息認的是原生書籤 ID，對它一個都不適用。重抓預覽圖也**必須走加密寫入**，而且刻意沒有截圖退路：截圖那條路會先把明文寫進 IndexedDB 再加密刪除，等於為一張縮圖在磁碟上開一個明文時間窗，那個窗對已在隱私空間裡的書籤本來不存在。
-
-**隱私空間可以建資料夾**：頂端的「新增資料夾」建在目前所在的層級，麵包屑巡覽，對書籤右鍵「移動到…」搬進去。刪除資料夾時**裡面的內容會移到上一層，不會一起刪掉** —— 這裡刻意與原生書籤不同，因為隱私空間沒有「復原刪除」，一次誤刪要靠備份檔才救得回來。少數人會因此多按幾次刪除，但沒有人會因此失去資料。
-
-隱私空間的資料夾**可以搬動**（右鍵「移動到…」或多選批量），搬進自己或自己的子孫會被擋掉 —— 那會造成環狀 `parentId`，之後巡覽與麵包屑都走不出來。單筆移入的書籤一律先落在最上層。
-
-**整個資料夾可以進出隱私空間，層級原樣保留。** 對書籤資料夾按鎖圖示（或右鍵「把整個資料夾移入隱私空間」）會把整棵子樹搬進去；反方向對隱私資料夾右鍵「把整個資料夾移出」會在原生書籤裡把子樹重建回來。確認畫面顯示的是**實際筆數**（「共 2 個資料夾、6 個書籤」）——這個動作不可逆，那個數字就是判斷依據。
-
-兩個方向的順序是鏡像的，而且是這個功能最要緊的部分：移入**先 persist 加密資料、最後才 `removeTree`**；移出**先建原生書籤、最後才標記墓碑**。原則是「任何一個瞬間，資料至少完整存在於一邊」。轉換規則本身（保留層級、空資料夾照建、`place:` 略過）抽成純函式放在 `shared/vault-subtree.ts` 並用測試釘住 —— 做錯的代價是整棵子樹的書籤消失，不能靠讀程式碼推論。
-
-**Firefox 內建的根資料夾**（書籤選單／書籤工具列／其他書籤）不能移入：它們是永久的，`removeTree` 會失敗。根層那一列因此不顯示鎖圖示、右鍵也沒有移入 —— 讓人按下去才看到錯誤，不如一開始就不給那個入口。
-
-**可以批量搬移**：底部工具列的「選取」進入多選，勾選後可以「移動到…」其他資料夾，或「移入隱私空間」（後者要解鎖）。勾選狀態跨資料夾巡覽保留，所以可以從不同資料夾各挑幾個再一次處理。
-
-**資料夾也能勾選，而且點整列就是勾選**（與書籤一致）。勾選標記疊在縮圖／圖示的左上角而不是在版面中另外佔一格 —— 塞進列的 flex 流裡會把每一列推寬一塊，大卡模式下更是多出一整行。
-
-側邊欄與全頁瀏覽都是這個規則。多選中資料夾的**巡覽移到 `›` 按鈕**（側邊欄在列右側，全頁瀏覽在卡片右上角）。跨資料夾挑選是這個功能的重點，資料夾不能點進去就沒得挑；但「點資料夾卻只是進去、選不到它」也同樣不合直覺，所以兩個動作各有自己的目標。那顆按鈕必須是列**外面**的兄弟元素 —— 巢狀 `<button>` 是無效的 HTML。
-
-勾到的資料夾會**連同裡面的內容一起移入**；只有「勾到的東西裡一個書籤都沒有」時那顆按鈕才停用。切換分頁（書籤 ↔ 隱私空間）會先退出多選 —— 勾選的是書籤那一頁的項目，帶著它切過去只會留下一排無處可用的動作按鈕。
-
-「選取」本身一律提供 —— 批量搬到其他資料夾不需要金鑰，所以它不再是隱私空間專屬的功能，也就不會因為出現而透露什麼。批量是逐筆執行而不是「全部寫完再存檔」—— 每一筆都維持「先寫入加密資料、後刪除原生書籤」的順序，否則中途失敗就等於直接遺失書籤。單筆失敗不中斷整批。
-
-「選取」只在隱私空間已解鎖時出現。批量的唯一動作就是移入，鎖著時一個沒有用途的選取按鈕本身就是線索。
-
-**移入的確認提示貼著觸發點跳出**，不是畫在清單頂端。原本是內嵌在清單上方的通知，於是在長清單裡點了下方某一列的鎖圖示之後，確認按鈕出現在畫面外 —— 得先捲回最上面才能按下「移入」。單筆貼著那一列的鎖圖示，批量貼著工具列的按鈕（工具列固定在底部不會捲走）。
-
-## 救援金鑰與更改主密碼
-
-原本主密碼派生的金鑰**直接**加密資料，那讓兩件事不可能：忘記密碼就永久遺失（備份檔用的是同一組密碼，所以有備份也沒用），以及更改主密碼等於整包重新加密。現在中間多一層資料金鑰（`src/crypto/keyring.ts`）：
-
-```
-主密碼 ──PBKDF2(600k)──→ KEK(密碼) ──包裹──→ ┐
-                                          ├─→ DEK ──加密──→ 書籤與縮圖
-救援金鑰 ──HKDF────────→ KEK(救援) ──包裹──→ ┘
-```
-
-兩把鑰匙包同一個 DEK，任一把都解得開。**驗證器因此移除** —— 「解不開那個 32 bytes 的包」本身就是「密碼錯誤」的答案，而且比解整包書籤便宜；少一個欄位就少一個會與實際金鑰不同步的地方。
-
-救援金鑰是 160 bit 隨機值，Crockford base32 編成 8 組 4 字元。字母表**刻意不含 I、L、O、U**：前三個會與 1、0 混淆，而這串字的用途就是被抄在紙上、幾個月後再打回來（輸入時大小寫與分隔符號都無所謂，`I`/`L` 自動當 `1`、`O` 當 `0`）。用 HKDF 而不是 PBKDF2 —— 高迭代次數是為了保護**低熵**的人選密碼，對一個 160 bit 的隨機值毫無意義。
-
-建立隱私空間時**強制產生並顯示一次**，勾了「已抄下」才能繼續。做成選填的話幾乎沒有人會設，而會忘記主密碼的人正好就是不會主動去設的那些人。那串碼也以 DEK 加密存著，所以事後還能再看一次 —— 這不削弱什麼，要解開它得先有 DEK，而有 DEK 的人本來就看得到全部內容。
-
-**中介資料的改動也必須推上雲端。** 更改主密碼與重新產生救援金鑰都只換包裹、完全不動書籤，內容指紋因此不變；只比指紋的話那兩個操作永遠不會被同步出去，其他裝置會繼續只認舊密碼、已失效的舊救援金鑰照樣開得了。
-
-「上鎖 + 忘記主密碼」原本是死路（刪除要求先解鎖，於是既進不去也刪不掉），現在有**「放棄這台裝置上的隱私空間」**，不需要解鎖。那道門想擋的是「有人趁你離開清掉資料」，但能碰到這台電腦的人本來就能直接清掉擴充套件的儲存目錄 —— 它擋住的其實只有誤觸，卻把真正需要出路的人關在外面。它不動雲端副本（這台打不開不代表別台打不開）。
-
-## 備份與跨裝置同步（M4）
-
-「忘記主密碼就永久遺失」是這個擴充套件唯一無法補救的失敗模式。M4 的兩個功能都在設定頁，都對著這件事：
-
-**加密備份檔**（`vault/backup-export`／`backup-import`）匯出一個 JSON，裡面是加密的書籤加上整份 `VaultMeta`（salt、KDF 參數、以主密碼與以救援金鑰各包一份的資料金鑰）。**那份中介資料一定要在檔案裡** —— 少了它，即使記得密碼也派生不出金鑰，那份檔案就是一堆永遠打不開的位元組。因此備份檔也能用**救援金鑰**打開；少了這一點，「忘記主密碼」時備份檔一樣是廢的。檔案**不含預覽圖**：圖丟了可以重抓，書籤丟了才是真的沒了，把圖放進去只會讓檔案大到不好保管。
-
-匯出要求先解鎖。檔案本身是加密的、解鎖與否都不影響內容 —— 這個要求的用意是讓使用者在匯出當下**證明自己還記得密碼**。一份打不開的備份檔比沒有備份更糟，它會讓人以為自己有備份。
-
-匯入分兩條路：本機**還沒有**隱私空間時連 KDF 參數一起採用（換裝置、重裝、災難還原），之後就用備份檔的密碼解鎖；本機**已有**隱私空間時要先解鎖，然後逐筆合併（備份檔的密碼可以與本機不同 —— 用備份檔的金鑰解開、用本機的金鑰寫回）。
-
-**跨裝置同步**預設關閉，而且必須由使用者自己打開：開啟等於把加密後的書籤交給 Mozilla 的同步伺服器保管。主儲存永遠是 `storage.local`，`storage.sync` 只放一份加密副本，所以 100 KB 的額度只約束「能同步多少」，不約束「能存多少」。
-
-同步的四條規則，每一條都對應一個實際會弄丟資料的情境：
-
-1. **只在解鎖時合併並上傳。** 合併必須解開遠端那份，而金鑰只在解鎖時存在。上鎖時把本機那份推上去會直接覆蓋另一台裝置新增的東西。
-2. **遠端「還沒傳完」時什麼都不做。** `storage.sync` 是逐筆傳播的，塊沒到齊時我們手上沒有完整的遠端內容，這時上傳就是覆蓋。這一條特別容易漏 —— 把關若只寫在「遠端完整」那個分支裡，最該保守的時刻反而變成無條件覆蓋。新裝置的災難還原正是這個時刻。
-3. **salt 不同就停下來並回報。** 兩邊是各自建立的隱私空間時金鑰互不相通，沒有合併的可能，只能讓使用者明確選一邊。
-4. **用內容指紋而不是密文判斷「是否需要上傳」。** 每次加密都換 IV，同一份內容的密文永遠不同；用密文判斷會讓兩台裝置輪流認定「雲端跟我不一樣」而互相覆蓋，每次覆蓋又觸發對方再覆蓋 —— 一個永遠停不下來的來回寫入。
-
-逐筆合併規則（`src/shared/vault-merge.ts`，純函式）：以 `id` 為鍵、`updatedAt` 較大者勝、**墓碑優先於編輯**（不看時間 —— 「以為刪了卻復活」比「刪錯了要重新加一次」嚴重得多）、墓碑保留 30 天。合併後還要正規化：父項不存在的記錄拉回最上層、環狀 `parentId` 打斷。兩台裝置分別搬動資料夾就足以造出這兩種狀態，而它們的症狀是「書籤還在資料裡但畫面上永遠看不到」—— 那和弄丟沒有差別。
-
-刪除整個隱私空間會在 `storage.sync` 留下一個**刪除標記**。只清空雲端副本不夠：另一台裝置看到「雲端沒有副本」就會把自己那份推上去，於是刪除的那台下次同步又把整個隱私空間拉回來。標記只讓其他裝置**停下來詢問**，不會自動刪掉它們的資料 —— 遠端的一個旗標不該有權銷毀本機資料。
-
-要照實說的限制：Firefox for Android 完全不同步 `storage.sync`（Mozilla bug 1625257）；同步週期約 10 分鐘；主密碼不同步；**擴充套件無法得知使用者是否已登入 Firefox 帳號**（沒有 API，未登入時寫入照樣成功、只是傳不出去），所以設定頁不假裝顯示「同步已啟用」，而是攤出雲端副本的最後更新時間讓使用者自己判斷。另外整份 `VaultMeta` 是**明文**放在同步資料裡的（salt、KDF 參數、兩個金鑰包裹 —— 換裝置時得靠它們派生金鑰），代價是能存取該 Firefox 帳號的人可以離線暴力猜密碼 —— 這也寫在設定頁。包裹本身是密文，所以明文放著不洩漏書籤內容。
-
-M0 實測通過的項目：
-
-| 項目 | 結果 |
-|---|---|
-| 側邊欄隨安裝自動開啟、中文正常渲染 | ✅ |
-| 根資料夾列表，空資料夾（行動書籤）被濾除 | ✅ |
-| `place:` 智慧書籤被濾除（種 12 筆，顯示 11 筆） | ✅ |
-| 資料夾巡覽與麵包屑 | ✅ |
-| 三層深度時麵包屑折疊成「全部 / … / 開發工具 / 前端」 | ✅ |
-| 搜尋跨整棵樹（在最深層資料夾搜到別處的書籤） | ✅ |
-| 點擊在當前分頁開啟、Ctrl+click 在背景分頁開啟 | ✅ |
-| 新增書籤後側邊欄自動更新（未手動重載） | ✅ |
-| `Ctrl+Shift+L` 開啟側邊欄 | ✅ |
-
-## 鍵盤操作
-
-側邊欄與全頁瀏覽都能完全不用滑鼠操作。
-
-| 鍵 | 動作 |
-|---|---|
-| `Tab` / `Shift+Tab` | 在搜尋框、工具列與清單之間移動 |
-| `↑` `↓` | 上一列／下一列（全頁瀏覽是上一列／下一列的**同一欄**） |
-| `←` `→` | 側邊欄：回上一層／進入資料夾。全頁瀏覽：左右相鄰的卡片 |
-| `Backspace` | 回上一層（兩邊都是） |
-| `Home` / `End` | 第一項／最後一項 |
-| `Enter` | 開啟書籤，或進入資料夾 |
-| `Menu` 鍵或 `Shift+F10` | 開啟該列／該卡片的右鍵選單 |
-| 選單內：`↑` `↓` `Home` `End` | 在項目間移動（會跳過停用的項目） |
-| 選單內：`Tab` | 在選單內循環，不會跑到背後的清單去 |
-| `Escape` | 關掉選單，焦點回到打開它的那一列 |
-
-方向鍵的欄數是從**實際版面量出來**的（比對各項目的 `getBoundingClientRect().top`），不是從卡片大小設定推算 —— 全頁瀏覽的欄數會隨視窗寬度變動，設定裡的欄寬只是 `minmax` 的下限。單欄清單自然量出 1 欄，於是上下鍵就是逐列移動、左右鍵空出來給進出資料夾用。
-
-右鍵選單**只掛在 `contextmenu` 事件上**，不另外攔鍵盤。選單鍵與 `Shift+F10` 本來就會產生 `contextmenu`，而那個事件是唯一擋得掉 Firefox 原生選單的地方（實測對它們的 `keydown` 呼叫 `preventDefault()` 無效，結果是自己畫的選單與原生選單疊在一起）。鍵盤叫出來的事件沒有游標位置，改用該元素的邊界當座標。
-
-刪除這類不可逆的確認框，預設焦點放在「取消」而不是排在前面的「確定」—— 否則用鍵盤按下「刪除」之後，連按兩次 `Enter` 就刪掉東西了。
-
-## 大量書籤
-
-清單與網格都只渲染**看得到的那幾列**。3000 個書籤的資料夾在全頁瀏覽下，從 render 到畫上畫面由約 220 毫秒降到 8 毫秒，同時掛載的縮圖元件由 3000 個降到 32 個。
-
-先量再改：改之前確認過瓶頸確實在渲染而不是在讀取縮圖 —— 3000 次 IndexedDB 讀取一秒內就全部跑完，而光是把 3000 張卡片畫出來就要 220 毫秒以上，且那個數字在「完全沒有縮圖」與「縮圖都在」兩種情況下一樣（縮圖是之後才非同步補上的）。
-
-幾個設計上的取捨：
-
-- **列高是量出來的，不是假設固定的。** 大卡模式下封面圖採用自己的長寬比，每一列本來就不一樣高；假設固定高度會讓捲軸長度與內容位置對不上。還沒量到的列用估計值，只影響捲軸長度。
-- **計算的單位是「列」而不是「項目」。** 側邊欄一列一個、全頁瀏覽一列 N 個，把欄數收斂在呼叫端之後，兩個畫面共用同一份計算（`src/sidebar/lib/virtual.ts`）。
-- **網格的欄數從容器寬度算，不是從已渲染的元素量。** 要在「決定渲染哪幾列」之前就知道欄數，所以照 `auto-fill` 的規則自己算一次。
-- **墊高用 `padding` 而不是空的佔位元素。** 清單有 `gap`，上下各塞一個空 div 會多出兩道間距。
-- **縮圖有一層快取**（`src/sidebar/lib/thumb-cache.ts`）。捲動會不停掛載／卸載同一批列，沒有快取的話捲回去的每一列都會先閃一下色卡再換成圖。快取帶佔用計數，正在顯示的項目不會被淘汰 —— 撤銷正在使用的 object URL 會讓畫面出現破圖。
-
-搜尋結果的上限因此從 300 放寬到 5000。上限沒有完全拿掉，但用途變了：搜尋走的是整棵樹，一個字元可能命中全部書籤，上限只是不讓結果陣列無界成長。
-
-鍵盤巡覽在虛擬化之後仍然涵蓋整份清單：`End` 會跳到真正的最後一筆，而不是可視範圍的最後一筆 —— 目標還沒被渲染出來時先捲過去，再把焦點放上去。
-
-## 底部工具列
-
-工具列原本混了三種不同性質的東西而沒有層級：設定一次就不再動的偏好（預覽圖來源、顯示密度）、動作（補抓、全頁瀏覽、選取）、以及最多三行的暫時性狀態文字。五個控制項加上會換行的文字擠在 320px 寬的欄裡，結果是一團看不出重點的東西。
-
-現在分三層：
-
-- **常用的留在檯面上** —— 顯示密度（瀏覽時真的會反覆切，改用圖示：「大卡／小列／純文字」是 9 個中文字，光這一組就吃掉近三分之一寬度）加上「全頁瀏覽」與「選取」。
-- **偶爾用的收進溢出選單（`⋯`）** —— 預覽圖來源與補抓預覽圖。它們是設定一次或偶爾按一次的東西，不值得長期佔用寬度。目前生效的來源用打勾標示。
-- **狀態文字只佔一行**，依「進行中 → 剛完成 → 背景診斷」的優先序只顯示最重要的那一則，而且放在控制列**上方** —— 放下方的話每次訊息來去都會把控制列往上頂，清單跟著位移。
-
-主工具列刻意**不換行**（換行會讓高度隨內容跳動），只有多選那一列允許換行，因為「已選 N 個」的寬度會隨數字變化。
-
-順帶補上原本完全沒有的 `:focus-visible` 樣式：`.toolbar__action`、`.segmented__item`、`.rowmenu__item` 之前只有 hover 沒有 focus，鍵盤操作時完全看不出焦點在哪。後來再補上 `.chip`、`.link-button`、`.tabs__item` 與 `.row__lock` —— 只用 `Tab` 走完一輪的時候，任何沒有外框的一格都會表現成「焦點消失了」。
-
-## 全頁瀏覽
-
-側邊欄底部的「全頁瀏覽」會在新分頁開啟一個獨立頁面，以整個視窗的寬度**並排**顯示書籤。側邊欄再怎麼調都只有 320–420px，一次只放得下一欄；要一眼看過幾十個封面就需要整個視窗。
-
-欄數用 CSS `auto-fill` + `minmax` 隨視窗寬度自動決定，不寫任何斷點；卡片大小有小／中／大三段可切。樹索引、搜尋與縮圖讀取全部沿用側邊欄那一套，沒有另寫一份 —— 搜尋與縮圖 fallback 的行為一分岔就會開始各自漂移。
-
-點擊預設**開新分頁**（用當前分頁載入會把這個瀏覽畫面本身蓋掉），Ctrl+click 開在背景。右鍵選單與側邊欄同一個（直接重用 `RowMenu`）：在新分頁開啟、複製網址、重新抓預覽圖、重新命名、移動到…、刪除，以及解鎖後的「移入隱私空間」。
-
-### 上方工具列
-
-兩個模式（書籤／隱私空間）共用同一組列，位置固定：
-
-1. 標題 / 搜尋 / 卡片大小 / 更多選項（`⋯`）
-2. 範圍切換 / 選取 / 該模式專屬的動作（隱私空間才有「新增資料夾」與「立即上鎖」）
-3. 多選列（只在多選時出現）：已選數量 / 全選 / 動作 / 取消
-
-原本「選取」在書籤模式放第一列、在隱私空間放第二列，兩個模式長得不一樣。現在把「目前模式的多選狀態與動作」在程式裡先收斂成同一組值，那一列就不必到處判斷模式 —— 每個按鈕各寫一次三元運算正是兩邊會走鐘的成因。
-
-**功能與側邊欄一致**。預覽圖來源與補抓預覽圖收在 `⋯` 裡，而且與側邊欄**共用同一個元件**（`PreviewOptionsMenu`）與同一個狀態 hook（`useBackfill`，含進度與擷取診斷那一行）。共用不只是省程式碼：它讓「兩邊功能不能有缺少」變成結構上的保證，而不是每次改動都要記得同步兩處 —— 全頁瀏覽原本就整組缺漏。補抓抓哪一邊由目前模式決定。
-
-多選中卡片的勾選標記疊在縮圖角落而不是另外佔一行 —— 卡片高度一致，網格才排得整齊。
-
-**隱私空間也進得去**，入口與側邊欄一致：在搜尋框打觸發字串，跳出同一個密碼畫面。解鎖後才出現「書籤／隱私空間」切換，隱密模式下在那之前這個頁面完全沒有相關痕跡。隱私空間裡可以巡覽資料夾、新增資料夾、用右鍵選單操作、以及立即上鎖。
-
-`useVault` 會在解鎖期間自己維持一條 keepalive port，分頁關閉時 port 斷開，若側邊欄也沒開就自動上鎖。
-
-⚠️ **這條 port 目前撐不住 MV3 事件頁**（Firefox 153 實測）：事件頁照樣會在閒置約 30～50 秒後被終止，金鑰跟著消失，表現成「隔一下子回來就要重打主密碼」。port 目前只確保 UI 不會謊稱「已解鎖」。修法與證據見 [NEXT.md](NEXT.md) 的「2026-08-05 實機驗證」。
-
-要留意這是一個**整個視窗大小**的隱私書籤畫面 —— 在別人看得到螢幕的場合，記得用「立即上鎖」或直接關掉分頁。
-
----
-
-## 開發
+Not yet on [addons.mozilla.org](https://addons.mozilla.org/). To run it from source:
 
 ```bash
 npm install
 npm run build
 ```
 
-在 Firefox 中載入：開啟 `about:debugging#/runtime/this-firefox` →「載入臨時附加元件」→ 選擇 `dist/manifest.json`。
+Then open `about:debugging#/runtime/this-firefox` → "Load Temporary Add-on" → pick
+`dist/manifest.json`.
 
-改完程式碼跑一次完整驗證（四項全綠才算沒壞）：
+Requires Firefox 140 or newer, desktop only (`sidebar_action` does not exist on Firefox
+for Android).
 
-```bash
-npm run verify
-```
+## Documentation
 
-側邊欄會在安裝時自動開啟（`open_at_install`）；之後用 `Ctrl+Shift+L`，或側邊欄標頭的切換選單，或 `檢視 → 側邊欄`。
+| | |
+|---|---|
+| [docs/previews.md](docs/previews.md) | How a preview image is chosen, and why site-wide `og:image`s get demoted |
+| [docs/vault.md](docs/vault.md) | The hidden entrance, the keyring, recovery keys, moving folders in and out |
+| [docs/sync-and-backup.md](docs/sync-and-backup.md) | The backup file, cross-device sync, and the merge rules |
+| [docs/interface.md](docs/interface.md) | Keyboard map, virtual scrolling, the toolbars, the full-page view |
+| [docs/architecture.md](docs/architecture.md) | Build setup, source layout, the invariants worth knowing before changing things |
+| [docs/permissions.md](docs/permissions.md) | Every permission and why it is needed |
+| [docs/development.md](docs/development.md) | Building, testing on Windows, headless testing in a container |
 
-### 為什麼沒有工具列按鈕
+`PLAN.md` holds the original design and staged plan; `NEXT.md` is the working handover
+document (current state, what is verified against a real browser, and the traps in the test
+environment). Both are in Traditional Chinese.
 
-一開始的做法是宣告 `action`，在 `action.onClicked` 裡呼叫 `sidebarAction.toggle()`。實測（Firefox 153，開啟主控台的多處理程序模式確認）**從擴充套件面板點擊該列不會派送 `action.onClicked`** —— 沒有日誌、沒有錯誤，處理器根本沒被呼叫。
+## Screenshots
 
-改用 Firefox 內建的 `commands._execute_sidebar_action`：由 Firefox 自己處理，不需要任何背景程式碼，也不受「`toggle()` 必須在使用者操作處理器內同步呼叫」的限制。等於刪掉一段無法驗證的程式碼，換成一個實測可用的內建機制。
+| | |
+|---|---|
+| ![Full-page grid view](amo/screenshots/02-gallery.png) | ![The vault's unlock screen](amo/screenshots/03-vault-unlock.png) |
+| Full-page view — every cover at once | The vault entrance is hidden behind a trigger string |
 
-快速鍵選 `Ctrl+Shift+L` 也是實測的結果。原本選 `Alt+Shift+B`，但在 Linux 上撞到 GTK 選單列的助記鍵 —— `Alt+B` 會打開 Firefox 的「書籤」選單，側邊欄不會開。使用者可在 `about:addons` →齒輪 →「管理擴充套件快速鍵」自行改綁。
-
-開發時用 watch 模式（改檔案自動重建，在 `about:debugging` 按「重新載入」即可看到變更）：
-
-```bash
-npm run watch
-```
-
-若本機有 Firefox，也可以讓 web-ext 自動開啟一個乾淨的測試 profile：
-
-```bash
-npm run start:firefox
-```
-
-其他指令：
-
-```bash
-npm run typecheck
-npm run lint:ext
-```
-
----
-
-## 在 Windows 上測試
-
-專案目前跑在 Docker 容器裡（`/workspaces` 掛的是 `/dev/sde`，一個 Docker volume，**不是**從 Windows 或 WSL bind mount 進來的）。所以檔案沒有對應的 Windows 路徑，必須先把封裝檔取出來。
-
-先產生封裝檔：
-
-```bash
-npm run package
-```
-
-輸出在 `web-ext-artifacts/bookmark-preview-vault-0.1.0.zip`。
-
-**取出檔案** —— 兩種方式，選一種：
-
-1. **VS Code（最簡單）**：在總管中找到該 `.zip`，右鍵 →「Download...」，存到 Windows 上任意位置。
-2. **Windows PowerShell**：
-
-```powershell
-docker cp 208ad232db4b:/workspaces/firefox_plugin/web-ext-artifacts/bookmark-preview-vault-0.1.0.zip $HOME\Downloads\
-```
-
-容器 ID 若變動，用 `docker ps` 查目前的。
-
-**在 Windows 的 Firefox 載入**：開 `about:debugging#/runtime/this-firefox` →「載入臨時附加元件」→ 直接選那個 `.zip`（此處接受 `.zip`／`.xpi`，不必解壓）。
-
-臨時附加元件在 Firefox 關閉後就會消失，每次重開要重新載入 —— 這是 Firefox 對未簽署擴充套件的限制，不是設定問題。若想長期留著，得走 AMO 簽署，或改用 Firefox Developer Edition／Nightly 並將 `xpinstall.signatures.required` 設為 `false`。
-
-如果你會頻繁在 Windows 上反覆測試，每次搬檔會很煩。比較省事的長期做法是**在 Windows 端直接開發**：裝 Node.js，把原始碼放在 Windows 檔案系統，`npm run build` 後直接指向 `dist/manifest.json`，改完按「重新載入」即可。
-
-## 在容器內無頭測試
-
-容器沒有圖形介面，但可以用 Xvfb 虛擬顯示器實際跑起來並截圖。操作走 `scripts/ff.sh`：
-
-```bash
-./scripts/ff.sh start
-```
-
-它會在背景啟動 Xvfb（`:99`）與載入 `dist/` 的 Firefox，並等到視窗真的出現。底層仍是 `scripts/test-headless.sh`，它會建立一個含種子書籤（巢狀資料夾、中文名稱、一個應被過濾的 `place:` 智慧書籤）的乾淨 profile；首次使用需要的系統套件與 Firefox tarball 安裝指令寫在該腳本開頭的註解裡。`KEEP_PROFILE=1` 可保留既有 profile（權限與隱私空間都留著，但原生書籤每次啟動都會重新匯入）。
-
-操作與截圖用同一支腳本，子指令可以串接，截圖存到 `.test-shots/`：
-
-```bash
-./scripts/ff.sh click 120 220 type '###' wait 2 sidebar gate
-```
-
-常用子指令：`start stop alive click rclick move scroll type key wait shot sidebar crop zoom trigger unlock`。座標速查表與踩過的坑寫在 `.claude/skills/firefox-e2e/SKILL.md`，完整用法在腳本開頭的註解。
-
-幾個踩過的坑：
-
-- **清理殘留進程用 `./scripts/ff.sh stop`。** 不要用 `pkill -f firefox`（腳本自己的路徑就含 "firefox"，會把自己殺掉），也不要用 `pkill -x firefox`（**進程名其實是 `firefox-bin`**）。
-- **Firefox 要用官方 tarball**，Ubuntu 24.04 的 apt 版是 snap 轉接包，在容器裡起不來。另外容器內無法建立 user namespace，需設 `MOZ_DISABLE_CONTENT_SANDBOX=1`。
-- **選用權限（`<all_urls>`）不必碰權限彈出面板**（那是 XUL popup，合成點擊點不到）：`about:addons` → 擴充套件 → 這個套件 →「權限與資料」→ 切開關。
-
----
-
-## 建置架構
-
-背景腳本與擴充套件頁面**分成兩次 Vite 建置**，這不是偏好而是必要：
-
-Firefox 的 MV3 不支援 `background.service_worker`（[Firefox bug 1573659](https://bugzil.la/1573659)），只支援 `background.scripts` 事件頁，而事件頁載入的是傳統腳本而非 ES module。因此背景必須打包成單一自足的 IIFE 檔（`vite.config.background.ts`），無法與 ES module 頁面共用同一次建置（`vite.config.ts`）。
-
-兩個相關的設定細節：
-
-- `build.modulePreload: false` — MV3 預設 CSP 禁止 inline script，而 Vite 的 modulepreload polyfill 會注入一段 inline script。
-- 兩份設定的 `emptyOutDir` 都是 `false`，改由 `npm run clean` 統一清空，避免 watch 模式下兩次建置互相覆蓋輸出。
-
-```
-dist/
-├── manifest.json          ← 由 public/ 複製
-├── icons/icon.svg         ← 由 public/ 複製
-├── background.js          ← IIFE，事件頁
-├── sidebar/index.html
-├── options/index.html
-├── gallery/index.html     ← 全頁瀏覽
-└── assets/*.{js,css}
-```
-
-## 原始碼結構
-
-```
-src/
-├── shared/        兩端共用：型別、訊息協定、網址工具、合併與備份格式（純函式）
-├── crypto/        加密核心（KDF、AES-GCM、gzip、分塊、vault 編碼）
-├── storage/       持久化（IndexedDB 縮圖、設定、隱私空間、同步副本、診斷）
-├── background/    事件頁：書籤、擷取管線、OG 抓取、隱私空間、自動上鎖、同步
-├── sidebar/       React UI（側邊欄）
-├── options/       設定頁
-└── gallery/       全頁瀏覽（重用 sidebar 的樹索引、搜尋與縮圖元件）
-```
-
-**合併與備份格式刻意放在 `shared/` 而不是 `background/`，因為它們是純函式。** 那是整個 M4 最容易靜默弄丟資料的地方（墓碑優先、孤兒重掛、環狀打斷），純函式才能把每條規則都用測試釘住，不必先架一個假的 `browser.storage`。
-
-**所有會改動隱私空間的操作都排成一列跑（`vault.ts` 的 `exclusive`）。** 這不是效能考量而是正確性：那些操作都是「拿到 payload → await 幾件事 → 改它 → 存檔」，而同步的合併會把 `payload` 換成另一個物件。兩者交錯時改動會落在已經被換掉的那份上，接著存檔寫出的是不含該改動的新 payload。最糟的組合是移入隱私空間 —— 加密資料沒寫進去，原生書籤卻照樣被移除，書籤兩邊都不存在了而 UI 回報成功。**鎖刻意不可重入**（可重入的版本看似合理，實際上完全不互斥，理由寫在 `shared/serial-queue.ts` 的註解裡）：批量操作要呼叫不取鎖的 `*Locked` 內部函式，在 `exclusive` 裡呼叫另一個 `exclusive` 函式會直接死結。
-
-**無痕視窗有一個例外要注意。** 側邊欄平常直接讀 IndexedDB（省掉每張縮圖的序列化來回），但**無痕視窗的擴充套件頁面拿到的是另一個、空的 IndexedDB**。那條快路徑在那裡永遠讀到空值 —— 縮圖確實抓到並寫進背景頁那一份了，畫面卻只有色卡。所以 `useThumb` 只在 `browser.extension.inIncognitoContext` 時改走 `thumbs/get` 訊息向背景頁索取，一般視窗維持快路徑。（隱私書籤的縮圖反而一直正常，因為那條路本來就是向背景頁索取位元組。）
-
-**上鎖狀態不能只靠廣播判斷。** MV3 事件頁被卸載時記憶體裡的金鑰會直接消失 —— 等於上鎖 —— 但那條路沒有任何程式碼跑得到，因此**不會有 `vault/changed` 廣播**。UI 會一直顯示「已解鎖」而實際上早就鎖了：移不進隱私空間，畫面卻看起來正常。三道防線：keepalive port 的 `onDisconnect`（唯一可靠的「背景頁還活著嗎」訊號）、回到畫面時的 `visibilitychange` / `focus` 重新確認、以及觸發字串進入隱私空間前一律向背景頁問一次權威狀態而不信快取。這三道在 2026-08-05 的實機驗證中確認有效 —— 事件頁被回收時 UI 確實會誠實地變回「上鎖」。（但**事件頁被回收的頻率遠高於預期**，那是另一個待修的問題，見 [NEXT.md](NEXT.md)。）
-
-**金鑰只存在背景頁的記憶體裡。** 側邊欄永遠拿不到金鑰 —— 需要明文（例如隱私書籤的縮圖）時透過訊息向背景頁索取。這讓「金鑰在哪」只有一個答案，不必追蹤它有沒有被複製到其他 context。事件頁被卸載時金鑰自然消失，等於自動上鎖。
-
-**隱私書籤的縮圖也加密，且明文那份會被刪除。** 如果隱私書籤的截圖以明文躺在 IndexedDB 裡，任何能翻擴充套件儲存目錄的人看圖就知道內容，整個加密設計就形同虛設。
-
-`shared/messages.ts` 是背景頁與 UI 之間的唯一介面。單一 `Protocol` 型別同時約束呼叫端與處理端 —— 新增一種訊息時，背景頁少實作對應 handler 會直接編譯失敗。例外以 `Result` 包裝傳遞，因為 `Error` 物件無法通過 structured clone，直接 throw 會讓呼叫端只收到 `undefined`。
-
-## 權限
-
-目前只宣告 `bookmarks`。其餘權限刻意等到用得上的階段才加入，而非一次全部索取：
-
-| 權限 | 用途 | 何時索取 |
-|---|---|---|
-| `bookmarks` | 讀取書籤樹；移入隱私空間時移除原書籤 | 安裝時 |
-| `storage`, `unlimitedStorage` | 設定、隱私空間加密資料、IndexedDB 縮圖 | 安裝時 |
-| `idle` | 閒置自動上鎖 | 安裝時 |
-| `scripting` | 注入一小段函式到分頁讀取封面圖（需搭配下方的網站權限才會實際執行） | 安裝時 |
-| `menus` | 圖片右鍵選單「設為這個書籤的預覽圖」 | 安裝時 |
-| `<all_urls>` | 擷取畫面與抓取 OG image | 使用者按下「授予權限」時 |
-| `history` | 移入隱私空間時清除該網址的瀏覽記錄 | 勾選該選項並按下「移入」時 |
-
-**選用權限有個 Firefox 特有的陷阱**：WebExtension 的 API 表面是依「該 context 建立時已授予的權限」計算的。背景頁在沒有 `<all_urls>` 時啟動，`tabs.captureVisibleTab` 根本不會被注入，事後授權也不會補上。所以背景頁監聽 `permissions.onAdded`，偵測到「已有權限但 API 仍不存在」時呼叫 `browser.runtime.reload()`。同一個陷阱對 `history` 也成立。
-
-另外權限樣式必須是字面上的 `<all_urls>`：改用等價的 `*://*/*` 會讓 `captureVisibleTab` 永遠不出現，即使權限已授予、即使重啟瀏覽器。
-
-`strict_min_version` 為 **140.0**。這不是任意選的：`browser_specific_settings.gecko.data_collection_permissions` 對新上架的擴充套件是強制的，而該 key 需要 Firefox 140+。這個下限同時覆蓋了 `CompressionStream`（113+，M4 壓縮用）與 `optional_host_permissions`（116+，M1 用）的需求。
-
-`data_collection_permissions` 宣告為 `required: ["none"]`：所有資料都留在本機，不傳給開發者或第三方。M4 的 `storage.sync` 走的是使用者自己的 Firefox 帳號且內容已在客戶端加密，同樣不構成資料蒐集。**若日後改用第三方縮圖服務，這個宣告必須改** —— 那也是 PLAN.md 排除該方案的原因之一。
-
-## 已知的 lint 警告
-
-`npm run lint:ext` 目前是 0 errors / 3 warnings，三者都已確認可接受：
-
-- `UNSAFE_VAR_ASSIGNMENT` ×2 — 來自 React 執行期壓縮後程式碼中的 `innerHTML`，不是我們自己的程式碼。使用 React 無法避免，AMO 接受（提交時會一併上傳原始碼供審核）。
-- `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION` — Android 版需要 142+。本擴充套件是桌面版專用（`sidebar_action` 在 Firefox for Android 上不存在），未宣告 `gecko_android`，故此警告不適用。
-
-## 授權
+## License
 
 Copyright (c) 2026 andytw366
 
-本專案以 **Mozilla Public License 2.0** 授權，全文見 [LICENSE](LICENSE)。
+Licensed under the **Mozilla Public License 2.0**; the full text is in [LICENSE](LICENSE).
 
 > This Source Code Form is subject to the terms of the Mozilla Public
 > License, v. 2.0. If a copy of the MPL was not distributed with this
 > file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-選 MPL-2.0 而不是 MIT：它是 Mozilla 自己的授權，對 Firefox 擴充套件是自然的選擇，而且是**檔案層級**的 copyleft —— 別人改了這裡的檔案要釋出改動，但可以把它和自己的閉源程式碼組合起來。這比 GPL 寬鬆、又比 MIT 多保留一點東西。
+MPL-2.0 rather than MIT: it is Mozilla's own license, a natural fit for a Firefox
+extension, and its copyleft is **file-level** — changes to these files must be published,
+but they can be combined with closed-source code. Looser than the GPL, and it keeps a
+little more than MIT does.
 
-**原始碼檔案裡沒有逐檔的授權標頭**，這是刻意的。MPL-2.0 的 Exhibit A 明文允許把通知放在
-「收件者會去找的地方（例如相關目錄下的 LICENSE 檔）」而不是每一個檔案裡；根目錄的
-`LICENSE` 加上這一節就滿足了。七十幾個檔案各加三行樣板，對這個專案「註解要能解釋為什麼」
-的慣例是純粹的雜訊。
+**There are no per-file license headers, and that is deliberate.** MPL-2.0's Exhibit A
+explicitly permits placing the notice "in a location (such as a LICENSE file in a relevant
+directory) where a recipient would be likely to look for such a notice" instead of in every
+file. The root `LICENSE` plus this section satisfies that; three lines of boilerplate
+across seventy-odd files would be pure noise.
 
-唯一的執行期相依套件是 React 與 ReactDOM（MIT 授權），與 MPL-2.0 相容。
+The only runtime dependencies are React and ReactDOM (MIT), which are compatible with
+MPL-2.0.
