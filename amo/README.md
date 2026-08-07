@@ -51,16 +51,23 @@
 用 `.claude/skills/firefox-e2e/` 那套無頭 Firefox 環境拍的，流程是：
 
 ```bash
-npm run build && ./scripts/ff.sh start          # 乾淨的測試 profile
+npm run build && SEED_SHOWCASE=1 ./scripts/ff.sh start   # 乾淨 profile + 展示用書籤
 # about:addons → 權限與資料 → 開啟「存取您所有網站中的資料」
-# 造訪幾個已加入書籤的網站，讓擷取管線抓到真實的預覽圖
+# 側邊欄 ⋯ → 補抓預覽圖（抓 og:image），再造訪幾個沒有 og:image 的站讓它截圖
 ./scripts/ff.sh shot <名稱>                      # 整個畫面
 ./scripts/store-shot.sh <名稱> <輸出名稱>         # 裁成 1280x800
 ```
 
+`SEED_SHOWCASE=1`（`scripts/test-headless.sh`）換上一組知名網站的書籤 —— GitHub、ChatGPT、
+YouTube、Wikipedia、Google 之類的。預設那組是為了**測試**挑的，最上層塞著九筆
+`127.0.0.1` 的封面判定素材，對商店頁的讀者只是雜訊。
+
+**預覽圖必須是真的抓下來的。** 補抓走的是各站自己的 og:image，沒有 og:image 的（Google
+首頁、Hacker News）就造訪一次讓擷取管線截圖。目前四張裡有兩筆刻意留成色卡（MDN 與
+Stack Overflow）—— 那是沒有預覽圖時的實際樣子，截圖不該假裝每一筆都有圖。
+
 `scripts/store-shot.sh` 會把「已停用安全沙盒」那條提示列去掉 —— 那是**容器環境專屬**的
 產物（容器裡建不了 user namespace，測試時只好關掉沙盒），一般使用者不會看到它。
-做法是把它上下兩段接起來，不動其他任何像素。
-
-**建議送審前用你自己的書籤重拍一次。** 現在這幾張用的是測試 profile 的種子書籤，
-內容能表達功能，但用真實的收藏拍出來的畫面說服力高得多。
+做法是把它上下兩段接起來，不動其他任何像素。**那兩個高度是量出來的，改視窗尺寸或
+Firefox 版本後要重量一次**：提示列最左邊有一條橘色強調直條，只要多算幾個像素就會留在
+接縫上（腳本註解裡有取樣的指令）。

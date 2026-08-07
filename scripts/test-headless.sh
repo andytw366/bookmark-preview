@@ -49,6 +49,53 @@ if [[ "${KEEP_PROFILE:-0}" != "1" ]]; then
 fi
 mkdir -p "$PROFILE"
 
+# SEED_SHOWCASE=1 改用一組「像真實使用者的收藏」的書籤，用於拍商店截圖。
+#
+# 為什麼要另外一組：預設那組是為了**測試**而挑的，最上層塞著九筆
+# 「測試漫畫頁（本地）」之類的 127.0.0.1 項目 —— 那些是封面判定的素材，
+# 對商店頁的讀者只是雜訊。這一組全部是知名網站，補抓之後多數拿得到
+# og:image，畫面接近使用者實際會看到的樣子。
+#
+# 刻意留一兩個沒有 og:image 的（Google 首頁、Hacker News）：那正是色卡退路
+# 的實際樣子，截圖不該假裝每一筆都有圖。
+if [[ "${SEED_SHOWCASE:-0}" == "1" ]]; then
+cat > "$PROFILE/bookmarks.html" <<'HTML'
+<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks Menu</H1>
+<DL><p>
+    <DT><H3 PERSONAL_TOOLBAR_FOLDER="true">書籤工具列</H3>
+    <DL><p>
+        <DT><A HREF="https://github.com/">GitHub</A>
+        <DT><A HREF="https://chatgpt.com/">ChatGPT</A>
+        <DT><A HREF="https://www.youtube.com/">YouTube</A>
+        <DT><A HREF="https://developer.mozilla.org/">MDN Web Docs</A>
+        <DT><A HREF="https://stackoverflow.com/">Stack Overflow</A>
+        <DT><A HREF="https://www.wikipedia.org/">Wikipedia</A>
+        <DT><A HREF="https://www.google.com/">Google</A>
+        <DT><A HREF="https://news.ycombinator.com/">Hacker News</A>
+        <DT><H3>開發</H3>
+        <DL><p>
+            <DT><A HREF="https://react.dev/">React</A>
+            <DT><A HREF="https://vite.dev/">Vite</A>
+            <DT><A HREF="https://www.typescriptlang.org/">TypeScript</A>
+            <DT><A HREF="https://caniuse.com/">Can I use</A>
+            <DT><A HREF="https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions">WebExtensions</A>
+        </DL><p>
+        <DT><H3>閱讀</H3>
+        <DL><p>
+            <DT><A HREF="https://www.bbc.com/news">BBC News</A>
+            <DT><A HREF="https://www.theverge.com/">The Verge</A>
+            <DT><A HREF="https://arxiv.org/">arXiv</A>
+        </DL><p>
+    </DL><p>
+    <DT><H3>其他書籤</H3>
+    <DL><p>
+        <DT><A HREF="https://www.mozilla.org/">Mozilla</A>
+    </DL><p>
+HTML
+else
 # 種子書籤：涵蓋巢狀資料夾、中文名稱，以及一個應被過濾掉的 place: 智慧書籤
 cat > "$PROFILE/bookmarks.html" <<'HTML'
 <!DOCTYPE NETSCAPE-Bookmark-file-1>
@@ -95,6 +142,7 @@ cat > "$PROFILE/bookmarks.html" <<'HTML'
         <DT><A HREF="https://bugzilla.mozilla.org/">Bugzilla</A>
     </DL><p>
 HTML
+fi
 
 # SEED_BULK=3000 另外塞一個「大量書籤」資料夾，用於量測清單效能。
 # 網域刻意輪替：色卡是依 hostname 取色的，全部同一個網域會讓畫面看不出
