@@ -23,3 +23,9 @@ for size in 48 96 128; do
   rsvg-convert -w "$size" -h "$size" -o "$ROOT/public/icons/icon-$size.png" "$SRC"
   echo "產生 public/icons/icon-$size.png"
 done
+
+# AMO 商店頁的圖示欄另外給一張 512：那一欄會在高解析度螢幕上放大顯示，
+# 交給它從 128 拉大會糊。**刻意不放進 public/icons/** —— 那個目錄整個會被複製到
+# dist/，而 manifest 沒有引用 512，等於讓每個使用者多下載一張用不到的圖。
+rsvg-convert -w 512 -h 512 -o "$ROOT/amo/icon-512.png" "$SRC"
+echo "產生 amo/icon-512.png（AMO 商店頁用，不進 dist/）"

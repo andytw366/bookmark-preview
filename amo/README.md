@@ -10,6 +10,7 @@
 | [permissions.md](permissions.md) | Permissions justification |
 | [reviewer-notes.md](reviewer-notes.md) | Notes to Reviewer（含原始碼與建置步驟）。**該欄位上限 3000 字元**，`scripts/amo-paste.py` 會檢查並在超過時失敗 |
 | [screenshots/](screenshots/) | Screenshots（1280×800） |
+| [icon-512.png](icon-512.png) | 附加元件圖示。**不填也可以** —— manifest 已宣告 48/96/128，AMO 會自己採用；上傳這張只是為了高解析度螢幕更清楚 |
 
 **`permissions.md` 與 `reviewer-notes.md` 刻意用英文寫**：那兩份唯一的讀者是 Mozilla 的
 審查員，中文會拖慢審查甚至被要求補件。商店文案與隱私政策則中英都備了，AMO 支援分語系填。
