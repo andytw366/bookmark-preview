@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>測試漫畫頁</title>
+    <!--
+      這個測試頁刻意「不」放任何 og:image / twitter:image / JSON-LD。
+
+      因為真實的漫畫站與影音站常常什麼中介資料都沒有，封面就只是頁面上
+      一張比較大的直式圖片。封面擷取的啟發式必須在這種情況下也能挑對，
+      而且要排除掉橫幅廣告與小圖示。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <nav style="background: #333; color: #fff; padding: 10px">首頁 | 分類 | 排行 | 書架</nav>
+
+    <!-- 干擾項一：橫幅廣告。長寬比 10:1，應被長寬比條件排除 -->
+    <img src="/banner.png" width="900" height="90" alt="橫幅廣告" />
+
+    <div style="display: flex; gap: 16px; padding: 16px">
+      <!-- 正解：直式封面。位置靠上、面積大、直式，分數應為最高 -->
+      <img src="/cover.png" width="200" height="300" alt="封面" />
+      <div>
+        <h1>測試漫畫標題</h1>
+        <p>作者：某人</p>
+        <p>狀態：連載中</p>
+      </div>
+    </div>
+
+    <h2 style="padding: 0 16px">章節列表</h2>
+    <ul style="padding: 0 32px">
+      <li>第 1 話</li>
+      <li>第 2 話</li>
+      <li>第 3 話</li>
+    </ul>
+
+    <!-- 干擾項二：小圖示。應被最小尺寸條件排除 -->
+    <img src="/icon.png" width="32" height="32" alt="小圖示" />
+  </body>
+</html>

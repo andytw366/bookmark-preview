@@ -1,0 +1,1066 @@
+/*
+ * 側邊欄樣式。
+ *
+ * 版面前提：Firefox 側邊欄可拖曳，典型寬度 320–420px，最窄可到 ~200px。
+ * 因此全部採單欄、不做水平滾動，縮圖尺寸以 em 相對單位隨字級縮放。
+ */
+
+:root {
+  --bg: #ffffff;
+  --bg-hover: #f2f2f5;
+  --fg: #15141a;
+  --fg-dim: #5b5b66;
+  --border: #e0e0e6;
+  --accent: #4f46e5;
+  --error-bg: #fdf2f2;
+  --error-fg: #8f1d1d;
+  --warn-bg: #fff8e6;
+  --warn-fg: #7a5200;
+  --info-bg: #eef0fe;
+  --info-fg: #2f2a7a;
+  --thumb-size: 2.75rem;
+  --radius: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1b22;
+    --bg-hover: #2b2a33;
+    --fg: #fbfbfe;
+    --fg-dim: #b1b1bb;
+    --border: #3a3944;
+    --accent: #a29bfe;
+    --error-bg: #3a1f22;
+    --error-fg: #ffb3b3;
+    --warn-bg: #3a2f16;
+    --warn-fg: #ffd88a;
+    --info-bg: #26253a;
+    --info-fg: #cfcbff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── 頁首：搜尋 + 麵包屑 ─────────────────────────────────── */
+
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 8px 6px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.search__input {
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-hover);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+}
+
+.search__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.head__hint {
+  margin: 6px 2px 0;
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 0.9em;
+}
+
+.crumbs__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crumbs__item {
+  max-width: 12rem;
+  padding: 2px 4px;
+  overflow: hidden;
+  color: var(--accent);
+  font: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.crumbs__item:hover {
+  background: var(--bg-hover);
+}
+
+.crumbs__item--current {
+  color: var(--fg-dim);
+  cursor: default;
+}
+
+.crumbs__sep {
+  color: var(--fg-dim);
+}
+
+/* ── 清單 ───────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--bg-hover);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.row__title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.row__meta {
+  overflow: hidden;
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.row__chevron {
+  color: var(--fg-dim);
+  font-size: 1.1em;
+}
+
+/* ── 密度 ───────────────────────────────────────────────── */
+
+/* 大卡：縮圖佔滿側邊欄寬度。側邊欄約 320px 時等於 320×180，
+   足以辨識頁面 —— 這是選擇側邊欄形態後仍能保有預覽感的關鍵。 */
+.list--card .row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 6px;
+}
+
+.list--card .thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+/*
+ * 大卡模式下封面圖採用它自己的長寬比（由 --thumb-ratio 傳入），
+ * 而不是統一的 16:9。直式漫畫封面因此能完整呈現。
+ * 高度設上限，避免超高的圖把清單其他項目推到看不見的地方。
+ */
+.list--card .thumb--contain {
+  aspect-ratio: var(--thumb-ratio, 16 / 9);
+  max-height: 320px;
+}
+
+/* 資料夾沒有預覽圖可放，在大卡模式仍維持橫向小圖示 ——
+   給它一塊全寬 16:9 的空框只是浪費垂直空間。 */
+.list--card .row--folder {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.list--card .row--folder .thumb {
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  aspect-ratio: auto;
+}
+
+.list--card .row--link .row__chevron {
+  display: none;
+}
+
+/* 純文字：完全不顯示縮圖 */
+.list--text .thumb {
+  display: none;
+}
+
+/* ── 預覽區塊 ───────────────────────────────────────────── */
+
+.thumb {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  overflow: hidden;
+  background: var(--bg-hover);
+  border-radius: 5px;
+}
+
+.thumb--image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 截圖：填滿並從頂端裁切，讓清單排列整齊 */
+.thumb--fill img {
+  object-fit: cover;
+  object-position: top center;
+}
+
+/* 封面圖：完整顯示，不裁切 */
+.thumb--contain img {
+  object-fit: contain;
+}
+
+.thumb--placeholder {
+  color: hsl(var(--thumb-hue) 60% 28%);
+  background: hsl(var(--thumb-hue) 62% 88%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .thumb--placeholder {
+    color: hsl(var(--thumb-hue) 70% 86%);
+    background: hsl(var(--thumb-hue) 35% 28%);
+  }
+}
+
+.thumb__initial {
+  font-size: 1.15em;
+  font-weight: 600;
+}
+
+.thumb--folder {
+  color: var(--fg-dim);
+  background: var(--bg-hover);
+}
+
+/*
+ * hover 時把圖示底色翻成 --bg。
+ *
+ * 資料夾圖示的底色本來就是 --bg-hover，與列的 hover 底色**同一個顏色** ——
+ * 滑過去時整塊圖示會融進背景消失（深色主題下尤其明顯，因為那兩色更接近）。
+ * 翻成 --bg 之後對比反轉，圖示在兩種狀態下都看得見，也不必另外挑一個新顏色。
+ */
+.row:hover .thumb--folder,
+.row-wrap:hover .thumb--folder {
+  color: var(--fg);
+  background: var(--bg);
+}
+
+/* ── 提示與空狀態 ───────────────────────────────────────── */
+
+.empty {
+  padding: 16px 8px;
+  color: var(--fg-dim);
+  text-align: center;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice button {
+  padding: 3px 10px;
+  font: inherit;
+  color: inherit;
+  background: rgb(0 0 0 / 8%);
+  border: 1px solid currentcolor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.notice--error {
+  color: var(--error-fg);
+  background: var(--error-bg);
+}
+
+.notice--warn {
+  color: var(--warn-fg);
+  background: var(--warn-bg);
+}
+
+.notice--info {
+  color: var(--info-fg);
+  background: var(--info-bg);
+}
+
+.notice__body {
+  font-size: 0.92em;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
+.link-button {
+  display: block;
+  margin: 0 8px 8px;
+  padding: 2px 0;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.9em;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── 底部工具列 ─────────────────────────────────────────── */
+
+.toolbar {
+  flex: 0 0 auto;
+  padding: 7px 8px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+/*
+ * 單一列：左邊密度、右邊動作。刻意**不換行** —— 換行會讓工具列高度隨內容
+ * 跳動，清單跟著上下位移。內容已經縮到 320px 放得下（密度改用圖示、
+ * 偶爾用的項目收進溢出選單）。
+ */
+.toolbar__bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/*
+ * 多選模式的內容比較不可控（「已選 N 個」會隨數字變寬），所以只有那一列允許換行。
+ * 主工具列維持不換行，因為它的內容是固定的、已確認放得下。
+ */
+.toolbar__bar--wrap {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.toolbar__group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.toolbar__action {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9em;
+  white-space: nowrap;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.toolbar__action:hover:not(:disabled) {
+  border-color: var(--fg-dim);
+}
+
+/*
+ * 鍵盤使用者看不到 hover，focus 必須是獨立的可見狀態。
+ *
+ * 這一條刻意涵蓋所有能收到焦點的控制項：只用 Tab 走完一輪的時候，任何
+ * 沒有外框的一格都會表現成「焦點消失了」—— 使用者無從知道自己停在哪裡。
+ * `--accent` 在深淺兩個主題下都是對比色，所以兩邊共用同一條規則。
+ */
+.toolbar__action:focus-visible,
+.segmented__item:focus-visible,
+.chip:focus-visible,
+.link-button:focus-visible,
+.tabs__item:focus-visible,
+.row__lock:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 常駐但低對比的鎖圖示：收到焦點時要跟 hover 一樣提高對比才看得出停在它上面 */
+.row__lock:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.toolbar__action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 圖示按鈕做成正方形，讓它與文字按鈕等高而不是被文字撐開 */
+.toolbar__action--icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  aspect-ratio: 1;
+}
+
+/* 與 .chip--primary 同樣的做法：用 --bg 當前景色，深淺主題各自都有對比 */
+.toolbar__action--primary {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toolbar__count {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+/*
+ * 狀態文字改放在控制列**上方**：它是暫時性的，出現與消失時只影響自己上面的
+ * 空間，控制列本身留在原位不動。放下方的話每次訊息來去都會把控制列往上頂。
+ */
+.toolbar__status {
+  margin: 0 2px 6px;
+  overflow: hidden;
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  line-height: 1.4;
+  /* 長訊息（例如錯誤原因）最多兩行，不讓它把工具列撐高 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.segmented {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.segmented__item {
+  padding: 3px 7px;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.85em;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.segmented__item:hover:not(.segmented__item--active) {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+/* 圖示版：正方形觸發區，圖形置中 */
+.segmented__item--icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+}
+
+.segmented__item + .segmented__item {
+  border-left: 1px solid var(--border);
+}
+
+.segmented__item--active {
+  color: var(--bg);
+  background: var(--accent);
+}
+
+/* ── 分頁切換 ───────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs__item {
+  flex: 1;
+  padding: 7px 4px;
+  color: var(--fg-dim);
+  font: inherit;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tabs__item:hover {
+  background: var(--bg-hover);
+}
+
+.tabs__item--active {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* ── 移入隱私空間的按鈕 ─────────────────────────────────── */
+
+.row-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.row-wrap .row {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * 常駐但低對比，hover / 聚焦時才提高對比。
+ *
+ * 一開始做成 hover 才出現，但這是整個擴充套件的核心動作 ——
+ * 藏起來既不好發現也不好點中。常駐避免了版面跳動，低對比則讓它
+ * 平常不搶注意力。
+ */
+.row__lock {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--fg-dim);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  opacity: 0.35;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.row-wrap:hover .row__lock,
+.row-wrap:focus-within .row__lock {
+  opacity: 1;
+}
+
+.row__lock:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 大卡模式下縮圖佔滿寬度，按鈕貼在縮圖右上角而不是垂直居中 */
+.list--card .row__lock {
+  top: 6px;
+  transform: none;
+}
+
+/* 避免文字被按鈕蓋住 */
+.row-wrap .row__text {
+  padding-right: 26px;
+}
+
+/* ── 隱私空間 ───────────────────────────────────────────── */
+
+/* 三顆項目在窄側邊欄放不下一行，允許換行 */
+.vault__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 8px;
+}
+
+.vault__count {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+/* ── 多選模式 ────────────────────────────────────────────── */
+
+/* 多選中勾選框佔住左上角，把原本貼在右側的鎖圖示收起來避免兩者搶位置 */
+.row-wrap--selecting .row__lock {
+  display: none;
+}
+
+/*
+ * 多選中資料夾的巡覽入口。
+ *
+ * 點整列改成勾選（與書籤一致）之後，還是得有辦法進到資料夾裡 ——
+ * 跨資料夾挑選是這個功能的重點。沿用鎖圖示原本的位置與低對比常駐做法。
+ */
+.row__enter {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 1.1em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  opacity: 0.55;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.row__enter:hover,
+.row__enter:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+/* 整列變成勾選觸發區，所以要清掉 <button> 的預設外觀 */
+.row--select {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.row-wrap--selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 6px;
+}
+
+/*
+ * 勾選框疊在縮圖左上角，不在版面中另外佔一格。
+ *
+ * 原本是塞進列的 flex 流裡，於是每一列都被推寬一塊、大卡模式下更是多出一行。
+ * 改成絕對定位（與 `.row__lock` 同一套做法，只是靠左）之後版面完全不動，
+ * 而且它成為獨立的點擊目標 —— 資料夾因此能「點框勾選、點其餘部分巡覽」。
+ */
+.row__check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  /*
+   * 純視覺的疊加元素，點擊要穿透過去。
+   *
+   * 它是列按鈕的**兄弟**（絕對定位疊在縮圖左上角），不是子元素 —— 少了這一行，
+   * 點在那個 20x20 的框上完全沒有反應，而那正是看起來最該點的地方。
+   */
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75em;
+  line-height: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/*
+ * 小列模式的縮圖只有 --thumb-size 見方，貼齊頂端會超出它；垂直居中比較穩。
+ * 純文字模式沒有縮圖可疊，另外讓出左側空間，避免蓋住標題。
+ */
+.list--row .row__check,
+.list--text .row__check {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.list--text .row-wrap--selecting .row {
+  padding-left: 32px;
+}
+
+.row__check--on {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.vault__row {
+  padding-bottom: 4px;
+}
+
+/* 新增資料夾的行內表單（側邊欄、隱私空間、全頁瀏覽共用） */
+.newfolder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 0 8px;
+}
+
+.newfolder .rowmenu__input {
+  flex: 1 1 140px;
+  min-width: 0;
+  width: auto;
+}
+
+.newfolder__hint {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+/* 麵包屑與「新增資料夾」同一列，按鈕靠右 */
+.head__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.head__row .crumbs {
+  min-width: 0;
+}
+
+.vault__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 6px 0;
+}
+
+.chip {
+  padding: 2px 8px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85em;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip--primary {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.chip--danger {
+  color: var(--error-fg);
+  border-color: currentcolor;
+}
+
+.vault__danger {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── 書籤列右鍵選單 ─────────────────────────────────────── */
+
+.rowmenu {
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  max-width: 220px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}
+
+/* 資料夾清單可能很長 */
+.rowmenu--list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.rowmenu__heading {
+  margin: 2px 6px 4px;
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+.rowmenu__item {
+  padding: 5px 8px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.92em;
+  text-align: left;
+  white-space: pre;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rowmenu__item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.rowmenu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rowmenu__item--danger {
+  color: var(--error-fg);
+}
+
+.rowmenu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/*
+ * 選單裡表示「目前生效」的選項。用打勾符號而不是把整列塗成強調色 ——
+ * 塗色會讓它看起來像被 hover 的那一列，反而說不清是「選中」還是「游標在上面」。
+ */
+.rowmenu__item--on::before {
+  content: '✓';
+  display: inline-block;
+  width: 1.1em;
+  margin-left: -1.1em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rowmenu__item--on {
+  padding-left: calc(8px + 1.1em);
+}
+
+.rowmenu__divider {
+  height: 0;
+  margin: 4px 6px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.rowmenu__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px;
+}
+
+.rowmenu__input {
+  width: 100%;
+  padding: 5px 6px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* 移入確認比選單寬一些：要放得下說明文字與勾選項 */
+.rowmenu--prompt {
+  gap: 6px;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 8px;
+}
+
+.rowmenu__note {
+  margin: 0 2px;
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  line-height: 1.45;
+}
+
+.rowmenu__preview {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.rowmenu__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* ── 觸發字串跳出的密碼畫面 ─────────────────────────────── */
+
+/*
+ * 置中覆蓋整個視窗。這是需要專注輸入的密碼欄位，貼著搜尋框展開會蓋掉
+ * 正在打字的地方；而且蓋住底下的清單也有實際好處 —— 輸入密碼時
+ * 螢幕上不會同時攤著一整排書籤。
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.overlay__panel {
+  width: 100%;
+  max-width: 340px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+}
+
+/* ── 隱私空間的建立／解鎖表單 ───────────────────────────── */
+
+.gate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.gate__title {
+  margin: 0;
+  font-size: 1.05em;
+}
+
+.gate__input {
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.gate__submit {
+  padding: 6px 10px;
+  color: var(--bg);
+  font: inherit;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.gate__submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.gate__hint {
+  margin: 0;
+  color: var(--warn-fg);
+  font-size: 0.88em;
+}
+
+.gate__check {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  font-size: 0.9em;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+/* 救援金鑰：要抄在紙上，所以字距寬、字級大、可以整串選取 */
+.recovery__code {
+  display: block;
+  margin: 10px 0;
+  padding: 10px 12px;
+  font-family: monospace;
+  font-size: 1.05em;
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  user-select: all;
+}
+
+.recovery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}

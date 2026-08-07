@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>嵌入式播放器測試</title>
+    <!--
+      模擬影音站最常見的結構：
+
+      1. og:image 是整站共用的 logo（那種圖當預覽比截圖還糟）
+      2. 真正的封面只出現在嵌入式播放器 iframe 的 src 參數裡（?poster=...）
+      3. 頁面下方還有一排「其他影片」的推薦縮圖 —— 它們是合法的 <img>，
+         尺寸與位置都過得了門檻，很容易被誤選
+
+      正解是 iframe 的 poster 參數。它比 og:image 更可信：og:image 常是
+      整站共用的分享圖，而傳給播放器的 poster 必然是「這一頁這支影片」的封面。
+
+      注意這裡的 poster 值必須是**絕對網址**（判定只接受 http/https 開頭，
+      否則 ?image=1 這類同名無關參數會被誤收），所以連埠號一起寫死成 8899 ——
+      與 scripts/test-headless.sh 的種子書籤一致。
+    -->
+    <meta property="og:image" content="/logo.png" />
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <nav style="background: #333; color: #fff; padding: 10px">首頁 | 分類 | 排行</nav>
+
+    <div style="padding: 16px">
+      <h1>嵌入式播放器測試</h1>
+      <!-- 正解在 src 的 poster 參數裡；iframe 本身是跨文件的，內容不含任何圖 -->
+      <iframe
+        src="/player?id=XK6VZ7&amp;poster=http://127.0.0.1:8899/cover.png"
+        width="640"
+        height="360"
+        style="border: 0"
+        title="播放器"
+      ></iframe>
+    </div>
+
+    <h2 style="padding: 0 16px">其他影片</h2>
+    <!-- 干擾項：推薦縮圖。橫式、尺寸合格、位置也還在門檻內 -->
+    <div style="display: flex; gap: 12px; padding: 0 16px 400px">
+      <img src="/poster.png" width="360" height="200" alt="推薦一" />
+      <img src="/poster.png" width="360" height="200" alt="推薦二" />
+    </div>
+  </body>
+</html>

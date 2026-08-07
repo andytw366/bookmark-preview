@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>共用 og 圖測試 A</title>
+    <!--
+      這兩頁（shared-a / shared-b）刻意宣告「同一張」og:image，
+      模擬很多網站把全站 logo 當成 og:image 的情況。
+
+      第一次造訪時無從判斷，會照宣告層使用 logo；
+      造訪第二頁後，同一張圖在同網域出現於兩個不同頁面 → 判定為全站共用 →
+      降級到內容圖之下，預覽圖改用這一頁自己的內容圖。
+    -->
+    <meta property="og:image" content="/logo.png" />
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <div style="padding: 16px">
+      <h1>共用 og 圖測試 A</h1>
+      <img src="/content-a.png" width="200" height="300" alt="內容圖 A" />
+    </div>
+  </body>
+</html>

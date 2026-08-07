@@ -1,0 +1,38 @@
+{
+  "name": "bookmark-preview-vault",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Firefox sidebar extension: visual bookmark previews with an encrypted private space",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andytw366/bookmark-preview.git"
+  },
+  "homepage": "https://github.com/andytw366/bookmark-preview",
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && vite build && vite build --config vite.config.background.ts",
+    "watch": "npm run clean && (vite build --watch & vite build --config vite.config.background.ts --watch & wait)",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint:ext": "web-ext lint --source-dir dist",
+    "verify": "npm run typecheck && npm test && npm run package && npm run lint:ext",
+    "package": "npm run build && web-ext build --source-dir dist --overwrite-dest --filename bookmark-preview-vault-{version}.zip",
+    "start:firefox": "web-ext run --source-dir dist --browser-console"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/firefox-webext-browser": "^143.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10",
+    "web-ext": "^10.5.0"
+  }
+}

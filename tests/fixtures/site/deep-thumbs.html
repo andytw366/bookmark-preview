@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>背景封面 vs 推薦縮圖</title>
+    <!--
+      這一頁分開驗證「<img> 與 CSS background-image 同池競爭」。
+
+      舊版把兩者各自壓成一個扁平分數（<img> 一律 500、背景圖一律 400），
+      於是**頁面最頂端、明顯是主體的背景封面**會輸給**捲到一千多像素以下、
+      推薦列表裡的一張小縮圖** —— 視覺分數算出來了卻沒用在最終排序上。
+
+      這裡刻意不放 og:image 也不放 poster 參數，讓兩個視覺候選直接對決：
+        - 背景封面：640x360、靠頁首（top ≈ 130），打七折後仍應勝出
+        - 推薦縮圖：顯示 360x200、位於 top ≈ 1300，靠上加成大幅衰減
+
+      背景圖打七折是因為它比 <img> 不可靠（拿不到真實像素尺寸，也可能是底紋），
+      但差距夠大時仍該贏。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <nav style="background: #333; color: #fff; padding: 10px">首頁 | 分類 | 排行</nav>
+
+    <div style="padding: 16px">
+      <h1>背景封面 vs 推薦縮圖</h1>
+      <!-- 正解：封面是 CSS background-image，document.images 完全看不到 -->
+      <div
+        style="
+          width: 640px;
+          height: 360px;
+          background-image: url('/cover.png');
+          background-size: cover;
+        "
+      ></div>
+      <p>上面那塊是這一頁的主體，但它是背景圖。</p>
+    </div>
+
+    <!-- 把推薦列表推到 top ≈ 1300：仍在 2000px 的門檻內，不會被位置條件排除 -->
+    <div style="height: 700px; padding: 16px; color: #666">
+      <p>（大量說明文字，把推薦列表往下推）</p>
+    </div>
+
+    <h2 style="padding: 0 16px">其他影片</h2>
+    <div style="display: flex; gap: 12px; padding: 0 16px 400px">
+      <img src="/poster.png" width="360" height="200" alt="推薦一" />
+      <img src="/poster.png" width="360" height="200" alt="推薦二" />
+    </div>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>測試宣告優先頁</title>
+    <!--
+      驗證：站方宣告的 og:image 必須勝過頁面上一張顯示面積更大的圖。
+      宣告層（1000 分）永遠壓過啟發式（500 分）。
+    -->
+    <meta property="og:image" content="/cover.png" />
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <div style="padding: 16px">
+      <h1>宣告的封面應該優先</h1>
+      <!-- 干擾項：比宣告的封面顯示得更大 -->
+      <img src="/hero.png" width="600" height="400" alt="很大的無關圖片" />
+    </div>
+  </body>
+</html>

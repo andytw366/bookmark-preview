@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>測試背景圖頁</title>
+    <!--
+      驗證：封面放成 CSS background-image 時也要抓得到。
+      document.images 完全看不到這種圖，需要第五層的 background-image 掃描。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <nav style="background: #333; color: #fff; padding: 10px">導覽列</nav>
+    <div style="display: flex; gap: 16px; padding: 16px">
+      <div
+        style="
+          width: 200px;
+          height: 300px;
+          background-image: url('/cover.png');
+          background-size: cover;
+        "
+        aria-label="封面"
+      ></div>
+      <div><h1>用背景圖當封面的頁面</h1></div>
+    </div>
+  </body>
+</html>

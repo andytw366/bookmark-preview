@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>測試影片頁</title>
+    <!--
+      驗證：橫式的影片封面（video poster）必須勝過一張更大的全寬 hero 圖。
+
+      這是「直式加成」幫不上忙的情況 —— 靠的是 poster 屬於宣告層（900 分），
+      以及全寬圖會吃到 fullBleedPenalty。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <!-- 干擾項：全寬 hero 圖，顯示面積比播放器大 -->
+    <img src="/hero.png" style="width: 100%; height: 260px; object-fit: cover" alt="全寬 hero" />
+
+    <div style="padding: 16px">
+      <h1>測試影片標題</h1>
+      <video poster="/poster.png" width="640" height="360" controls></video>
+      <p>說明文字。</p>
+    </div>
+  </body>
+</html>

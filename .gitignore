@@ -1,0 +1,13 @@
+node_modules/
+dist/
+web-ext-artifacts/
+*.log
+.DS_Store
+.test-profile/
+.test-xvfb.log
+tests/fixtures/site/*.png
+.test-shots/
+.test-headless.log
+
+# Claude Code 的執行期產物（含 pid 與 session id），不屬於專案
+.claude/scheduled_tasks.lock

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>測試延遲載入頁</title>
+    <!--
+      驗證：封面在頁面載入完成「之後」才被指定 src 時仍能抓到。
+
+      這模擬 SPA 與延遲載入：第一次擷取時圖片還沒有 naturalWidth，
+      單次擷取會什麼都找不到。靠 coverCandidatesFromTab 的重試機制解決。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <div style="padding: 16px">
+      <h1>延遲載入的封面</h1>
+      <img id="cover" width="200" height="300" alt="封面" />
+    </div>
+    <script>
+      // 頁面 load 事件之後 1.2 秒才給 src
+      setTimeout(() => {
+        document.getElementById('cover').src = '/cover.png';
+      }, 1200);
+    </script>
+  </body>
+</html>

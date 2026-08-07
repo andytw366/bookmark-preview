@@ -1,0 +1,159 @@
+/* 設定頁在一般分頁中開啟，寬度充裕，不受側邊欄的窄欄限制。 */
+
+body {
+  font-size: 14px;
+}
+
+.options {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+.options h1 {
+  margin: 0 0 4px;
+  font-size: 1.4em;
+}
+
+.options__lede {
+  margin: 0 0 24px;
+  color: var(--fg-dim);
+}
+
+.options section {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.options h2 {
+  margin: 0 0 4px;
+  font-size: 1.05em;
+}
+
+.options p {
+  margin: 0 0 10px;
+  line-height: 1.55;
+}
+
+.options__hint {
+  color: var(--fg-dim);
+  font-size: 0.92em;
+}
+
+.options__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.options label.options__check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 8px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.options input[type='number'],
+.options input[type='text'],
+.options textarea {
+  padding: 5px 7px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.options textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+}
+
+/* 標籤在輸入框上方而不是當成 placeholder —— placeholder 一打字就消失 */
+.options__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+.options__field input {
+  min-width: 220px;
+}
+
+.options__status {
+  margin-top: 8px;
+  color: var(--fg-dim);
+  font-size: 0.92em;
+}
+
+.options input[type='password'],
+.options input[type='file'] {
+  padding: 5px 7px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.options input[type='password'] {
+  min-width: 220px;
+}
+
+.options__details {
+  margin-top: 10px;
+  font-size: 0.92em;
+}
+
+.options__details summary {
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.options__details > * {
+  margin-top: 8px;
+}
+
+/* 備份內容的手動複製區。等寬字讓「這是一團密文」看得出來 */
+.options__blob {
+  width: 100%;
+  min-height: 120px;
+  font-family: monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+/* 名稱／值兩欄。用 dl 是因為這確實是一組「項目 → 現況」 */
+.options__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 12px 0 0;
+  font-size: 0.94em;
+}
+
+.options__facts dt {
+  color: var(--fg-dim);
+}
+
+.options__facts dd {
+  margin: 0;
+}
+
+.options__list {
+  margin: 8px 0 0;
+  padding-left: 1.3em;
+  color: var(--fg-dim);
+  line-height: 1.6;
+}
+
+.options__list li + li {
+  margin-top: 6px;
+}

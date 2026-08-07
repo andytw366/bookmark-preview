@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "書籤預覽",
+  "version": "1.0.0",
+  "description": "以縮圖預覽瀏覽書籤，並提供密碼加密的隱私書籤空間。",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "bookmark-preview@andytw366.github.io",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+
+  "permissions": ["bookmarks", "storage", "unlimitedStorage", "idle", "scripting", "menus"],
+
+  "optional_permissions": ["history"],
+
+  "optional_host_permissions": ["<all_urls>"],
+
+  "background": {
+    "scripts": ["background.js"]
+  },
+
+  "options_ui": {
+    "page": "options/index.html",
+    "open_in_tab": false
+  },
+
+  "sidebar_action": {
+    "default_title": "書籤預覽",
+    "default_panel": "sidebar/index.html",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
+    "open_at_install": true
+  },
+
+  "commands": {
+    "_execute_sidebar_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L"
+      },
+      "description": "開啟書籤預覽側邊欄"
+    }
+  },
+
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  }
+}
