@@ -54,6 +54,10 @@ Then open `about:debugging#/runtime/this-firefox` → "Load Temporary Add-on" �
 Requires Firefox 140 or newer, desktop only (`sidebar_action` does not exist on Firefox
 for Android).
 
+**The interface is currently in Traditional Chinese only.** There is no `_locales/` yet and
+no `browser.i18n` calls — the strings are inline. Adding English is planned; see
+[NEXT.md](NEXT.md).
+
 ## Documentation
 
 | | |

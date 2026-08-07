@@ -89,6 +89,8 @@ Browse bookmarks as visual previews instead of a wall of text. Includes a passwo
 ```
 Once you have a few hundred bookmarks, the bookmark menu is just a wall of text. This extension turns it into something you can actually look at: bookmarks as visual previews, plus a password-encrypted vault whose entrance is hidden.
 
+Please note: the add-on's own interface is currently in Traditional Chinese only. English is planned but not available yet — this listing is translated, the UI is not.
+
 ■ Visual previews
 
 A sidebar that lists bookmarks with thumbnails, in three densities (card / row / text-only). When you want to scan dozens of covers at once, "Full page" lays them out as a grid across the whole window.
