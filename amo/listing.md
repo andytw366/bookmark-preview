@@ -24,7 +24,7 @@
 ### 完整描述
 
 ```
-書籤存了幾百個之後，書籤選單就只是一排看不出內容的文字。這個擴充套件把它換成看得懂的畫面。
+書籤存了幾百個之後，書籤選單就只是一排看不出內容的文字。這個擴充套件把它換成看得懂的畫面：用縮圖預覽瀏覽書籤，另外附一個以主密碼加密、入口隱藏的隱私空間。
 
 ■ 縮圖預覽
 
@@ -87,7 +87,7 @@ Browse bookmarks as visual previews instead of a wall of text. Includes a passwo
 ### Description
 
 ```
-Once you have a few hundred bookmarks, the bookmark menu is just a wall of text. This extension turns it into something you can actually look at.
+Once you have a few hundred bookmarks, the bookmark menu is just a wall of text. This extension turns it into something you can actually look at: bookmarks as visual previews, plus a password-encrypted vault whose entrance is hidden.
 
 ■ Visual previews
 
