@@ -45,6 +45,38 @@ it worked.
 > screen and files the master password in the password manager. The search box therefore
 > no longer uses a form; Enter is handled in `onKeyDown`.
 
+## Getting locked back out
+
+Three triggers, whichever comes first (`src/background/vault-lock.ts`):
+
+| Trigger | What it measures |
+|---|---|
+| **Time since you last used the vault** | The setting "lock after N minutes idle". The primary one. |
+| **You left the machine** | `browser.idle` — no keyboard or mouse input anywhere on the computer for the same N minutes. |
+| **The last extension page closed** | The keepalive port count reaching zero. The full-page view and the settings page count as open. |
+
+The first of those is the one that carries the weight, and it was **missing until
+2026-08-07** — auto-lock was wired only to `browser.idle`. That sounds equivalent but is
+not: `browser.idle` asks whether *the computer* is idle, not whether the vault is. Keep
+using your machine — read another tab, watch something, type in another app — and it never
+fires, so an unlocked vault stayed unlocked indefinitely. A full-page tab left open in the
+background made it worse, because its heartbeat deliberately stops the event page from
+being reclaimed, removing even the accidental protection of losing the key to a reclaim.
+
+What counts as "using the vault" is deliberately narrow, because getting it wrong in either
+direction is invisible:
+
+- **The 15-second heartbeat does not count.** It fires whether or not anyone is there; if it
+  reset the deadline, the deadline would never arrive.
+- **Reads do not count.** When `vault-sync` picks up a remote change it broadcasts
+  `vault/changed`, and every open page re-reads `vault/list` and `vault/folders` in
+  response. Counting those would let another device's sync hold this one unlocked forever.
+- **Pointer and key events count only while the vault view is in front** — browsing ordinary
+  bookmarks in the sidebar is not using the vault.
+
+`tests/vault-autolock.test.ts` pins all three of those as static checks, since none of this
+module can be unit-tested (it needs `browser.*`) and every one of these mistakes is silent.
+
 ## The keyring
 
 The original design had the password-derived key encrypt the data **directly**, which made

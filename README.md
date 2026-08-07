@@ -25,7 +25,8 @@ intact.
 
 The entrance is hidden by default — the sidebar shows no trace of it. You type a trigger
 string of your own choosing into the search box to bring up the password screen. It
-re-locks on an idle timeout or when you close the sidebar.
+re-locks a configurable number of minutes after you last touched the vault, when you walk
+away from the machine, or when you close the sidebar.
 
 A forgotten master password **cannot be recovered**, so the vault hands you a recovery key
 when you create it, exports an encrypted backup file, and can optionally keep an encrypted

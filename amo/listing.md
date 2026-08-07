@@ -38,7 +38,7 @@
 
 用主密碼建立一個加密的書籤空間。移進去的書籤會從 Firefox 的書籤管理員、書籤工具列與書籤選單中「消失」，只有解鎖後才看得到；連同它們的預覽圖一起加密（AES-256-GCM）。整個資料夾也可以連同層級一起移進去。
 
-入口預設是隱藏的：側邊欄上沒有任何相關痕跡，要在搜尋框輸入一段自訂的觸發字串才會跳出密碼畫面。閒置一段時間或關掉側邊欄就自動上鎖。
+入口預設是隱藏的：側邊欄上沒有任何相關痕跡，要在搜尋框輸入一段自訂的觸發字串才會跳出密碼畫面。沒碰隱私空間滿一段時間（分鐘數可設定）、離開電腦、或關掉側邊欄，都會自動上鎖。
 
 忘記主密碼是救不回來的，所以建立時會給一組救援金鑰，並可匯出加密的備份檔。也可以選擇把加密副本放進 Firefox 同步，在自己的其他裝置上使用 —— 送出去的是密文，同步伺服器讀不到內容。
 
@@ -101,7 +101,7 @@ The heuristics never look at the domain, so there is no site list to maintain an
 
 Create an encrypted bookmark space behind a master password. Bookmarks moved into it disappear from Firefox's bookmark manager, toolbar and menu; they are only visible after you unlock. Their preview images are encrypted too (AES-256-GCM). Whole folders can be moved in with their structure intact.
 
-The entrance is hidden by default: the sidebar shows no trace of it. You type a trigger string of your choosing into the search box to bring up the password screen. It re-locks automatically after an idle timeout or when you close the sidebar.
+The entrance is hidden by default: the sidebar shows no trace of it. You type a trigger string of your choosing into the search box to bring up the password screen. It re-locks automatically a configurable number of minutes after you last touched the vault, when you walk away from the machine, or when you close the sidebar.
 
 A forgotten master password cannot be recovered, so you get a recovery key when you create the vault, and you can export an encrypted backup file. You can also opt in to putting an encrypted copy in Firefox Sync to use it on your own other devices — what leaves the device is ciphertext, unreadable to the sync server.
 

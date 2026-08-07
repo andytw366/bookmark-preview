@@ -71,10 +71,11 @@ export function Gallery() {
   const { roots, error, reload } = useBookmarks();
   const { settings, update } = useSettings();
   const permission = useHostPermission();
-  const vault = useVault();
   const permissionGranted = permission.granted === true;
 
   const [mode, setMode] = useState<Mode>('bookmarks');
+  // vaultInView 讓 useVault 知道要不要把使用者的操作算成「還在用隱私空間」
+  const vault = useVault({ vaultInView: mode === 'vault' });
   const [folderId, setFolderId] = useState<string | null>(null);
   const [vaultFolderId, setVaultFolderId] = useState<string | null>(null);
   const [query, setQuery] = useState('');

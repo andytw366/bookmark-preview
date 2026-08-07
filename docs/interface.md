@@ -148,5 +148,10 @@ an idle port alone does not (measured on Firefox 153: the event page was still r
 after 30–50 seconds, and the key went with it). When the tab closes the port drops, and if
 no sidebar is open either, the vault locks.
 
+The same port carries a second, distinct message: `activity`, sent when the user actually
+does something (pointer down, key down) **while the vault view is in front**. That is what
+drives the "lock after N minutes idle" deadline. The heartbeat deliberately does not count —
+see [vault.md](vault.md#getting-locked-back-out) for why keeping those two separate matters.
+
 Worth remembering that this is a **window-sized** view of your private bookmarks. Where
 others can see the screen, use "Lock now" or just close the tab.

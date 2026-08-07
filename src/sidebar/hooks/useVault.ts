@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { request, subscribe } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder, VaultState } from '@/shared/types';
 
@@ -11,6 +11,26 @@ const KEEPALIVE_PORT = 'vault-keepalive';
  * 又不值得更密（每次心跳都會喚醒背景頁）。15 秒留了一倍的餘裕。
  */
 const KEEPALIVE_PING_MS = 15_000;
+
+/**
+ * 兩則「使用者動了」之間至少隔這麼久才再送一次。
+ *
+ * 這只是要把自動上鎖的期限往後推，不需要每一次按鍵都送 —— 打字時那會是每秒好幾則
+ * 訊息，而每一則都喚醒背景頁。節流到 5 秒對「分鐘為單位」的期限完全不影響精度。
+ */
+const ACTIVITY_THROTTLE_MS = 5_000;
+
+interface UseVaultOptions {
+  /**
+   * 使用者現在正看著隱私空間那一頁嗎。
+   *
+   * 決定「指標按下／按鍵」要不要算成隱私空間的活動。在書籤那一頁翻書籤不該延後
+   * 隱私空間的自動上鎖 —— 設定頁那句「閒置 N 分鐘後上鎖」指的是沒碰**隱私空間**。
+   * 省略時視為 false（設定頁就是這樣：它對 vault 的操作各自會在背景記一次活動，
+   * 不需要把整頁的點擊都算進來）。
+   */
+  vaultInView?: boolean;
+}
 
 interface VaultApi {
   state: VaultState | null;
@@ -53,11 +73,18 @@ interface VaultApi {
   refreshState: () => Promise<VaultState | null>;
 }
 
-export function useVault(): VaultApi {
+export function useVault(options: UseVaultOptions = {}): VaultApi {
+  const vaultInView = options.vaultInView ?? false;
   const [state, setState] = useState<VaultState | null>(null);
   const [bookmarks, setBookmarks] = useState<PrivateBookmark[]>([]);
   const [folders, setFolders] = useState<PrivateFolder[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /*
+   * 活動訊息要送到目前那條 port 上，而 port 由下面的 effect 持有。
+   * 放在 ref 裡而不是 state：換 port 不該觸發重新渲染。
+   */
+  const portRef = useRef<ReturnType<typeof browser.runtime.connect> | null>(null);
+  const lastActivitySentRef = useRef(0);
 
   /**
    * 廣播抵達時除了更新狀態，**解鎖中就一併重讀清單**。
@@ -98,6 +125,7 @@ export function useVault(): VaultApi {
     }
     let closing = false;
     const port = browser.runtime.connect({ name: KEEPALIVE_PORT });
+    portRef.current = port;
     /*
      * 光是「port 開著」擋不住事件頁被回收 —— 2026-08-05 在 Firefox 153 實測：
      * 側邊欄開著、port 連著、隱私空間解鎖中，事件頁照樣在 30～50 秒後被終止，
@@ -139,9 +167,53 @@ export function useVault(): VaultApi {
       // 自己拆掉連線時不必回頭問狀態（例如已經切成上鎖）
       closing = true;
       clearInterval(heartbeat);
+      portRef.current = null;
       port.disconnect();
     };
   }, [status]);
+
+  /*
+   * 把「使用者真的動了」告訴背景頁，讓自動上鎖的期限往後推。
+   *
+   * 心跳不能兼任這件事：它每 15 秒固定發生，與使用者有沒有在操作無關，當成活動的話
+   * 期限永遠不會到（那正是原本的缺陷 —— 上鎖只綁在 `browser.idle` 的「整台電腦沒有
+   * 鍵鼠輸入」上，人還在用電腦就永遠不會觸發）。所以另外送一種訊息。
+   */
+  const reportActivity = useCallback(() => {
+    const now = Date.now();
+    if (now - lastActivitySentRef.current < ACTIVITY_THROTTLE_MS) {
+      return;
+    }
+    lastActivitySentRef.current = now;
+    try {
+      portRef.current?.postMessage({ type: 'activity' });
+    } catch {
+      // port 已經斷了；onDisconnect 會處理
+    }
+  }, []);
+
+  /*
+   * 只在隱私空間那一頁前景時聽 —— 在書籤那一頁翻書籤不算在用隱私空間。
+   *
+   * 用 capture 階段：清單裡的元件有自己的 handler 且可能 stopPropagation，
+   * 冒泡階段會漏掉一部分操作。
+   */
+  useEffect(() => {
+    if (status !== 'unlocked' || !vaultInView) {
+      return;
+    }
+    // 剛切到這一頁本身就是一次操作
+    reportActivity();
+    const onInput = (): void => {
+      reportActivity();
+    };
+    document.addEventListener('pointerdown', onInput, true);
+    document.addEventListener('keydown', onInput, true);
+    return () => {
+      document.removeEventListener('pointerdown', onInput, true);
+      document.removeEventListener('keydown', onInput, true);
+    };
+  }, [status, vaultInView, reportActivity]);
 
   /*
    * 回到這個畫面時重新確認狀態。

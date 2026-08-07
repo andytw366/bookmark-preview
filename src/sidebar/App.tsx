@@ -28,9 +28,10 @@ export function App() {
   const { roots, error, reload } = useBookmarks();
   const { settings, update } = useSettings();
   const permission = useHostPermission();
-  const vault = useVault();
 
   const [tab, setTab] = useState<Tab>('bookmarks');
+  // vaultInView 讓 useVault 知道要不要把使用者的操作算成「還在用隱私空間」
+  const vault = useVault({ vaultInView: tab === 'vault' });
   const [folderId, setFolderId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [openError, setOpenError] = useState<string | null>(null);

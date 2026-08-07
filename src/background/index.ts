@@ -38,7 +38,7 @@ import {
   unlockWithRecoveryKey,
   vaultState,
 } from './vault';
-import { startVaultLock } from './vault-lock';
+import { noteVaultActivity, startVaultLock } from './vault-lock';
 import {
   clearRemote,
   overwriteRemote,
@@ -56,10 +56,29 @@ import {
  * 所有監聽器都必須在頂層同步註冊，否則喚醒後不會生效。
  */
 
+/**
+ * 廣播隱私空間的狀態，並記一次使用者活動（自動上鎖的期限往後推）。
+ *
+ * 每一個改動 vault 的 handler 都會呼叫這裡，所以活動記錄放在這一點就涵蓋了大半。
+ * **只有 handler 會走到這裡** —— `vault-sync` 那邊的遠端變動是自己 `broadcast`，
+ * 不經過這個函式，所以另一台裝置的同步不會被誤記成本機的使用者活動。
+ */
 async function announceVault() {
+  noteVaultActivity();
   const state = await vaultState();
   broadcast('vault/changed', state);
   return state;
+}
+
+/**
+ * 包住「使用者主動操作但不需要廣播狀態」的那些 handler。
+ *
+ * 資料夾的增刪改、搬移、補抓縮圖都不會改變 `VaultState`（書籤數沒變），所以它們
+ * 沒有走 `announceVault`；但它們同樣是使用者在操作隱私空間，必須把上鎖期限推回去。
+ */
+async function acted<T>(work: Promise<T>): Promise<T> {
+  noteVaultActivity();
+  return work;
 }
 
 serve({
@@ -150,11 +169,11 @@ serve({
     scheduleVaultSync();
     return announceVault();
   },
-  'vault/change-password': async ({ current, next }) => changePassword(current, next),
+  'vault/change-password': async ({ current, next }) => acted(changePassword(current, next)),
   'vault/regenerate-recovery': async ({ password }) => ({
-    recoveryKey: await regenerateRecoveryKey(password),
+    recoveryKey: await acted(regenerateRecoveryKey(password)),
   }),
-  'vault/reveal-recovery': async () => ({ recoveryKey: await revealRecoveryKey() }),
+  'vault/reveal-recovery': async () => ({ recoveryKey: await acted(revealRecoveryKey()) }),
   'vault/forget': async () => {
     await forgetVault();
     return announceVault();
@@ -182,14 +201,14 @@ serve({
     await renameBookmark(id, title);
     return announceVault();
   },
-  'vault/refresh-thumb': async ({ id }) => refreshVaultThumbnail(id),
+  'vault/refresh-thumb': async ({ id }) => acted(refreshVaultThumbnail(id)),
   'vault/folders': async () => listFolders(),
-  'vault/folder-create': async ({ name, parentId }) => createFolder(name, parentId),
-  'vault/folder-rename': async ({ id, name }) => renameFolder(id, name),
-  'vault/folder-delete': async ({ id }) => deleteFolder(id),
-  'vault/folder-move': async ({ id, parentId }) => moveFolderToParent(id, parentId),
-  'vault/move': async ({ id, folderId }) => moveBookmarkToFolder(id, folderId),
-  'vault/backfill': async () => backfillVaultThumbnails(),
+  'vault/folder-create': async ({ name, parentId }) => acted(createFolder(name, parentId)),
+  'vault/folder-rename': async ({ id, name }) => acted(renameFolder(id, name)),
+  'vault/folder-delete': async ({ id }) => acted(deleteFolder(id)),
+  'vault/folder-move': async ({ id, parentId }) => acted(moveFolderToParent(id, parentId)),
+  'vault/move': async ({ id, folderId }) => acted(moveBookmarkToFolder(id, folderId)),
+  'vault/backfill': async () => acted(backfillVaultThumbnails()),
   'vault/export': async ({ id, parentId }) => {
     await exportToNative(id, parentId);
     return announceVault();
@@ -198,7 +217,7 @@ serve({
     const result = await exportManyToNative(ids, parentId);
     return { state: await announceVault(), ...result };
   },
-  'vault/move-many': async ({ ids, folderId }) => moveManyToFolder(ids, folderId),
+  'vault/move-many': async ({ ids, folderId }) => acted(moveManyToFolder(ids, folderId)),
   'vault/remove': async ({ id }) => {
     await removeBookmark(id);
     return announceVault();
@@ -209,7 +228,7 @@ serve({
   },
   'vault/thumb': async ({ id }) => readVaultThumb(id),
 
-  'vault/backup-export': async () => exportBackup(),
+  'vault/backup-export': async () => acted(exportBackup()),
   'vault/backup-import': async ({ json, secret, viaRecoveryKey }) => {
     const result = await importBackup(json, secret, viaRecoveryKey);
     return { state: await announceVault(), ...result };

@@ -6,7 +6,7 @@ Permissions are requested when they become useful, not all at once up front.
 |---|---|---|
 | `bookmarks` | Read the bookmark tree; remove the original when moving into the vault | At install |
 | `storage`, `unlimitedStorage` | Settings, encrypted vault, IndexedDB thumbnails | At install |
-| `idle` | Idle auto-lock | At install |
+| `idle` | Auto-lock the vault once the user is away from the machine (one of two triggers; the other is time since the vault was last used, which needs no permission) | At install |
 | `scripting` | Inject a small function into a tab to read its cover image (needs the host permission below to actually run) | At install |
 | `menus` | The "Use as this bookmark's preview" image context menu | At install |
 | `<all_urls>` | Screen capture and OG image fetching | When the user presses "Grant permission" |
