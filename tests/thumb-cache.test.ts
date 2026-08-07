@@ -116,6 +116,31 @@ describe('縮圖快取', () => {
     });
   });
 
+  describe('清除所有預覽圖', () => {
+    it('全部標記過時 —— 否則設定頁清空之後，開著的側邊欄還在顯示已經不存在的圖', () => {
+      cache.storeThumb('a', image('blob:a'));
+      cache.storeThumb('b', image('blob:b'));
+      expect(cache.peekThumb('a')).toEqual(image('blob:a'));
+
+      cache.invalidateAllThumbs();
+
+      // undefined 是「要重讀一次」，與 null（讀過了、沒有縮圖）不同
+      expect(cache.peekThumb('a')).toBeUndefined();
+      expect(cache.peekThumb('b')).toBeUndefined();
+    });
+
+    it('不立刻撤銷 object URL —— 正在顯示的那幾列還沒重繪，撤銷會出現破圖', () => {
+      cache.storeThumb('a', image('blob:a'));
+      cache.holdThumb('a');
+      cache.invalidateAllThumbs();
+      expect(revoked).not.toContain('blob:a');
+      // 重讀之後才換掉（這次讀到的是「沒有縮圖」）
+      cache.storeThumb('a', null);
+      expect(revoked).toContain('blob:a');
+      expect(cache.peekThumb('a')).toBeNull();
+    });
+  });
+
   describe('網址 → SHA 鍵的對照', () => {
     it('記住之後就不必再算一次 —— 雜湊是非同步的，重算會讓快取慢一拍才生效', () => {
       expect(cache.knownDigest('https://example.test/')).toBeUndefined();

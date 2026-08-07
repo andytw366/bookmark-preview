@@ -3,6 +3,7 @@ import { request, subscribe } from '@/shared/messages';
 import { hueFromString, initialOf, vaultThumbKey } from '@/shared/url';
 import {
   holdThumb,
+  invalidateAllThumbs,
   invalidateThumb,
   peekThumb,
   releaseThumb,
@@ -76,9 +77,16 @@ export function VaultThumb({ id, hostname }: VaultThumbProps) {
       }
     });
 
+    // 「清除所有預覽圖」是一次清空，不會逐一廣播 thumbs/updated
+    const unsubscribeCleared = subscribe('thumbs/cleared', () => {
+      invalidateAllThumbs();
+      load();
+    });
+
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeCleared();
       releaseThumb(key);
     };
   }, [id]);

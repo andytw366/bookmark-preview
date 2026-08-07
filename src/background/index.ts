@@ -150,7 +150,12 @@ serve({
     };
   },
   'thumbs/usage': async () => usage(),
-  'thumbs/clear': async () => ({ removed: await pruneOlderThan(Date.now()) }),
+  'thumbs/clear': async () => {
+    const removed = await pruneOlderThan(Date.now());
+    // 開著的頁面各自有一份記憶體快取，清空 IndexedDB 不會動到它們
+    broadcast('thumbs/cleared', undefined);
+    return { removed };
+  },
   'site-stats/clear': async () => clearSiteImageStats(),
 
   'vault/state': async () => vaultState(),

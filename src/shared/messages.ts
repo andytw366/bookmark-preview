@@ -249,6 +249,14 @@ export type Protocol = {
 export type EventMap = {
   'bookmarks/invalidated': void;
   'thumbs/updated': { key: string };
+  /**
+   * 全部的預覽圖都被清掉了（設定頁的「清除所有預覽圖」）。
+   *
+   * 不能用逐一 `thumbs/updated` 代替：那會是幾千則訊息。而少了這一則的話，開著的
+   * 側邊欄會繼續顯示已經不存在的圖 —— `thumb-cache` 是記憶體裡的一份，IndexedDB
+   * 清空不會動到它，使用者按了「清除」卻看不出有任何變化，要重開側邊欄才會消失。
+   */
+  'thumbs/cleared': void;
   'backfill/progress': { done: number; total: number; ok: number };
   'vault/changed': VaultState;
   /**

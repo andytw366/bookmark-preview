@@ -4,6 +4,7 @@ import { urlKey } from '@/shared/url';
 import { getThumb } from '@/storage/thumbs-db';
 import {
   holdThumb,
+  invalidateAllThumbs,
   invalidateThumb,
   knownDigest,
   peekThumb,
@@ -130,9 +131,15 @@ export function useThumb(url: string): LoadedThumb | null {
       void load();
     });
 
+    const unsubscribeCleared = subscribe('thumbs/cleared', () => {
+      invalidateAllThumbs();
+      void load();
+    });
+
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeCleared();
       if (held !== null) {
         releaseThumb(held);
       }

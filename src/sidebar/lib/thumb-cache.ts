@@ -111,6 +111,18 @@ export function invalidateThumb(key: string): void {
   }
 }
 
+/**
+ * 全部標記過時（設定頁清除了所有預覽圖）。
+ *
+ * 與 `invalidateThumb` 同樣只標記、不撤銷：正在顯示的那幾列還沒重繪，這時撤銷
+ * object URL 會出現破圖。重讀之後 `storeThumb` 會拿 null 換掉它們。
+ */
+export function invalidateAllThumbs(): void {
+  for (const entry of cache.values()) {
+    entry.stale = true;
+  }
+}
+
 function revoke(image: CachedImage | null): void {
   if (image !== null) {
     URL.revokeObjectURL(image.src);
