@@ -34,7 +34,9 @@ All of it lives in your browser's local storage:
 | The vault (encrypted bookmarks and preview images) | `storage.local`, encrypted with AES-GCM |
 
 The decryption key exists only in the background script's memory and is never written to
-disk. It disappears when you lock the vault, close the browser, or the idle timeout fires.
+disk. It disappears when you lock the vault, close the browser, leave the vault unused for
+a configurable number of minutes, step away from the machine, or close the last extension
+page.
 
 ## When data leaves your device
 
