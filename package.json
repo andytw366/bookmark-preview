@@ -19,6 +19,7 @@
     "lint:ext": "web-ext lint --source-dir dist",
     "verify": "npm run typecheck && npm test && npm run package && npm run lint:ext",
     "package": "npm run build && web-ext build --source-dir dist --overwrite-dest --filename bookmark-preview-vault-{version}.zip",
+    "package:source": "./scripts/source-zip.sh",
     "start:firefox": "web-ext run --source-dir dist --browser-console"
   },
   "dependencies": {

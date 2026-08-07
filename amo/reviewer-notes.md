@@ -46,9 +46,16 @@ The submitted `.zip` is produced by `npm run package`, which runs the build and 
 - The only runtime dependencies are React and ReactDOM (see `dependencies` in
   `package.json`); both are bundled into `dist/`.
 
-`web-ext lint` reports two `UNSAFE_VAR_ASSIGNMENT` warnings. Both point at `innerHTML`
-inside **React's minified runtime**, not at code written for this add-on — grepping the
-source for `innerHTML` returns nothing.
+`web-ext lint` reports 0 errors and 3 warnings, all expected:
+
+- Two `UNSAFE_VAR_ASSIGNMENT` warnings. Both point at `innerHTML` inside **React's
+  minified runtime** (`assets/styles-*.js`), not at code written for this add-on —
+  grepping the source for `innerHTML` returns nothing.
+- One `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`, because
+  `data_collection_permissions` needs Firefox for Android 142 while `strict_min_version`
+  is 140. **This add-on is Firefox for Desktop only** — `sidebar_action`, the whole
+  interface, does not exist on Firefox for Android — so the Android version floor is not
+  applicable. It is submitted for Desktop only.
 
 ## Network requests
 
@@ -85,5 +92,7 @@ Implementation is in `src/crypto/`. `tests/crypto.test.ts` and `tests/keyring.te
 cover round-trips, wrong passwords, tamper detection and chunk boundaries.
 
 The decrypted key exists only in the background event page's memory. It is never written
-to disk, and it disappears when the event page is unloaded, when the idle timeout fires,
-or when the user locks the vault.
+to disk. It disappears when the user locks the vault, when the event page is unloaded, and
+on any of three automatic triggers (`src/background/vault-lock.ts`): a configurable number
+of minutes since the vault was last used, the same span of system-wide idle time
+(`browser.idle`), or the last extension page being closed.

@@ -18,7 +18,9 @@
 
 - [ ] `npm run verify` 四項全綠（typecheck、測試、打包、`web-ext lint`）
 - [ ] `npm run package` 產生 `web-ext-artifacts/bookmark-preview-vault-<版本>.zip`
-- [ ] 一併上傳原始碼壓縮檔（打包過的程式碼必須附原始碼，理由與建置步驟見 reviewer-notes.md）
+- [ ] `npm run package:source` 產生 `…-<版本>-source.zip` 並一併上傳（打包過的程式碼必須
+      附原始碼，理由與建置步驟見 reviewer-notes.md）。它打包的是 **HEAD 而不是工作區**，
+      有未提交的改動時腳本會出聲警告
 - [ ] 平台選 **Firefox for Desktop only**（`sidebar_action` 在 Firefox for Android 上不存在）
 - [ ] 貼上隱私政策、權限說明、審查備註
 - [ ] 上傳四張截圖並加上說明文字（下面有現成的）
