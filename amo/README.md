@@ -49,7 +49,7 @@ python3 scripts/amo-paste.py     # → amo/paste/*.txt
 | `01-sidebar.png` | 側邊欄以縮圖列出書籤，取代一排看不出內容的文字 | Bookmarks as visual previews in the sidebar, instead of a wall of text |
 | `02-gallery.png` | 全頁瀏覽：以整個視窗的寬度並排看過所有封面 | Full-page view: scan every cover at once across the whole window |
 | `03-vault-unlock.png` | 隱私空間的入口是隱藏的 —— 在搜尋框打自訂的觸發字串才會跳出密碼畫面 | The vault entrance is hidden — type your own trigger string in the search box to bring up the password screen |
-| `04-options.png` | 設定頁：入口方式、觸發字串、備份與同步都在這裡 | Settings: entrance mode, trigger string, backup and sync |
+| `04-options.png` | 設定頁：隱私空間的入口方式、移出落點與觸發字串都在這裡 | Settings: the vault's entrance mode, where bookmarks land when moved out, and the trigger string |
 
 ## 送審表單要填的值
 
