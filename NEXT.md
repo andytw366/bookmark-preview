@@ -1,6 +1,6 @@
 # 接手指南 / 待辦
 
-最後更新：2026-08-07（第三輪。**大部分 ⬜ 清掉了、截圖也重拍了**，剩 M4 那五條刻意延後的與「移出到…」。下一步就是送審本身）
+最後更新：2026-08-07（第三輪。**已送出 AMO 審查**。等審查結果；通過後的下一件事是介面英文化，見「從這裡開始」第 4 項）
 
 給下一個 session 的交接文件。設計背景讀 [PLAN.md](PLAN.md)；操作與架構已拆成英文的
 [`docs/`](docs/)（architecture、vault、previews、interface、sync-and-backup、permissions、
@@ -57,6 +57,38 @@ Google、Hacker News…），預覽圖全部是真的抓下來的：有 og:image
 
 `amo/README.md` 有送審檢查清單與「送審表單要填的值」對照表（名稱、版本、ID、授權、
 首頁、支援網址六欄）。原始碼壓縮檔也要一起上傳，理由與建置步驟在 `amo/reviewer-notes.md`。
+
+### 4. 介面英文化（i18n）—— 審查通過後才動
+
+**送審中的版本不要再改程式碼**，所以這件事排在審查之後。
+
+商店頁的英文版已經上了（文案在 `amo/listing.md`），但**介面還是全中文**。因為英文商店文案
+會把英文使用者帶進來、然後撞上中文介面，英文 Description 第二段已經明說這件事；i18n 做完
+之後要把那句拿掉。
+
+現況與規模（2026-08-07 量的）：
+
+| | |
+|---|---|
+| `_locales/` | 不存在 |
+| `browser.i18n` 呼叫 | 0 次 |
+| `default_locale` | manifest 裡沒有 |
+| 含中文的原始碼檔 | 79 個 |
+| 使用者看得到的中文行 | 約 583 行 |
+| 需要 placeholder 的字串 | 58 條 |
+
+兩個容易低估的地方：
+
+1. **那 58 條帶變數的字串不能直接搬**（例如「已移入 ${n} 個書籤與 ${m} 個資料夾」）。要拆成
+   `messages.json` 的 placeholder，而中英語序不同，有些句子得重寫而不是直譯。
+2. **有 10 個測試檔在比對中文字串**（`vault-merge`、`keyboard-entry`、`url` 等），抽換文案
+   會弄壞它們，得一起改。
+
+manifest 也有四處中文要 `__MSG__` 化：`name`、`description`、`sidebar_action.default_title`、
+`commands._execute_sidebar_action.description`，並補上 `default_locale`。
+
+建議做法：先建 `_locales/` 骨架與一層薄的取字串包裝，再分批搬（一個目錄一批），每批跑
+`npm run verify`。不要一次全改 —— 583 處一起動，壞了很難二分搜尋。
 
 ---
 
