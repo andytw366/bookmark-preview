@@ -59,12 +59,15 @@ async function applyManualCover(
       return;
     }
     const thumbnail = grabbed.thumbnail;
+    // 記下是三段裡的哪一段成功的：失敗時才知道該往哪裡查（`grabImage` 已經算出來了，
+    // 這裡原本把它丟掉，於是診斷只看得到「成功」而看不出走了哪條路）
+    const via = { detail: `取圖方式：${grabbed.strategy}` };
 
     // 隱私書籤已經不在原生書籤樹裡，要分開判斷，而且縮圖必須加密
     const priv = findVaultBookmarkByUrl(pageUrl);
     if (priv !== null) {
       await storeVaultThumbnail(priv.id, thumbnail);
-      await recordCapture({ ...stamp, stage: 'manual:ok' });
+      await recordCapture({ ...stamp, stage: 'manual:ok', ...via });
       broadcast('thumbs/updated', { key: vaultThumbKey(priv.id) });
       return;
     }
@@ -83,7 +86,7 @@ async function applyManualCover(
       encrypted: false,
       iv: null,
     });
-    await recordCapture({ ...stamp, stage: 'manual:ok' });
+    await recordCapture({ ...stamp, stage: 'manual:ok', ...via });
     broadcast('thumbs/updated', { key });
   } catch (cause) {
     await recordCapture({
