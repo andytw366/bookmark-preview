@@ -11,3 +11,6 @@ tests/fixtures/site/*.png
 
 # Claude Code 的執行期產物（含 pid 與 session id），不屬於專案
 .claude/scheduled_tasks.lock
+
+# scripts/amo-paste.py 產生的送審用純文字（由 amo/*.md 轉出）
+amo/paste/

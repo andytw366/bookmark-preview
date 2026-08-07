@@ -14,6 +14,22 @@
 **`permissions.md` 與 `reviewer-notes.md` 刻意用英文寫**：那兩份唯一的讀者是 Mozilla 的
 審查員，中文會拖慢審查甚至被要求補件。商店文案與隱私政策則中英都備了，AMO 支援分語系填。
 
+## 貼進表單前先跑這個
+
+```bash
+python3 scripts/amo-paste.py     # → amo/paste/*.txt
+```
+
+**上面那幾份 `.md` 不要整份貼。** 兩個理由：
+
+1. `permissions.md` 與 `reviewer-notes.md` 開頭有「Paste into the … field」這種**寫給填表
+   的人看的指示**，還有一句中文備註。貼進去審查員會看到一段莫名其妙的話。
+2. AMO 的敘述欄只吃「部分 Markdown」，審查備註與權限說明則是純文字欄位 —— `##`、`**`、
+   反引號會原樣顯示，Markdown 表格更是會爛成一堆直線。`permissions.md` 有 12 列表格。
+
+`scripts/amo-paste.py` 會把這兩件事處理掉，輸出到 `amo/paste/`（那個目錄是產生出來的，
+不進版本庫）。`listing.md` 不在轉換範圍內 —— 它的每一段本來就用 ``` 框好了，照框內容貼。
+
 ## 送審前的檢查清單
 
 - [ ] `npm run verify` 四項全綠（typecheck、測試、打包、`web-ext lint`）
