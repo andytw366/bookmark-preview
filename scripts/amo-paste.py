@@ -76,13 +76,33 @@ def convert(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
 
 
+# AMO 表單的欄位上限。超過會被擋在送審那一刻，而那時人已經在填表了 ——
+# 所以在這裡就檢查，不要等到貼上去才發現。
+LIMITS = {"reviewer-notes": 3000}
+
+
 def main() -> int:
     OUT.mkdir(exist_ok=True)
+    over = []
     for name in ("reviewer-notes", "permissions", "privacy-policy.zh-TW", "privacy-policy.en"):
         src = ROOT / "amo" / f"{name}.md"
         dst = OUT / f"{name}.txt"
-        dst.write_text(convert(src.read_text()), encoding="utf-8")
-        print(f"{dst.relative_to(ROOT)}  ({len(dst.read_text())} 字元)")
+        text = convert(src.read_text())
+        dst.write_text(text, encoding="utf-8")
+
+        limit = LIMITS.get(name)
+        if limit is None:
+            note = ""
+        elif len(text) > limit:
+            note = f"  ✗ 超出上限 {limit} 共 {len(text) - limit} 字元"
+            over.append(name)
+        else:
+            note = f"  ✓ 上限 {limit}，還剩 {limit - len(text)}"
+        print(f"{dst.relative_to(ROOT)}  ({len(text)} 字元){note}")
+
+    if over:
+        print(f"\n請縮短 amo/{{{','.join(over)}}}.md 之後再送審。", file=sys.stderr)
+        return 1
     return 0
 
 

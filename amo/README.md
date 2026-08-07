@@ -8,7 +8,7 @@
 | [listing.md](listing.md) | 名稱、摘要、完整描述、分類、標籤、版本說明（zh-TW 與 en-US 各一份） |
 | [privacy-policy.zh-TW.md](privacy-policy.zh-TW.md)、[privacy-policy.en.md](privacy-policy.en.md) | Privacy Policy（AMO 可分語系填） |
 | [permissions.md](permissions.md) | Permissions justification |
-| [reviewer-notes.md](reviewer-notes.md) | Notes to Reviewer（含原始碼與建置步驟） |
+| [reviewer-notes.md](reviewer-notes.md) | Notes to Reviewer（含原始碼與建置步驟）。**該欄位上限 3000 字元**，`scripts/amo-paste.py` 會檢查並在超過時失敗 |
 | [screenshots/](screenshots/) | Screenshots（1280×800） |
 
 **`permissions.md` 與 `reviewer-notes.md` 刻意用英文寫**：那兩份唯一的讀者是 Mozilla 的

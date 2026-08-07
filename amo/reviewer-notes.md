@@ -1,98 +1,72 @@
 # Notes to Reviewer
 
-Paste into the "Notes to Reviewer" field on the AMO submission form.
+Paste into the "Notes to Reviewer" field on the AMO submission form. **That field is
+limited to 3000 characters**, so this is deliberately terse — run
+`python3 scripts/amo-paste.py` and paste `amo/paste/reviewer-notes.txt`.
 
 > 這份刻意用英文寫：它唯一的讀者是 Mozilla 的審查員。
 
 ---
 
-## Why source code is attached
+## Source code and build
 
-The JavaScript in the submitted `.zip` is bundled and minified by Vite (Rollup + esbuild),
-so the source is submitted alongside it as AMO requires. The source archive contains the
-full `src/`, `public/`, the build configuration and `package-lock.json`.
-
-The add-on is licensed under the **Mozilla Public License 2.0**; the verbatim license
-text is in `LICENSE` at the root of the source archive. Source is also published at
+The JavaScript in the `.zip` is bundled and minified by Vite, so the source is attached.
+Licensed **MPL-2.0** (`LICENSE` in the archive); also at
 https://github.com/andytw366/bookmark-preview.
 
-## Build instructions (reproducible)
-
-Requires Node.js 22 (developed on v22.21.1) and npm 10. OS-independent.
+Requires Node.js 22 (developed on v22.21.1) and npm 10. OS-independent:
 
 ```bash
 npm ci          # installs exactly what package-lock.json pins
 npm run build   # produces dist/
 ```
 
-`npm run build` runs:
+`npm run build` cleans `dist/`, then runs `vite build` twice — once for the extension
+pages, once with `vite.config.background.ts` for the background event page (MV3 background
+scripts must be a single IIFE, so they cannot share a build with ES-module pages). The
+submitted `.zip` is `npm run package` (build + `web-ext build`).
 
-1. `npm run clean` — removes `dist/`
-2. `vite build` — bundles the three extension pages (sidebar, options, full-page view);
-   configuration in `vite.config.ts`
-3. `vite build --config vite.config.background.ts` — bundles the background event page.
-   This is a second pass because a Firefox MV3 background script must be a single IIFE
-   file and cannot share a build with the ES-module pages.
-
-The submitted `.zip` is produced by `npm run package`, which runs the build and then
-`web-ext build` over `dist/`.
-
-`npm run verify` runs type-checking, unit tests, packaging and `web-ext lint` in one go.
+Verified: `npm ci && npm run build` on the attached source yields a `dist/` md5-identical
+to the submitted package.
 
 ## No remote code
 
-- No `eval`, no `new Function`, no remotely loaded scripts anywhere in the package.
-- No `nativeMessaging`. No backend server of any kind.
-- The only runtime dependencies are React and ReactDOM (see `dependencies` in
-  `package.json`); both are bundled into `dist/`.
+No `eval`, no `new Function`, no remote scripts, no `nativeMessaging`, no backend server.
+The only runtime dependencies are React and ReactDOM, both bundled.
 
-`web-ext lint` reports 0 errors and 3 warnings, all expected:
+`web-ext lint`: 0 errors, 3 warnings, all expected.
 
-- Two `UNSAFE_VAR_ASSIGNMENT` warnings. Both point at `innerHTML` inside **React's
-  minified runtime** (`assets/styles-*.js`), not at code written for this add-on —
-  grepping the source for `innerHTML` returns nothing.
-- One `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`, because
-  `data_collection_permissions` needs Firefox for Android 142 while `strict_min_version`
-  is 140. **This add-on is Firefox for Desktop only** — `sidebar_action`, the whole
-  interface, does not exist on Firefox for Android — so the Android version floor is not
-  applicable. It is submitted for Desktop only.
+- 2 × `UNSAFE_VAR_ASSIGNMENT` (`innerHTML`) point inside **React's minified runtime**
+  (`assets/styles-*.js`). Grepping this add-on's source for `innerHTML` returns nothing.
+- 1 × `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`: `data_collection_permissions`
+  wants Android 142, `strict_min_version` is 140. **Desktop only** — `sidebar_action`, the
+  entire interface, does not exist on Firefox for Android.
 
 ## Network requests
 
-There is exactly one kind: when generating a preview image, the add-on fetches
-**the bookmark's own URL** to read the page's cover image (`og:image`, `twitter:image`,
-JSON-LD, `<video poster>`). Nothing is ever sent to the developer or to any third party.
-See `src/background/og-fetcher.ts` and `src/background/cover.ts`.
+Exactly one kind: to generate a preview, the add-on fetches **the bookmark's own URL** to
+read its cover image (`og:image`, `twitter:image`, JSON-LD, `<video poster>`). Nothing is
+ever sent to the developer or a third party. See `src/background/og-fetcher.ts`.
 
 ## Optional permissions
 
-`<all_urls>` and `history` are both declared as `optional_*`. They are not requested at
-install time; the add-on calls `permissions.request()` only when the user presses the
-corresponding button. Everything works without them:
-
-- Without `<all_urls>`: no preview images are generated; the add-on falls back to
-  colour cards derived from the domain name.
-- Without `history`: the "also clear this URL from history" option when moving a
-  bookmark into the vault has no effect.
+`<all_urls>` and `history` are `optional_*`, requested only when the user presses the
+corresponding button. Without `<all_urls>`: no previews, just per-domain colour cards.
+Without `history`: the "also clear this URL from history" option does nothing (`history` is
+used solely for `browser.history.deleteUrl`; history is never read or sent).
 
 After `<all_urls>` is granted the add-on calls `runtime.reload()` on itself. This is
-necessary rather than cosmetic: Firefox decides which APIs to inject when the extension
-context is created, so `tabs.captureVisibleTab` simply does not exist if the host
-permission was not held at startup. The UI explains this to the user; it is not a fault.
+necessary, not cosmetic: Firefox computes the API surface when the extension context is
+created, so `tabs.captureVisibleTab` does not exist if the host permission was not held at
+startup.
 
 ## Encryption
 
-The vault uses AES-256-GCM. The key encrypting the data is wrapped twice — once by a key
-derived from the master password via PBKDF2-SHA256 (600,000 iterations, the current OWASP
-recommendation), and once by a key derived from a randomly generated recovery key via
-HKDF. Either unwraps the same data key, which is what makes both "recover with the
-recovery key" and "change the master password without re-encrypting everything" possible.
+AES-256-GCM. The data key is wrapped twice — by PBKDF2-SHA256 (600,000 iterations) from
+the master password, and by HKDF from a random recovery key — which is what makes both
+recovery and password changes without re-encryption possible. See `src/crypto/`.
 
-Implementation is in `src/crypto/`. `tests/crypto.test.ts` and `tests/keyring.test.ts`
-cover round-trips, wrong passwords, tamper detection and chunk boundaries.
-
-The decrypted key exists only in the background event page's memory. It is never written
-to disk. It disappears when the user locks the vault, when the event page is unloaded, and
-on any of three automatic triggers (`src/background/vault-lock.ts`): a configurable number
-of minutes since the vault was last used, the same span of system-wide idle time
-(`browser.idle`), or the last extension page being closed.
+The decrypted key lives only in the background event page's memory, is never written to
+disk, and is discarded on lock, on event-page unload, and on three triggers in
+`src/background/vault-lock.ts`: time since the vault was last used, system idle, or the
+last extension page closing.
