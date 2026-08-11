@@ -284,24 +284,51 @@ async function tryCapture(tabId: number, url: string, key: string): Promise<bool
   return stored?.source === 'capture';
 }
 
+/**
+ * 截這個分頁的畫面做成縮圖，**只回傳、不寫入**。
+ *
+ * 與 `coverThumbnailFor` 是一對：兩者都產生位元組而不決定要寫去哪裡，
+ * 於是隱私書籤能拿同一份結果走加密寫入（`storeVaultThumbnail`），
+ * 明文完全不必落地。
+ *
+ * **也刻意不記診斷。** `recordCapture` 會把網址明文寫進 `storage.local`，
+ * 對隱私書籤來說那等於把藏起來的網址又漏出去一次。要不要記由呼叫端決定 ——
+ * 一般書籤那條路（`capture`）記，隱私空間那條不記。
+ *
+ * 回傳 null 只有一個原因：那個分頁已經不是這個網址、或不是作用中的分頁。
+ * 截圖失敗會往上丟。
+ */
+export async function screenshotThumbnailFor(tabId: number, url: string): Promise<Thumbnail | null> {
+  // 等待期間使用者可能已經換頁，確認還在同一個網址才擷取。
+  // 比對用正規化後的形式，與 `coverThumbnailFor` 一致 —— 嚴格字串比對會把
+  // 「書籤存 https://x.com、分頁顯示 https://x.com/」誤判成使用者換頁了。
+  const fresh = await browser.tabs.get(tabId);
+  if (
+    normalizeUrl(fresh.url ?? '') !== normalizeUrl(url) ||
+    fresh.active !== true ||
+    fresh.windowId === undefined
+  ) {
+    return null;
+  }
+  // captureVisibleTab 而非 captureTab：後者是 Firefox 專屬且在 Firefox 153
+  // 已經不存在（型別定義還留著，執行期會丟 "is not a function"）。
+  // captureVisibleTab 只能截視窗目前可見的分頁，這正好符合上面
+  // 「只截作用中分頁」的設計，沒有功能損失。
+  const dataUrl = await browser.tabs.captureVisibleTab(fresh.windowId, {
+    format: 'jpeg',
+    quality: 90,
+  });
+  const response = await fetch(dataUrl);
+  return makeThumbnail(await response.blob());
+}
+
 async function capture(tabId: number, url: string, key: string): Promise<void> {
   try {
-    // 等待期間使用者可能已經換頁，確認還在同一個網址才擷取
-    const fresh = await browser.tabs.get(tabId);
-    if (fresh.url !== url || fresh.active !== true || fresh.windowId === undefined) {
+    const thumbnail = await screenshotThumbnailFor(tabId, url);
+    if (thumbnail === null) {
       await skip('skipped:navigated-away', url);
       return;
     }
-    // captureVisibleTab 而非 captureTab：後者是 Firefox 專屬且在 Firefox 153
-    // 已經不存在（型別定義還留著，執行期會丟 "is not a function"）。
-    // captureVisibleTab 只能截視窗目前可見的分頁，這正好符合上面
-    // 「只截作用中分頁」的設計，沒有功能損失。
-    const dataUrl = await browser.tabs.captureVisibleTab(fresh.windowId, {
-      format: 'jpeg',
-      quality: 90,
-    });
-    const response = await fetch(dataUrl);
-    const thumbnail = await makeThumbnail(await response.blob());
     await putThumb({
       key,
       ...thumbnail,

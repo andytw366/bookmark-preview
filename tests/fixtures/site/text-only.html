@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>純文字頁（沒有任何圖）</title>
+    <!--
+      這一頁刻意什麼圖都沒有：沒有 og:image、沒有 JSON-LD、沒有 video poster、
+      沒有播放器參數，連一個 <img> 或 CSS 背景圖都沒有。
+
+      於是封面判定與伺服器端 og 兩條都必然落空，**截圖是唯一的出路**。
+      用來驗隱私書籤的截圖退路：修好之前這裡只會跳「這個頁面找不到可用的封面圖，
+      伺服器端也抓不到。」，修好之後應該拿到一張這頁的畫面。
+
+      真實世界對應的是被 Cloudflare 之類擋掉背景頁請求的站台 —— 那種頁面上明明
+      有圖，但背景頁抓不下來，效果與這裡完全一樣。用純文字頁模擬是因為它不依賴
+      外部網站，而且結果是確定的。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0; padding: 40px; background: #f6f2e8">
+    <h1 style="color: #3a2f1b">純文字測試頁</h1>
+    <p style="color: #5b4b2f; max-width: 40em; line-height: 1.8">
+      這一頁沒有任何圖片。封面判定會找不到候選，伺服器端也沒有 og:image 可抓。
+      如果隱私書籤的截圖退路正常運作，重新抓預覽圖之後應該會看到這段文字本身。
+    </p>
+    <p style="color: #8a7550">—— 書籤預覽測試素材</p>
+  </body>
+</html>

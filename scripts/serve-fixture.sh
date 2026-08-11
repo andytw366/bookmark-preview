@@ -62,6 +62,7 @@ cat <<INFO
   http://127.0.0.1:$PORT/shared-b     同上
   http://127.0.0.1:$PORT/embed        封面只在 iframe 的 ?poster= 參數裡（要勝過 og:image logo）
   http://127.0.0.1:$PORT/embed-spa    同上，但 iframe 的 src 是框架綁定 —— 封面只在序列化的初始資料裡
+  http://127.0.0.1:$PORT/text-only    完全沒有圖 —— 截圖是唯一出路（驗隱私書籤的截圖退路）
   http://127.0.0.1:$PORT/deep-thumbs  頂端的背景封面要勝過頁面深處的推薦縮圖
 INFO
 
