@@ -1,3 +1,5 @@
+import * as coverParams from '@/shared/cover-params';
+import { imagesInJsonLd } from '@/shared/json-ld';
 import { noteDeclaredImages } from '@/storage/site-image-stats';
 import { makeCoverThumbnail, type Thumbnail } from './image';
 
@@ -119,6 +121,14 @@ const IMAGE_SELECTORS = [
 /**
  * 依可信度順序取出所有宣告的預覽圖，去重後回傳。
  *
+ * 順序刻意對齊 `cover.ts` 的分數（1050 播放器 poster、1000 宣告層、950 JSON-LD、
+ * 900 video poster）—— 兩條路對「哪一張比較可信」的看法本來就該一樣，不一樣的只有
+ * 「看得到什麼」。
+ *
+ * **這裡只做得到宣告層。** `cover.ts` 還有第四層：版面上最像封面的那張圖，依面積與
+ * 位置競爭。那需要 `getBoundingClientRect`，沒有渲染就沒有版面 —— 所以補抓對
+ * 「什麼都沒宣告、但畫面上有一張大封面」的頁面永遠無能為力，那不是這裡能補的。
+ *
  * 取「全部」而不是第一個：全站共用判定需要知道這一頁宣告過哪些圖才能記錄，
  * 而且第一個被降級時要有第二個可以退。順帶修掉一個小缺口 —— 有些站台的
  * `og:image` 是共用 logo 但 `twitter:image` 才是內容圖，只看第一個就永遠拿不到。
@@ -127,27 +137,57 @@ function extractImageUrls(html: string, pageUrl: string): string[] {
   const document_ = new DOMParser().parseFromString(html, 'text/html');
   const found: string[] = [];
   const seen = new Set<string>();
+
+  const add = (raw: string | null | undefined): void => {
+    if (raw === null || raw === undefined || raw.trim() === '') {
+      return;
+    }
+    try {
+      // og:image 常是相對路徑，要以頁面網址為基準解析
+      const resolved = new URL(raw.trim(), pageUrl);
+      if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
+        return;
+      }
+      const url = resolved.toString();
+      if (!seen.has(url)) {
+        seen.add(url);
+        found.push(url);
+      }
+    } catch {
+      // 不是網址，跳過
+    }
+  };
+
+  /*
+   * ── 最可信：嵌入式播放器的封面參數 ────────────────────────────
+   *
+   * 掃的是**整份 HTML 文字**，不是 `iframe[src]` 屬性。實際案例（Vue）那個 iframe
+   * 寫的是 `:src="currentEpisode?.url"` —— 框架綁定，屬性上根本沒有網址，等 JS 跑完
+   * 才會填。但播放器網址連同 `?poster=` 就序列化在同一份 HTML 的初始資料裡，
+   * 只有掃文字看得到。理由與取捨見 `shared/cover-params.ts`。
+   */
+  for (const url of coverParams.fromText(html)) {
+    add(url);
+  }
+
+  // ── 宣告層：og:image / twitter:image / image_src ──────────────
   for (const selector of IMAGE_SELECTORS) {
     for (const element of document_.querySelectorAll(selector)) {
-      const raw = element.getAttribute('content') ?? element.getAttribute('href');
-      if (raw === null || raw.trim() === '') {
-        continue;
-      }
-      try {
-        // og:image 常是相對路徑，要以頁面網址為基準解析
-        const resolved = new URL(raw.trim(), pageUrl);
-        if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
-          continue;
-        }
-        const url = resolved.toString();
-        if (!seen.has(url)) {
-          seen.add(url);
-          found.push(url);
-        }
-      } catch {
-        continue;
-      }
+      add(element.getAttribute('content') ?? element.getAttribute('href'));
     }
   }
+
+  // ── JSON-LD（schema.org）──────────────────────────────────────
+  for (const script of document_.querySelectorAll('script[type="application/ld+json"]')) {
+    for (const url of imagesInJsonLd(script.textContent)) {
+      add(url);
+    }
+  }
+
+  // ── <video poster> ───────────────────────────────────────────
+  for (const video of document_.querySelectorAll('video[poster]')) {
+    add(video.getAttribute('poster'));
+  }
+
   return found;
 }

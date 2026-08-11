@@ -19,7 +19,53 @@ development 七份），[README.md](README.md) 只留簡介。
 
 ---
 
-## 下一件事：補抓抓不到影片封面（已分析完，還沒動手）
+## 補抓抓不到影片封面（已修，2026-08-11）
+
+修法與分析見下面那一節。**結果：兩個 fixture 都從站台 logo 變成正確的影片封面。**
+
+新增的東西：
+
+| | |
+|---|---|
+| `src/shared/cover-params.ts` | 封面參數的規則（`fromUrl` 給有 DOM 的那條路、`fromText` 給只有原始 HTML 的） |
+| `src/shared/json-ld.ts` | JSON-LD 裡的圖片（抽成純函式才測得到 —— og-fetcher 一路連到 `browser.storage`） |
+| `tests/cover-params.test.ts` | 19 項，含兩份複製清單的靜態檢查 |
+| `tests/fixtures/site/embed-spa.html` | 前端渲染版的嵌入式播放器頁 |
+
+`og-fetcher` 的 `extractImageUrls` 現在依 `cover.ts` 的分數順序取四層：播放器 poster
+參數（掃文字）→ og/twitter → JSON-LD → `<video poster>`。
+
+**`cover.ts` 必須留一份自己的 `POSTER_KEYS` 與 JSON-LD 欄位** —— 它是用
+`executeScript({ func })` 序列化注入頁面的，被序列化的函式看不到任何模組層 import
+（那也是它至今零 import 的原因）。兩份漂走的症狀是「某些站台補抓抓不到、開著分頁卻
+抓得到」，型別檢查與其他測試全綠，所以用靜態檢查釘住，**故意改壞確認過抓得到**。
+
+### fixture 挖出一個真實頁面沒暴露的缺口
+
+寫完先用真實 HTML 驗過，掃得到那一個 poster 參數。但換到自己寫的 fixture 就掃不到 ——
+參數不是第一個時，前面的 `&` 在 HTML 屬性裡是 `&amp;`、在 JS 字串裡是 `&`，
+兩種情況下 `poster` 前面都不是 `&`。真實案例剛好是 `?poster=`（排第一）才躲過。
+現在先把分隔符正規化再掃。
+
+### ⬜ 還沒解釋的：批量補抓之後畫面沒更新
+
+**修正本身沒問題**（同樣的網址，右鍵「重新抓預覽圖」立刻拿到正確封面），但批量補抓
+跑完之後，那幾列在畫面上仍然是網域色卡。已經排除的：
+
+- 12 個外部網站在容器裡本來就抓不到，第二次 `0 / 12` 是合理的
+- `background.html` 與 `lazy.html` **完全沒有宣告層標記**，補抓本來就無解（那是視覺層）
+- 但 `deep-thumbs.html` 有 og:image，卻也顯示色卡 —— **這一個解釋不了**
+
+懷疑是 `lib/thumb-cache.ts` 那份記憶體快取：`thumbs/updated` 廣播只有掛載中的元件會反應，
+沒掛載的鍵可能留著「這個鍵沒有圖」的舊答案。**但沒有證據，不要當成結論。**
+
+下一步該用背景頁 console（`about:debugging` → 檢測）看 `putThumb` 到底有沒有被呼叫，
+而不是繼續從畫面猜。**這個現象與這次的修改無關**（走的是同一個 `fetchOgThumbnail`），
+很可能本來就存在。
+
+---
+
+## 原始分析（保留，修法的依據）
 
 **症狀**：嵌入式影片頁按「補抓預覽圖」拿到站台 logo；同一頁**開著分頁**時按右鍵
 「重新抓預覽圖」則正確拿到影片封面。
