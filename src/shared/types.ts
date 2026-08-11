@@ -5,10 +5,11 @@ export type { WrappedKey };
 /**
  * 書籤的統一呈現型別。
  *
- * `source` 現在只會是 'native'，但先留著：M3 的隱私空間書籤會以同一個
- * 形狀送進側邊欄，讓渲染層不必因為資料來源不同而分歧。
+ * `source` 只會是 'native'。原本預留了 'vault'，設想隱私書籤會走同一個形狀進側邊欄；
+ * 實際做出來不是這樣 —— 隱私書籤有自己的型別與自己的渲染路徑（`PrivateBookmark`），
+ * 那個分支從來沒有人產生、也沒有人判斷過，所以拿掉了。
  */
-export type BookmarkSource = 'native' | 'vault';
+export type BookmarkSource = 'native';
 
 interface BookmarkBase {
   id: string;

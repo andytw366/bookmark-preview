@@ -1,4 +1,4 @@
-import { fromChunks, SYNC_TOTAL_BUDGET } from '@/crypto/chunk';
+import { fromChunks } from '@/crypto/chunk';
 import type { VaultMeta } from '@/shared/types';
 import { textDigest } from '@/shared/vault-merge';
 
@@ -37,8 +37,6 @@ export const SYNC_META_KEY = 'vaultSync';
 export const SYNC_CHUNK_PREFIX = 'vaultSyncC';
 export const SYNC_GONE_KEY = 'vaultSyncGone';
 const DEVICE_KEY = 'vaultSyncDeviceId';
-
-export const SYNC_QUOTA_BYTES = SYNC_TOTAL_BUDGET;
 
 export interface SyncMeta {
   version: 1;

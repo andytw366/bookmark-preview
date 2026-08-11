@@ -42,7 +42,8 @@ export function estimateSyncBytes(chunks: readonly string[], keyPrefix: string):
 /**
  * 留給中介資料那一筆的餘裕。
  *
- * 同步的那一筆 meta 含 salt、verifier、塊數與裝置 id，實測約 250 bytes。
+ * 同步的那一筆 meta 含 salt、KDF 參數、兩份金鑰包裹、加密過的救援金鑰、塊數、
+ * 兩個指紋與裝置 id，實測約 690 bytes。
  * 留 1 KB 是因為「差一點就爆配額」的失敗代價不對稱：估太保守只是少同步一些
  * 書籤，估太寬鬆會讓 `storage.sync.set` 中途失敗，遠端留下寫了一半的副本。
  */

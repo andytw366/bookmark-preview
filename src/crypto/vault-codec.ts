@@ -1,7 +1,7 @@
 import { t } from '@/shared/i18n';
 
 import { seal, unseal, IV_BYTES } from './aead';
-import { concat, copyBytes, equalBytes, fromBase64, fromUtf8, toBase64, utf8 } from './bytes';
+import { concat, copyBytes, fromBase64, fromUtf8, toBase64, utf8 } from './bytes';
 import { toChunks, fromChunks } from './chunk';
 import { gunzip, gzip } from './compress';
 
@@ -19,8 +19,6 @@ import { gunzip, gzip } from './compress';
 export const FORMAT_VERSION = 1;
 const FLAG_GZIP = 0x01;
 const HEADER_BYTES = 2 + IV_BYTES;
-
-const VERIFIER_PLAINTEXT = 'bookmark-preview-vault/v1';
 
 export interface EncodeOptions {
   /** 關閉壓縮主要是為了測試對照；正常情況一律開啟。 */
@@ -65,31 +63,4 @@ export async function decodePayload<T>(key: CryptoKey, chunks: readonly string[]
   const plain = new Uint8Array(await unseal(key, { iv, ciphertext: ciphertext.buffer }));
   const json = compressed ? await gunzip(plain) : plain;
   return JSON.parse(fromUtf8(json)) as T;
-}
-
-/**
- * 驗證器：以金鑰加密一段固定的已知明文。
- *
- * 解鎖時只要試著解開這一小段，就能判斷密碼對不對，
- * 不必先把整包書籤解密（那在資料多時明顯較慢）。
- */
-export async function makeVerifier(key: CryptoKey): Promise<string> {
-  const sealed = await seal(key, utf8(VERIFIER_PLAINTEXT));
-  return toBase64(concat(sealed.iv, new Uint8Array(sealed.ciphertext)));
-}
-
-export async function checkVerifier(key: CryptoKey, verifier: string): Promise<boolean> {
-  try {
-    const bytes = fromBase64(verifier);
-    if (bytes.length <= IV_BYTES) {
-      return false;
-    }
-    const plain = await unseal(key, {
-      iv: copyBytes(bytes.subarray(0, IV_BYTES)),
-      ciphertext: copyBytes(bytes.subarray(IV_BYTES)).buffer,
-    });
-    return equalBytes(new Uint8Array(plain), utf8(VERIFIER_PLAINTEXT));
-  } catch {
-    return false;
-  }
 }

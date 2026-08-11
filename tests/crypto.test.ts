@@ -4,7 +4,7 @@ import { concat, equalBytes, fromBase64, fromUtf8, toBase64, utf8 } from '@/cryp
 import { CHUNK_CHARS, estimateSyncBytes, fromChunks, toChunks } from '@/crypto/chunk';
 import { gunzip, gzip } from '@/crypto/compress';
 import { deriveKey, KDF_ITERATIONS, randomSalt } from '@/crypto/kdf';
-import { checkVerifier, decodePayload, encodePayload, makeVerifier } from '@/crypto/vault-codec';
+import { decodePayload, encodePayload } from '@/crypto/vault-codec';
 
 /**
  * 這些測試刻意用較低的迭代次數，讓整份測試能在數秒內跑完。
@@ -246,42 +246,15 @@ describe('vault 編碼', () => {
   });
 });
 
-describe('驗證器', () => {
-  it('正確金鑰通過', async () => {
-    const k = await key();
-    expect(await checkVerifier(k, await makeVerifier(k))).toBe(true);
-  });
-
-  it('錯誤金鑰不通過，且不拋錯', async () => {
-    const salt = randomSalt();
-    const right = await deriveKey('right', salt, FAST_ITERATIONS);
-    const wrong = await deriveKey('wrong', salt, FAST_ITERATIONS);
-    expect(await checkVerifier(wrong, await makeVerifier(right))).toBe(false);
-  });
-
-  it('垃圾輸入回傳 false 而不是爆掉', async () => {
-    const k = await key();
-    expect(await checkVerifier(k, 'not-base64!!!')).toBe(false);
-    expect(await checkVerifier(k, toBase64(new Uint8Array(4)))).toBe(false);
-  });
-
-  it('驗證器每次產生的內容不同（IV 隨機）', async () => {
-    const k = await key();
-    expect(await makeVerifier(k)).not.toBe(await makeVerifier(k));
-  });
-});
-
 describe('真實參數的整合檢查', () => {
   it('用 600,000 次迭代跑一次完整往返', async () => {
     const salt = randomSalt();
     const k = await deriveKey('a real master password', salt, KDF_ITERATIONS);
     const payload = { version: 1, bookmarks: makeBookmarks(500) };
-    const verifier = await makeVerifier(k);
     const chunks = await encodePayload(k, payload);
 
     // 模擬另一台裝置：只有相同的密碼與同步過來的 salt
     const other = await deriveKey('a real master password', salt, KDF_ITERATIONS);
-    expect(await checkVerifier(other, verifier)).toBe(true);
     expect(await decodePayload(other, chunks)).toEqual(payload);
   }, 30_000);
 

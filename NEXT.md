@@ -203,6 +203,47 @@ Google、Hacker News…），預覽圖全部是真的抓下來的：有 og:image
 首頁、支援網址六欄）。原始碼壓縮檔也要一起上傳，理由與建置步驟在 `amo/reviewer-notes.md`。
 **下一次送 1.0.1 時同一份清單再走一次**，尤其是原始碼壓縮檔那條。
 
+### 5. 死碼清查（2026-08-11 掃了一半，剩下的在這）
+
+起因是 `makeVerifier` / `checkVerifier`：金鑰環進來之後驗證器就沒必要了（解不開
+`passwordWrap` 本身就是「密碼錯誤」的答案），但那兩個函式留在 `src/crypto/vault-codec.ts`
+沒刪，測試還一直在測它們 —— 測試通過只是在證明「一個沒人用的東西還能動」。
+
+**同一天順手清掉的（都已刪，`npm run verify` 過）：**
+
+- `SYNC_QUOTA_BYTES`（`src/storage/vault-sync.ts`）—— 只是 `SYNC_TOTAL_BUDGET` 的別名，
+  宣告完全庫沒有第二次提及
+- `BookmarkSource` 的 `'vault'` 分支 —— 註解說「先留著，M3 的隱私書籤會走同一個形狀」，
+  但實際做出來隱私書籤有自己的型別（`PrivateBookmark`）與自己的渲染路徑，那個分支從來
+  沒被產生也沒被判斷過
+- `src/crypto/chunk.ts` 那句「meta 含 salt、verifier…約 250 bytes」—— 欄位和數字都過期了，
+  照實際 keyring 路徑量出來是 **684 bytes**（含 `vaultSync` 這個 key）。`SYNC_META_RESERVE`
+  留 1 KB 還夠，但真正的餘裕只剩約 340 bytes，不是舊註解讓人以為的約 770 bytes ——
+  以後 `VaultMeta` 再加欄位要記得這件事
+
+**不用查的：i18n key。** `tests/i18n.test.ts:120`「沒有沒人用的鍵」已經在守了，
+另外還有「維護的語系都補齊」「沒有語系多帶鍵」「placeholder 一致」三條。
+換句話說孤兒 key 這條路已經被測試釘死，`npm test` 過就代表乾淨。
+
+**還沒掃、但可能有東西的（照可能性排序）：**
+
+1. **沒用到的 CSS** —— 五批 i18n 動過大量 JSX，class 改名後遺留的規則不會有任何工具報錯，
+   目前也沒有任何測試守這件事。這條現在是最可能有貨的。
+2. **函式內部的死分支** —— 上面那輪只掃 export 出來的符號，函式內部走不到的 early return
+   或 `if` 分支完全沒查。M4 那幾個同步／合併函式最可能有。
+3. **`package.json` 沒用到的依賴**（`dependencies` 只有 react / react-dom，所以要看的是
+   `devDependencies`）。
+
+**過度 export（不急，但知道一下）：** `hex`、`SALT_BYTES`、`RECOVERY_BYTES`、
+`SYNC_ITEM_LIMIT`、`formatRecoveryKey`、`anchorOf`、`menuAnchorFrom`、`DEFAULT_SETTINGS`、
+`COMPRESSION_AVAILABLE`、`isLegacyMeta`、`metaStamp` 都只在自己檔案內被用到，
+`export` 是多的。它們是活的程式碼，拿掉 `export` 純粹是收窄介面。
+
+**`PLAN.md` 是刻意不動的。** 它第 84 與 326 行還在講驗證器，那份 `VaultMeta` 草圖也還是
+`version: 1` 配 `chunkCount` / `payloadVersion`（跟現在的形狀完全對不上）。它是金鑰環之前的
+原始規劃文件，只補驗證器那一行會讓它半真半假。要嘛整塊重寫，要嘛在開頭標一句「設計細節
+以 `docs/vault.md` 為準」，這是個判斷題，留給你決定。
+
 ---
 
 ## i18n 進度（2026-08-10 起）
