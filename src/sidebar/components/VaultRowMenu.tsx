@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { request } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder } from '@/shared/types';
 import { Popover } from './Popover';
+import { t } from '@/shared/i18n';
 
 export type VaultMenuTarget =
   | { kind: 'bookmark'; record: PrivateBookmark; x: number; y: number }
@@ -125,10 +126,10 @@ export function VaultRowMenu({
             onChange={(event) => {
               setName(event.target.value);
             }}
-            aria-label={target.kind === 'folder' ? '資料夾名稱' : '隱私書籤名稱'}
+            aria-label={target.kind === 'folder' ? t('folder_name_label_edit') : t('vault_bookmark_name_label')}
           />
           <button type="submit" className="chip chip--primary">
-            儲存
+            {t('action_save')}
           </button>
         </form>
       </Popover>
@@ -152,7 +153,7 @@ export function VaultRowMenu({
     const choices = flatten(folders, null, 0, movingFolder ? movingId : null);
     return (
       <Popover x={target.x} y={target.y} className="rowmenu rowmenu--list" onClose={onClose}>
-        <p className="rowmenu__heading">移動到…</p>
+        <p className="rowmenu__heading">{t('action_move_to')}</p>
         <button
           type="button"
           className="rowmenu__item"
@@ -161,7 +162,7 @@ export function VaultRowMenu({
             move(null);
           }}
         >
-          最上層
+          {t('folder_top_level')}
         </button>
         {choices.map((choice) => (
           <button
@@ -174,7 +175,7 @@ export function VaultRowMenu({
             }}
           >
             {' '.repeat(choice.depth * 2)}
-            {choice.name || '（未命名）'}
+            {choice.name || t('folder_untitled')}
           </button>
         ))}
       </Popover>
@@ -185,11 +186,11 @@ export function VaultRowMenu({
     const isFolder = target.kind === 'folder';
     return (
       <Popover x={target.x} y={target.y} onClose={onClose}>
-        <p className="rowmenu__heading">刪除「{initialName || '（未命名）'}」？</p>
+        <p className="rowmenu__heading">{t('delete_confirm_named', initialName || t('folder_untitled'))}</p>
         <p className="rowmenu__note">
           {isFolder
-            ? '資料夾裡的書籤與子資料夾會移到上一層，不會一起刪掉。'
-            : '直接刪除，不會還原成一般書籤。'}
+            ? t('vault_delete_folder_note')
+            : t('vault_delete_bookmark_note')}
         </p>
         <button
           type="button"
@@ -203,11 +204,11 @@ export function VaultRowMenu({
             onClose();
           }}
         >
-          確定刪除
+          {t('action_delete_confirm')}
         </button>
         {/* 焦點給「取消」，理由同 RowMenu：連按兩次 Enter 不該就刪掉東西 */}
         <button type="button" className="rowmenu__item" data-autofocus="" onClick={onClose}>
-          取消
+          {t('action_cancel')}
         </button>
       </Popover>
     );
@@ -226,7 +227,7 @@ export function VaultRowMenu({
               onClose();
             }}
           >
-            在新分頁開啟
+            {t('action_open_in_new_tab')}
           </button>
           <button
             type="button"
@@ -237,17 +238,17 @@ export function VaultRowMenu({
               onClose();
             }}
           >
-            複製網址
+            {t('action_copy_url')}
           </button>
           <button
             type="button"
             role="menuitem"
             className="rowmenu__item"
-            title="刪掉現有預覽圖並重新抓，結果會以主密碼加密。頁面開著時品質最好。"
+            title={t('vault_refresh_thumb_hint')}
             onClick={() => {
               const id = target.record.id;
               onClose();
-              onNotice('正在重新抓預覽圖…');
+              onNotice(t('refresh_thumb_running'));
               void request('vault/refresh-thumb', { id }).then(
                 (report) => {
                   onNotice(report.detail);
@@ -258,7 +259,7 @@ export function VaultRowMenu({
               );
             }}
           >
-            重新抓預覽圖
+            {t('action_refresh_thumb')}
           </button>
         </>
       ) : null}
@@ -271,7 +272,7 @@ export function VaultRowMenu({
           setRenaming(true);
         }}
       >
-        重新命名
+        {t('action_rename')}
       </button>
 
       {/* 資料夾也能搬 —— 多選已經可以勾它了，單筆選單沒有反而不一致 */}
@@ -283,7 +284,7 @@ export function VaultRowMenu({
           setChoosingFolder(true);
         }}
       >
-        移動到…
+        {t('action_move_to')}
       </button>
 
       {/* 資料夾與書籤都能移出：資料夾會連同子樹在原生書籤裡重建，與移入對稱 */}
@@ -293,27 +294,27 @@ export function VaultRowMenu({
         className="rowmenu__item"
         title={
           target.kind === 'folder'
-            ? '整個資料夾移回一般書籤，放進設定頁指定的預設資料夾'
-            : '移回一般書籤，放進設定頁指定的預設資料夾'
+            ? t('vault_export_folder_hint')
+            : t('vault_export_hint')
         }
         onClick={() => {
           onMoveOut(target.kind === 'folder' ? target.folder.id : target.record.id);
           onClose();
         }}
       >
-        {target.kind === 'folder' ? '把整個資料夾移出' : '移出隱私空間'}
+        {target.kind === 'folder' ? t('vault_export_folder') : t('vault_export')}
       </button>
       <button
         type="button"
         role="menuitem"
         className="rowmenu__item"
-        title="移回一般書籤，並自己選要放哪個資料夾"
+        title={t('vault_export_to_hint')}
         onClick={() => {
           onExportTo(target.kind === 'folder' ? target.folder.id : target.record.id, target.x, target.y);
           onClose();
         }}
       >
-        移出到…
+        {t('vault_export_to')}
       </button>
 
       <button
@@ -324,7 +325,7 @@ export function VaultRowMenu({
           setConfirmDelete(true);
         }}
       >
-        刪除
+        {t('action_delete')}
       </button>
     </Popover>
   );

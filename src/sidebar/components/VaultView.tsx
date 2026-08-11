@@ -15,6 +15,7 @@ import { Breadcrumb } from './Breadcrumb';
 import { NewFolderForm } from './NewFolderForm';
 import { FolderThumb } from './Thumb';
 import { VaultThumb } from './VaultThumb';
+import { t, tn } from '@/shared/i18n';
 
 /** 資料夾與書籤在畫面上是同一份清單，只是原本分兩段畫 */
 type VaultRow =
@@ -157,8 +158,8 @@ export function VaultView({
       >
         <FolderThumb />
         <span className="row__text">
-          <span className="row__title">{folder.name || '（未命名資料夾）'}</span>
-          <span className="row__meta">{countIn.get(folder.id) ?? 0} 個書籤</span>
+          <span className="row__title">{folder.name || t('folder_untitled_folder')}</span>
+          <span className="row__meta">{tn('unit_bookmarks', countIn.get(folder.id) ?? 0)}</span>
         </span>
         {selecting ? null : (
           <span className="row__chevron" aria-hidden="true">
@@ -177,8 +178,8 @@ export function VaultView({
           <button
             type="button"
             className="row__enter"
-            title="開啟這個資料夾"
-            aria-label={`開啟資料夾「${folder.name || '（未命名）'}」`}
+            title={t('row_open_folder')}
+            aria-label={t('row_open_folder_named', folder.name || t('folder_untitled'))}
             onClick={() => {
               onNavigate(folder.id);
             }}
@@ -251,7 +252,7 @@ export function VaultView({
   return (
     <div className="vault">
       <div className="vault__bar">
-        <span className="vault__count">{state.bookmarkCount} 個隱私書籤</span>
+        <span className="vault__count">{tn('unit_vault_bookmarks', state.bookmarkCount)}</span>
         <button
           type="button"
           className="toolbar__action"
@@ -259,10 +260,10 @@ export function VaultView({
             setCreatingFolder(true);
           }}
         >
-          新增資料夾
+          {t('action_new_folder')}
         </button>
         <button type="button" className="toolbar__action" onClick={onLock}>
-          立即上鎖
+          {t('vault_lock_now')}
         </button>
       </div>
 
@@ -283,8 +284,8 @@ export function VaultView({
       {empty ? (
         <p className="empty">
           {folderId === null
-            ? '還沒有隱私書籤。在書籤清單點某一列右側的鎖圖示就能把它移進來。'
-            : '這個資料夾是空的。'}
+            ? t('vault_empty_hint')
+            : t('folder_empty')}
         </p>
       ) : (
         <div
@@ -305,14 +306,14 @@ export function VaultView({
         {confirmDestroy ? (
           <div className="notice notice--error">
             <p>
-              <strong>確定要刪除整個隱私空間？</strong>
+              <strong>{t('vault_destroy_confirm')}</strong>
             </p>
             <p className="notice__body">
-              {state.bookmarkCount} 個隱私書籤與它們的預覽圖會被永久刪除，無法復原。
+              {t('vault_destroy_warning', tn('unit_vault_bookmarks', state.bookmarkCount))}
             </p>
             <div className="vault__actions">
               <button type="button" className="chip chip--danger" onClick={onDestroy}>
-                確定刪除
+                {t('action_delete_confirm')}
               </button>
               <button
                 type="button"
@@ -321,7 +322,7 @@ export function VaultView({
                   setConfirmDestroy(false);
                 }}
               >
-                取消
+                {t('action_cancel')}
               </button>
             </div>
           </div>
@@ -333,7 +334,7 @@ export function VaultView({
               setConfirmDestroy(true);
             }}
           >
-            刪除整個隱私空間…
+            {t('vault_destroy_action')}
           </button>
         )}
       </div>

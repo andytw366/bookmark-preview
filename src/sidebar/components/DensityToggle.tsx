@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Density } from '@/shared/types';
+import { t } from '@/shared/i18n';
 
 interface DensityToggleProps {
   value: Density;
@@ -18,12 +19,12 @@ interface DensityToggleProps {
 const OPTIONS: { value: Density; label: string; icon: ReactNode }[] = [
   {
     value: 'card',
-    label: '大縮圖卡片',
+    label: t('density_cards'),
     icon: <rect x="3" y="4" width="14" height="12" rx="2" />,
   },
   {
     value: 'row',
-    label: '小縮圖清單',
+    label: t('density_list'),
     // 一個小方塊加兩條線（= 一列有縮圖的清單項）。原本畫兩組堆疊的方塊加線條，
     // 在 15px 下四個元素糊成一團，看起來像亂碼而不是圖示。
     icon: (
@@ -35,14 +36,14 @@ const OPTIONS: { value: Density; label: string; icon: ReactNode }[] = [
   },
   {
     value: 'text',
-    label: '不顯示縮圖',
+    label: t('density_text'),
     icon: <path d="M3.5 6h13M3.5 10h13M3.5 14h9" />,
   },
 ];
 
 export function DensityToggle({ value, onChange }: DensityToggleProps) {
   return (
-    <div className="segmented" role="group" aria-label="顯示密度">
+    <div className="segmented" role="group" aria-label={t('density_label')}>
       {OPTIONS.map((option) => (
         <button
           key={option.value}

@@ -54,9 +54,10 @@ Then open `about:debugging#/runtime/this-firefox` → "Load Temporary Add-on" �
 Requires Firefox 140 or newer, desktop only (`sidebar_action` does not exist on Firefox
 for Android).
 
-**The interface is currently in Traditional Chinese only.** There is no `_locales/` yet and
-no `browser.i18n` calls — the strings are inline. Adding English is planned; see
-[NEXT.md](NEXT.md).
+The interface is available in **English and Traditional Chinese**, and follows the Firefox
+UI language. Adding another one means dropping a folder into `public/_locales/` — nothing
+in `src/` names a locale. See
+[docs/development.md](docs/development.md#strings-and-translations).
 
 ## Documentation
 
@@ -68,7 +69,7 @@ no `browser.i18n` calls — the strings are inline. Adding English is planned; s
 | [docs/interface.md](docs/interface.md) | Keyboard map, virtual scrolling, the toolbars, the full-page view |
 | [docs/architecture.md](docs/architecture.md) | Build setup, source layout, the invariants worth knowing before changing things |
 | [docs/permissions.md](docs/permissions.md) | Every permission and why it is needed |
-| [docs/development.md](docs/development.md) | Building, testing on Windows, headless testing in a container |
+| [docs/development.md](docs/development.md) | Building, strings and translations, testing on Windows, headless testing in a container |
 
 `PLAN.md` holds the original design and staged plan; `NEXT.md` is the working handover
 document (current state, what is verified against a real browser, and the traps in the test

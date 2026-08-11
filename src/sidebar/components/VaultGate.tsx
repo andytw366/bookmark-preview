@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { VaultState } from '@/shared/types';
 import { RecoveryKeyPanel } from './RecoveryKeyPanel';
+import { t } from '@/shared/i18n';
+import { Rich } from '../lib/rich';
+import { MIN_PASSWORD_LENGTH } from '@/shared/vault-entry';
 
 interface VaultGateProps {
   state: VaultState;
@@ -14,7 +17,7 @@ interface VaultGateProps {
   onForget?: () => void;
 }
 
-const MIN_LENGTH = 8;
+
 
 /** 尚未建立隱私空間、已建立但上鎖、或資料是舊格式時的介面。 */
 export function VaultGate({
@@ -42,7 +45,7 @@ export function VaultGate({
   if (recoveryKey !== null) {
     return (
       <div className="gate">
-        <h2 className="gate__title">隱私空間已建立</h2>
+        <h2 className="gate__title">{t('vault_created_title')}</h2>
         <RecoveryKeyPanel
           recoveryKey={recoveryKey}
           reason="created"
@@ -58,21 +61,21 @@ export function VaultGate({
   if (state.status === 'legacy') {
     return (
       <div className="gate">
-        <h2 className="gate__title">這個隱私空間是舊格式</h2>
+        <h2 className="gate__title">{t('vault_legacy_title')}</h2>
         <div className="notice notice--warn">
           <p>
-            <strong>目前的版本已經打不開它了。</strong>
+            <strong>{t('vault_legacy_cannot_open')}</strong>
           </p>
           <p className="notice__body">
-            開發期間換過加密格式（改成支援救援金鑰與更改主密碼），而舊格式刻意沒有做轉換。
-            正確的密碼也開不了，只能清掉它再重新建立一個。
+            {t('vault_legacy_why')}
+            
           </p>
         </div>
         {onForget === undefined ? (
-          <p className="gate__hint">到設定頁按「放棄這台裝置上的隱私空間」。</p>
+          <p className="gate__hint">{t('vault_legacy_how')}</p>
         ) : (
           <button type="button" className="gate__submit" onClick={onForget}>
-            清掉並重新開始
+            {t('vault_legacy_action')}
           </button>
         )}
       </div>
@@ -83,9 +86,9 @@ export function VaultGate({
     if (usingRecovery) {
       return (
         <div className="gate">
-          <h2 className="gate__title">用救援金鑰解鎖</h2>
+          <h2 className="gate__title">{t('vault_unlock_recovery_title')}</h2>
           <p className="gate__hint">
-            就是建立時要你抄下來的那 8 組字元。大小寫與分隔符號都不重要。
+            {t('vault_unlock_recovery_hint')}
           </p>
           {/* 不包在 <form> 裡：表單送出會觸發 Firefox 的存密碼提示 */}
           <input
@@ -113,7 +116,7 @@ export function VaultGate({
               onUnlockWithRecoveryKey(recoveryInput);
             }}
           >
-            解鎖
+            {t('vault_unlock_action')}
           </button>
           <button
             type="button"
@@ -123,7 +126,7 @@ export function VaultGate({
               setRecoveryInput('');
             }}
           >
-            改用主密碼
+            {t('vault_use_password_instead')}
           </button>
         </div>
       );
@@ -131,11 +134,11 @@ export function VaultGate({
 
     return (
       <div className="gate">
-        <h2 className="gate__title">隱私空間已上鎖</h2>
+        <h2 className="gate__title">{t('vault_locked_title')}</h2>
         <input
           type="password"
           className="gate__input"
-          placeholder="主密碼"
+          placeholder={t('vault_secret_password')}
           autoComplete="off"
           autoFocus
           value={password}
@@ -158,7 +161,7 @@ export function VaultGate({
             setPassword('');
           }}
         >
-          解鎖
+          {t('vault_unlock_action')}
         </button>
         <button
           type="button"
@@ -167,13 +170,13 @@ export function VaultGate({
             setUsingRecovery(true);
           }}
         >
-          忘記主密碼？用救援金鑰
+          {t('vault_forgot_password')}
         </button>
       </div>
     );
   }
 
-  const tooShort = password.length < MIN_LENGTH;
+  const tooShort = password.length < MIN_PASSWORD_LENGTH;
   const mismatch = password !== confirm;
 
   const submit = (): void => {
@@ -197,15 +200,15 @@ export function VaultGate({
 
   return (
     <div className="gate">
-      <h2 className="gate__title">建立隱私空間</h2>
+      <h2 className="gate__title">{t('vault_create_title')}</h2>
 
       <div className="notice notice--warn">
         <p>
-          <strong>忘記主密碼時，只有救援金鑰能救回資料。</strong>
+          <strong>{t('vault_create_warning')}</strong>
         </p>
         <p className="notice__body">
-          密碼不存在任何地方，我們也無法替你重設。建立後會給你一串
-          <strong>救援金鑰</strong>，那是唯一的備用鑰匙，請抄下來。
+          <Rich text={t('vault_create_body')} />
+          
         </p>
       </div>
 
@@ -213,7 +216,7 @@ export function VaultGate({
       <input
         type="password"
         className="gate__input"
-        placeholder={`主密碼（至少 ${String(MIN_LENGTH)} 字）`}
+        placeholder={t('vault_password_placeholder', MIN_PASSWORD_LENGTH)}
         autoComplete="new-password"
         value={password}
         onChange={(event) => {
@@ -223,7 +226,7 @@ export function VaultGate({
       <input
         type="password"
         className="gate__input"
-        placeholder="再次輸入"
+        placeholder={t('vault_password_again')}
         autoComplete="new-password"
         value={confirm}
         onChange={(event) => {
@@ -236,8 +239,8 @@ export function VaultGate({
         }}
       />
 
-      {password !== '' && tooShort ? <p className="gate__hint">密碼至少要 {MIN_LENGTH} 個字。</p> : null}
-      {confirm !== '' && mismatch ? <p className="gate__hint">兩次輸入不一致。</p> : null}
+      {password !== '' && tooShort ? <p className="gate__hint">{t('vault_password_too_short', MIN_PASSWORD_LENGTH)}</p> : null}
+      {confirm !== '' && mismatch ? <p className="gate__hint">{t('vault_password_mismatch')}</p> : null}
 
       <label className="gate__check">
         <input
@@ -247,7 +250,7 @@ export function VaultGate({
             setAcknowledged(event.target.checked);
           }}
         />
-        我了解忘記密碼且遺失救援金鑰將無法救回
+        {t('vault_create_acknowledge')}
       </label>
 
       <button
@@ -256,7 +259,7 @@ export function VaultGate({
         disabled={tooShort || mismatch || !acknowledged || busy}
         onClick={submit}
       >
-        {busy ? '建立中…' : '建立'}
+        {busy ? t('action_creating') : t('action_create')}
       </button>
     </div>
   );

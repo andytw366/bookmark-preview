@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "書籤預覽",
+  "name": "__MSG_extension_name__",
   "version": "1.0.0",
-  "description": "以縮圖預覽瀏覽書籤，並提供密碼加密的隱私書籤空間。",
+  "description": "__MSG_extension_description__",
+  "default_locale": "en",
 
   "browser_specific_settings": {
     "gecko": {
@@ -30,7 +31,7 @@
   },
 
   "sidebar_action": {
-    "default_title": "書籤預覽",
+    "default_title": "__MSG_extension_name__",
     "default_panel": "sidebar/index.html",
     "default_icon": {
       "48": "icons/icon-48.png",
@@ -44,7 +45,7 @@
       "suggested_key": {
         "default": "Ctrl+Shift+Period"
       },
-      "description": "開啟書籤預覽側邊欄"
+      "description": "__MSG_command_toggle_sidebar__"
     }
   },
 

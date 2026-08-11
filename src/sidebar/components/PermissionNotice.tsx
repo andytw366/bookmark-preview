@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 interface PermissionNoticeProps {
   onGrant: () => void;
 }
@@ -12,14 +14,14 @@ export function PermissionNotice({ onGrant }: PermissionNoticeProps) {
   return (
     <div className="notice notice--info">
       <p>
-        <strong>目前只能顯示網域色卡。</strong>
+        <strong>{t('permission_swatches_only')}</strong>
       </p>
       <p className="notice__body">
-        產生真實預覽需要「存取所有網站」的權限。縮圖只存在你的裝置上，不會上傳。
+        {t('permission_why')}
       </p>
-      <p className="notice__body">授權後擴充套件會自動重新啟動一次。</p>
+      <p className="notice__body">{t('permission_reload_note')}</p>
       <button type="button" onClick={onGrant}>
-        授予權限
+        {t('permission_grant')}
       </button>
     </div>
   );

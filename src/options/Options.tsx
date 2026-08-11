@@ -7,12 +7,14 @@ import {
   type VaultSyncStatus,
 } from '@/shared/messages';
 import type { VaultEntry } from '@/shared/types';
-import { DEFAULT_VAULT_TRIGGER } from '@/shared/vault-entry';
+import { DEFAULT_VAULT_TRIGGER, MIN_PASSWORD_LENGTH } from '@/shared/vault-entry';
 import type { MergeReport } from '@/shared/vault-merge';
 import { useSettings } from '@/sidebar/hooks/useSettings';
 import { useVault } from '@/sidebar/hooks/useVault';
 import { RecoveryKeyPanel } from '@/sidebar/components/RecoveryKeyPanel';
 import { VaultGate } from '@/sidebar/components/VaultGate';
+import { t, tn } from '@/shared/i18n';
+import { Rich } from '@/sidebar/lib/rich';
 
 /**
  * 把 JSON 交給瀏覽器下載。
@@ -40,27 +42,27 @@ function downloadJson(filename: string, json: string): void {
 function describeMerge(report: MergeReport, adopted: boolean): string {
   const parts: string[] = [];
   if (adopted) {
-    parts.push(`已還原 ${String(report.bookmarks.added)} 個書籤`);
+    parts.push(t('merge_restored', tn('unit_bookmarks', report.bookmarks.added)));
     if (report.folders.added > 0) {
-      parts.push(`${String(report.folders.added)} 個資料夾`);
+      parts.push(tn('unit_folders', report.folders.added));
     }
   } else {
-    parts.push(`新增 ${String(report.bookmarks.added)} 個書籤`);
+    parts.push(t('merge_added', tn('unit_bookmarks', report.bookmarks.added)));
     if (report.bookmarks.updated > 0) {
-      parts.push(`更新 ${String(report.bookmarks.updated)} 個`);
+      parts.push(t('merge_updated', report.bookmarks.updated));
     }
     if (report.folders.added > 0 || report.folders.updated > 0) {
       parts.push(
-        `資料夾新增 ${String(report.folders.added)} 個、更新 ${String(report.folders.updated)} 個`,
+        t('merge_folders', report.folders.added, report.folders.updated),
       );
     }
   }
-  let text = `${parts.join('，')}。`;
+  let text = t('merge_sentence', parts.join(t('list_separator')));
   if (report.reattached > 0) {
-    text += `其中 ${String(report.reattached)} 筆原本的資料夾在合併後不存在，已移到最上層。`;
+    text += t('merge_reattached', report.reattached);
   }
   if (adopted) {
-    text += '備份檔不含預覽圖，回到側邊欄按「補抓預覽圖」就會重新產生。';
+    text += t('merge_no_previews');
   }
   return text;
 }
@@ -72,17 +74,15 @@ function describeMerge(report: MergeReport, adopted: boolean): string {
  * 都會安靜地什麼都不做，那時說完成會讓人以為資料已經上去了。
  */
 const OUTCOME_TEXT: Record<SyncOutcome, string> = {
-  synced:
-    '已跟雲端副本對過（有較新的內容就已經合併進來）。' +
-    '實際上傳／下載到 Firefox 伺服器是 Firefox 自己排程的，不是這顆按鈕做的。',
-  unavailable: '這個 Firefox 沒有可用的 storage.sync，無法同步。',
-  disabled: '同步目前是關閉的，什麼都沒做。',
-  'no-vault': '這台裝置還沒有隱私空間，沒有東西可以同步。',
-  busy: '已經有一次同步在進行中。',
-  locked: '隱私空間目前上鎖，沒有金鑰可以合併雲端那份 —— 這次沒有讀也沒有寫。請先在側邊欄解鎖。',
-  waiting: '雲端副本還在傳輸中，這次先不動它（避免覆蓋掉還沒看到的內容）。稍後會自己完成。',
-  'deleted-elsewhere': '另一台裝置刪除了隱私空間，同步已暫停等你決定。',
-  failed: '同步失敗，原因見上面的訊息。',
+  synced: t('outcome_synced'),
+  unavailable: t('outcome_unavailable'),
+  disabled: t('outcome_disabled'),
+  'no-vault': t('outcome_no_vault'),
+  busy: t('outcome_busy'),
+  locked: t('outcome_locked'),
+  waiting: t('outcome_waiting'),
+  'deleted-elsewhere': t('outcome_deleted_elsewhere'),
+  failed: t('outcome_failed'),
 };
 
 function formatBytes(bytes: number): string {
@@ -215,7 +215,7 @@ export function Options() {
       setSyncLoadError(null);
       // lastOutcome 為 null 時不能假設成功 —— 那是「沒有結果可回報」，不是「完成了」
       setSyncStatusText(
-        next.lastOutcome === null ? '已送出同步請求，狀態見上面。' : OUTCOME_TEXT[next.lastOutcome],
+        next.lastOutcome === null ? t('sync_requested') : OUTCOME_TEXT[next.lastOutcome],
       );
     } catch (error) {
       setSyncStatusText(error instanceof Error ? error.message : String(error));
@@ -226,7 +226,7 @@ export function Options() {
   }, [refreshSync]);
 
   if (settings === null || vault.state === null) {
-    return <div className="options">載入設定…</div>;
+    return <div className="options">{t('options_loading')}</div>;
   }
 
   const vaultStatus = vault.state.status;
@@ -243,23 +243,23 @@ export function Options() {
 
   return (
     <div className="options">
-      <h1>書籤預覽</h1>
+      <h1>{t('extension_name')}</h1>
       <p className="options__lede">
         {settings.vaultSyncEnabled
-          ? '所有資料都在這台裝置上。隱私空間另有一份加密副本在 Firefox 同步裡，只有主密碼解得開。'
-          : '所有資料都在這台裝置上，不會上傳到任何伺服器。'}
+          ? t('options_lede_sync')
+          : t('options_lede')}
       </p>
 
       <section>
-        <h2>隱私空間的入口</h2>
+        <h2>{t('options_entry_title')}</h2>
         <p className="options__hint">
-          隱藏時，要在搜尋框打下面那段觸發字串才會跳出密碼畫面。
+          {t('options_entry_hint')}
         </p>
         <div className="options__row">
           {(
             [
-              ['hidden', '隱藏（用觸發字串進入）'],
-              ['tab', '顯示分頁'],
+              ['hidden', t('options_entry_hidden')],
+              ['tab', t('options_entry_tab')],
             ] as [VaultEntry, string][]
           ).map(([value, label]) => (
             <label key={value} className="options__check">
@@ -278,12 +278,12 @@ export function Options() {
       </section>
 
       <section>
-        <h2>移出隱私空間的落點</h2>
+        <h2>{t('options_export_target_title')}</h2>
         <p className="options__hint">
-          「移出隱私空間」會放進這個資料夾；「移出到…」則每次讓你選。
+          {t('options_export_target_hint')}
         </p>
         <label className="options__field">
-          <span>預設資料夾</span>
+          <span>{t('options_default_folder')}</span>
           <select
             value={settings.vaultExportFolderId ?? ''}
             onChange={(event) => {
@@ -291,7 +291,7 @@ export function Options() {
               update({ vaultExportFolderId: value === '' ? null : value });
             }}
           >
-            <option value="">（Firefox 預設：其他書籤）</option>
+            <option value="">{t('options_firefox_default_folder')}</option>
             {folders.map((folder) => (
               <option key={folder.id} value={folder.id}>
                 {' '.repeat(folder.depth * 2)}
@@ -301,20 +301,20 @@ export function Options() {
           </select>
         </label>
         <p className="options__hint">
-          這個資料夾被刪掉時，會自動退回 Firefox 的預設位置。
+          {t('options_export_target_fallback')}
         </p>
       </section>
 
       <section>
-        <h2>觸發字串</h2>
+        <h2>{t('options_trigger_title')}</h2>
         <p className="options__hint">
-          在搜尋框打這段字就會跳出密碼畫面。任何文字都可以。
+          {t('options_trigger_hint')}
         </p>
         <p className="options__hint">
-          <strong>建議改掉。</strong>預設值是公開的，別人打一次就能看出這台裝置有沒有隱私空間。
+          <Rich text={t('options_trigger_advice')} />
         </p>
         <label className="options__field">
-          <span>觸發字串</span>
+          <span>{t('options_trigger_title')}</span>
           <input
             type="text"
             value={settings.vaultTrigger}
@@ -328,13 +328,13 @@ export function Options() {
         </label>
         {settings.vaultTrigger.trim() === '' ? (
           <p className="options__hint">
-            空的等於停用這個入口。記得把上面改成「顯示分頁」，否則就進不去了。
+            {t('options_trigger_empty')}
           </p>
         ) : null}
       </section>
 
       <section>
-        <h2>隱私空間</h2>
+        <h2>{t('tab_vault')}</h2>
         {remoteAwaitingRestore ? (
           /*
            * 雲端已經有一份、本機還沒有 —— 這時**不能**顯示建立表單。
@@ -342,9 +342,7 @@ export function Options() {
            * 那份覆蓋掉；那正是災難還原最需要它的時候。
            */
           <p className="options__status">
-            雲端已經有一份加密副本。到下面的「跨裝置同步」按「從雲端還原到這台裝置」，
-            再用<strong>同一組主密碼</strong>解鎖。<strong>不要在這裡另外建立</strong> ——
-            金鑰會不同，兩份從此合不起來。
+            <Rich text={t('options_remote_awaiting_restore')} />
           </p>
         ) : vault.state.status === 'absent' || vault.state.status === 'legacy' ? (
           <VaultGate
@@ -359,13 +357,13 @@ export function Options() {
         ) : (
           <>
             <p>
-              狀態：
+              {t('options_status_label')}
               {vault.state.status === 'unlocked'
-                ? `已解鎖，${String(vault.state.bookmarkCount)} 個隱私書籤`
-                : '已上鎖'}
+                ? t('options_status_unlocked', tn('unit_vault_bookmarks', vault.state.bookmarkCount))
+                : t('options_status_locked')}
             </p>
             <p className="options__hint">
-              隱私書籤的管理（移出、刪除）在側邊欄解鎖後進行。
+              {t('options_vault_manage_hint')}
             </p>
           </>
         )}
@@ -373,9 +371,9 @@ export function Options() {
       </section>
 
       <section>
-        <h2>主密碼與救援金鑰</h2>
+        <h2>{t('options_keys_title')}</h2>
         <p className="options__hint">
-          主密碼與救援金鑰都能解開同一份資料。忘記主密碼時，救援金鑰是唯一的出路。
+          {t('options_keys_hint')}
         </p>
 
         {vaultStatus === 'unlocked' ? (
@@ -395,12 +393,12 @@ export function Options() {
                 );
               }}
             >
-              再看一次救援金鑰
+              {t('options_reveal_recovery')}
             </button>
           </div>
         ) : (
           <p className="options__hint">
-            要看救援金鑰或更改主密碼，先在側邊欄解鎖。
+            {t('options_keys_need_unlock')}
           </p>
         )}
 
@@ -418,12 +416,12 @@ export function Options() {
 
         {vaultStatus === 'unlocked' ? (
           <>
-            <h2 style={{ marginTop: 20 }}>更改主密碼</h2>
+            <h2 style={{ marginTop: 20 }}>{t('options_change_password_title')}</h2>
             <p className="options__hint">
-              救援金鑰<strong>不會</strong>因此改變。
+              <Rich text={t('options_change_password_hint')} />
             </p>
             <label className="options__field">
-              <span>目前的主密碼</span>
+              <span>{t('options_current_password')}</span>
               <input
                 type="password"
                 value={currentPassword}
@@ -434,7 +432,7 @@ export function Options() {
               />
             </label>
             <label className="options__field">
-              <span>新的主密碼（至少 8 字）</span>
+              <span>{t('options_new_password', MIN_PASSWORD_LENGTH)}</span>
               <input
                 type="password"
                 value={nextPassword}
@@ -445,7 +443,7 @@ export function Options() {
               />
             </label>
             <label className="options__field">
-              <span>再次輸入新的主密碼</span>
+              <span>{t('options_new_password_again')}</span>
               <input
                 type="password"
                 value={nextConfirm}
@@ -460,7 +458,7 @@ export function Options() {
                 type="button"
                 className="chip"
                 disabled={
-                  currentPassword === '' || nextPassword.length < 8 || nextPassword !== nextConfirm
+                  currentPassword === '' || nextPassword.length < MIN_PASSWORD_LENGTH || nextPassword !== nextConfirm
                 }
                 onClick={() => {
                   setKeyStatus(null);
@@ -472,7 +470,7 @@ export function Options() {
                       setCurrentPassword('');
                       setNextPassword('');
                       setNextConfirm('');
-                      setKeyStatus('主密碼已更改。下次解鎖請用新的密碼。');
+                      setKeyStatus(t('options_password_changed'));
                     },
                     (error: unknown) => {
                       setKeyStatus(error instanceof Error ? error.message : String(error));
@@ -480,33 +478,33 @@ export function Options() {
                   );
                 }}
               >
-                更改主密碼
+                {t('options_change_password_title')}
               </button>
             </div>
-            {nextPassword !== '' && nextPassword.length < 8 ? (
-              <p className="options__hint">新密碼至少要 8 個字。</p>
+            {nextPassword !== '' && nextPassword.length < MIN_PASSWORD_LENGTH ? (
+              <p className="options__hint">{t('vault_password_too_short', MIN_PASSWORD_LENGTH)}</p>
             ) : null}
             {nextConfirm !== '' && nextPassword !== nextConfirm ? (
-              <p className="options__hint">兩次輸入不一致。</p>
+              <p className="options__hint">{t('vault_password_mismatch')}</p>
             ) : null}
 
-            <h2 style={{ marginTop: 20 }}>重新產生救援金鑰</h2>
+            <h2 style={{ marginTop: 20 }}>{t('options_regenerate_title')}</h2>
             <p className="options__hint">
-              舊的那一串會<strong>立刻失效</strong>，記得把抄在紙上的丟掉。
+              <Rich text={t('options_regenerate_hint')} />
             </p>
             <div className="options__row">
               <button
                 type="button"
                 className="chip"
                 disabled={currentPassword === ''}
-                title={currentPassword === '' ? '請先在上面輸入目前的主密碼' : undefined}
+                title={currentPassword === '' ? t('options_need_current_password') : undefined}
                 onClick={() => {
                   setKeyStatus(null);
                   void request('vault/regenerate-recovery', { password: currentPassword }).then(
                     ({ recoveryKey }) => {
                       setCurrentPassword('');
                       setShownKey({ code: recoveryKey, reason: 'regenerated' });
-                      setKeyStatus('已產生新的救援金鑰（顯示在上面），舊的那一串已失效。');
+                      setKeyStatus(t('options_regenerated'));
                     },
                     (error: unknown) => {
                       setKeyStatus(error instanceof Error ? error.message : String(error));
@@ -514,7 +512,7 @@ export function Options() {
                   );
                 }}
               >
-                重新產生（需要目前的主密碼）
+                {t('options_regenerate_action')}
               </button>
             </div>
           </>
@@ -522,10 +520,10 @@ export function Options() {
 
         {hasLocalVault && vaultStatus !== 'unlocked' ? (
           <>
-            <h2 style={{ marginTop: 20 }}>放棄這台裝置上的隱私空間</h2>
+            <h2 style={{ marginTop: 20 }}>{t('options_forget_title')}</h2>
             <p className="options__hint">
-              主密碼與救援金鑰都沒有時唯一的出路。清掉這台裝置上的加密資料後可以重建，
-              <strong>裡面的書籤救不回來</strong>。雲端副本不受影響。
+              <Rich text={t('options_forget_hint')} />
+              
             </p>
             <div className="options__row">
               <button
@@ -534,11 +532,11 @@ export function Options() {
                 onClick={() => {
                   setKeyStatus(null);
                   void vault.forget().then(() => {
-                    setKeyStatus('已清掉這台裝置上的隱私空間。');
+                    setKeyStatus(t('options_forgot'));
                   }, () => undefined);
                 }}
               >
-                放棄這台裝置上的隱私空間
+                {t('options_forget_title')}
               </button>
             </div>
           </>
@@ -548,13 +546,13 @@ export function Options() {
       </section>
 
       <section>
-        <h2>加密備份檔</h2>
+        <h2>{t('options_backup_title')}</h2>
         <p className="options__hint">
-          <strong>忘記主密碼就永遠打不開。</strong>備份檔讓資料不會隨這台電腦一起消失，
-          但它一樣需要當時那組主密碼。
+          <Rich text={t('options_backup_hint')} />
+          
         </p>
         <p className="options__hint">
-          檔案是加密的（AES-256-GCM），可放進雲端硬碟或隨身碟。<strong>不含預覽圖</strong>（圖可以重抓）。
+          <Rich text={t('options_backup_hint2')} />
         </p>
 
         <div className="options__row">
@@ -566,15 +564,15 @@ export function Options() {
               vaultStatus === 'unlocked'
                 ? undefined
                 : hasLocalVault
-                  ? '要先在側邊欄解鎖隱私空間 —— 那同時證明你還記得這份備份的密碼'
-                  : '這台裝置還沒有隱私空間，沒有東西可以匯出'
+                  ? t('options_export_needs_unlock')
+                  : t('options_export_no_vault')
             }
             onClick={() => {
               void request('vault/backup-export', undefined).then(
                 (file) => {
                   downloadJson(file.filename, file.json);
                   setBackupText(file.json);
-                  setBackupStatus(`已匯出 ${file.filename}。如果沒有跳出下載，請用下面的內容自己存檔。`);
+                  setBackupStatus(t('options_exported', file.filename));
                 },
                 (error: unknown) => {
                   setBackupStatus(error instanceof Error ? error.message : String(error));
@@ -582,30 +580,30 @@ export function Options() {
               );
             }}
           >
-            匯出加密備份檔
+            {t('options_export_action')}
           </button>
         </div>
         {backupStatus !== null ? <p className="options__status">{backupStatus}</p> : null}
         {backupText !== null ? (
           <details className="options__details">
-            <summary>下載沒跳出來？在這裡複製內容</summary>
+            <summary>{t('options_download_fallback')}</summary>
             <p className="options__hint">
-              全選複製存成 <code>.json</code>。內容已加密。
+              {t('options_download_fallback_hint')}
             </p>
             <textarea readOnly value={backupText} className="options__blob" />
           </details>
         ) : null}
 
-        <h2 style={{ marginTop: 20 }}>從備份檔還原</h2>
+        <h2 style={{ marginTop: 20 }}>{t('options_restore_title')}</h2>
         <p className="options__hint">
-          這台裝置還沒有隱私空間時，之後就用這個備份檔的密碼解鎖。
-          已經有的話<strong>要先在側邊欄解鎖</strong>，還原會逐筆合併（同一筆取較新的）。
+          <Rich text={t('options_restore_hint')} />
+          
         </p>
         <div className="options__row">
           {(
             [
-              [false, '用主密碼'],
-              [true, '用救援金鑰'],
+              [false, t('options_restore_with_password')],
+              [true, t('options_restore_with_recovery')],
             ] as [boolean, string][]
           ).map(([value, label]) => (
             <label key={String(value)} className="options__check">
@@ -624,7 +622,7 @@ export function Options() {
         </div>
         {/* 用 <label> 包住才有可存取的名稱；<label> 不是 <form>，不會觸發存密碼提示 */}
         <label className="options__field">
-          <span>備份檔</span>
+          <span>{t('options_backup_file')}</span>
           <input
             type="file"
             accept=".json,application/json"
@@ -640,7 +638,7 @@ export function Options() {
                   setRestoreFile({ name: file.name, text });
                 },
                 () => {
-                  setRestoreStatus('讀不到這個檔案。');
+                  setRestoreStatus(t('options_file_unreadable'));
                 },
               );
             }}
@@ -652,7 +650,7 @@ export function Options() {
         */}
         {restoreViaRecovery ? (
           <label className="options__field">
-            <span>那個備份檔的救援金鑰</span>
+            <span>{t('options_backup_recovery_key')}</span>
             <input
               type="text"
               value={restoreRecoveryKey}
@@ -666,7 +664,7 @@ export function Options() {
           </label>
         ) : (
           <label className="options__field">
-            <span>那個備份檔的主密碼</span>
+            <span>{t('options_backup_password')}</span>
             <input
               type="password"
               value={restorePassword}
@@ -710,7 +708,7 @@ export function Options() {
               );
             }}
           >
-            {restoreBusy ? '還原中…' : '還原'}
+            {restoreBusy ? t('options_restoring') : t('options_restore_action')}
           </button>
           {restoreFile !== null ? (
             <span className="options__hint">{restoreFile.name}</span>
@@ -718,18 +716,18 @@ export function Options() {
         </div>
         {vaultStatus === 'locked' && hasLocalVault ? (
           <p className="options__hint">
-            這台裝置已經有隱私空間但目前上鎖。還原到現有的隱私空間需要先解鎖
-            —— 合併時得用這台裝置的金鑰把結果寫回去。
+            {t('options_restore_needs_unlock')}
+            
           </p>
         ) : null}
         {restoreStatus !== null ? <p className="options__status">{restoreStatus}</p> : null}
       </section>
 
       <section>
-        <h2>跨裝置同步</h2>
+        <h2>{t('options_sync_title')}</h2>
         <p className="options__hint">
-          把一份<strong>已加密</strong>的副本放進 Firefox 同步。其他裝置勾選同一個選項、
-          輸入同一組主密碼就能取得；主密碼不會被同步。
+          <Rich text={t('options_sync_hint')} />
+          
         </p>
         {/*
           折起來而不是刪掉：這兩件事都實際造成過誤解（按了好幾次卻發現另一台沒資料、
@@ -737,16 +735,16 @@ export function Options() {
           不該長期佔著版面。
         */}
         <details className="options__details">
-          <summary>其他裝置還沒看到？</summary>
+          <summary>{t('options_sync_not_seen')}</summary>
           <p className="options__hint">
-            這個勾選框只把加密副本寫進本機的 <code>storage.sync</code>（幾秒完成）；
-            真正傳到別台裝置是 Firefox 自己的排程，約 10 分鐘一次。不想等就到
-            <code>about:preferences#sync</code> 按「立即同步」——
-            <strong>來源那台先按，接收那台再按</strong>。
+            <Rich text={t('options_sync_not_seen_1')} />
+            
+            
+            
           </p>
           <p className="options__hint">
-            新裝置拿到資料後，在搜尋框打觸發字串，跳出的應該是<strong>解鎖</strong>畫面。
-            <strong>不要按「建立隱私空間」</strong> —— 金鑰會不同，兩份從此合不起來。
+            <Rich text={t('options_sync_not_seen_2')} />
+            
           </p>
         </details>
         <label className="options__check">
@@ -758,18 +756,18 @@ export function Options() {
               update({ vaultSyncEnabled: enabled });
               setSyncStatusText(
                 enabled
-                  ? '已開啟，正在上傳加密副本。'
-                  : '已關閉。雲端副本仍在，要移除請按下面的按鈕。',
+                  ? t('options_sync_on')
+                  : t('options_sync_off'),
               );
               void refreshSync();
             }}
           />
-          把加密副本放進 Firefox 同步
+          {t('options_sync_checkbox')}
         </label>
 
         {syncLoadError !== null && sync === null ? (
           <p className="options__status">
-            讀不到同步狀態：{syncLoadError}
+            {t('options_sync_unreadable', syncLoadError)}
             <button
               type="button"
               className="chip"
@@ -778,61 +776,61 @@ export function Options() {
                 void refreshSync();
               }}
             >
-              重試
+              {t('action_retry')}
             </button>
           </p>
         ) : sync === null ? (
-          <p className="options__hint">讀取同步狀態…</p>
+          <p className="options__hint">{t('options_sync_loading')}</p>
         ) : !sync.available ? (
-          <p className="options__status">這個 Firefox 沒有可用的 storage.sync，無法同步。</p>
+          <p className="options__status">{t('outcome_unavailable')}</p>
         ) : (
           <>
             <dl className="options__facts">
-              <dt>雲端副本</dt>
+              <dt>{t('options_sync_remote')}</dt>
               <dd>
                 {sync.remote === 'absent'
-                  ? '尚未上傳'
+                  ? t('options_sync_remote_absent')
                   : sync.remote === 'partial'
-                    ? '傳輸中（塊還沒到齊，同步會等它完成而不會覆蓋）'
-                    : `完整，最後更新於 ${formatTime(sync.remoteUpdatedAt ?? 0)}`}
+                    ? t('options_sync_remote_partial')
+                    : t('options_sync_remote_ok', formatTime(sync.remoteUpdatedAt ?? 0))}
               </dd>
-              <dt>配額用量</dt>
+              <dt>{t('options_sync_quota')}</dt>
               <dd>
                 {formatBytes(sync.bytes)} / {formatBytes(sync.quota)}
-                {sync.wouldFit ? '' : '（本機這份放不進去）'}
+                {sync.wouldFit ? '' : t('options_sync_does_not_fit')}
               </dd>
-              <dt>上次同步</dt>
+              <dt>{t('options_sync_last')}</dt>
               <dd>
-                {sync.lastSyncedAt === null ? '尚未同步過' : formatTime(sync.lastSyncedAt)}
+                {sync.lastSyncedAt === null ? t('options_sync_never') : formatTime(sync.lastSyncedAt)}
                 {sync.lastOutcome !== null && sync.lastOutcome !== 'synced'
-                  ? `（上次嘗試：${OUTCOME_TEXT[sync.lastOutcome]}）`
+                  ? t('options_sync_last_attempt', OUTCOME_TEXT[sync.lastOutcome])
                   : ''}
               </dd>
             </dl>
 
             {sync.deletedElsewhere ? (
               <p className="options__status">
-                <strong>另一台裝置刪除了整個隱私空間，同步已暫停。</strong>
-                這台裝置上的資料還在，也沒有被動過 —— 遠端的一個旗標不該有權刪掉本機資料。
-                要繼續用這台裝置的資料同步，請按下面的「忽略刪除、重新開始同步」；
-                若你也想刪掉這台裝置上的，請在側邊欄解鎖後刪除隱私空間。
+                <Rich text={t('options_sync_deleted_elsewhere')} />
+                
+                
+                
               </p>
             ) : null}
             {!sync.wouldFit ? (
               <p className="options__status">
-                本機的加密副本已超過 100 KB 的同步額度，同步會停在上一份副本
-                （本機資料完全不受影響）。書籤太多時請改用上面的加密備份檔。
+                {t('options_sync_over_quota')}
+                
               </p>
             ) : null}
             {sync.sameVault === false ? (
               <p className="options__status">
-                雲端那份是<strong>另外建立</strong>的隱私空間（salt 不同），
-                金鑰互不相通，沒辦法自動合併。請選一邊：用下面的「以這台裝置覆蓋雲端」，
-                或先在另一台裝置匯出備份檔再從這裡還原。
+                <Rich text={t('options_sync_different_vault')} />
+                
+                
               </p>
             ) : null}
             {sync.lastError !== null ? (
-              <p className="options__status">上次同步的問題：{sync.lastError}</p>
+              <p className="options__status">{t('options_sync_last_error', sync.lastError)}</p>
             ) : null}
 
             <div className="options__row">
@@ -840,12 +838,12 @@ export function Options() {
                 type="button"
                 className="chip"
                 disabled={syncBusy || !settings.vaultSyncEnabled}
-                title="讓這台裝置立刻讀寫本機的 storage.sync 並合併。這不會叫 Firefox 立刻上傳或下載 —— 那要在 about:preferences#sync 按「立即同步」。"
+                title={t('options_sync_now_hint')}
                 onClick={() => {
                   void runSyncNow();
                 }}
               >
-                立刻檢查雲端副本
+                {t('options_sync_now')}
               </button>
               {!sync.hasLocalVault && sync.remote === 'ok' ? (
                 <button
@@ -855,15 +853,15 @@ export function Options() {
                   title={
                     settings.vaultSyncEnabled
                       ? undefined
-                      : '要先勾選上面的「把加密副本放進 Firefox 同步」'
+                      : t('options_sync_needs_checkbox')
                   }
                   onClick={() => {
                     void runSync(async () => {
                       await request('vault/sync-adopt', undefined);
-                    }, '已把雲端那份還原到這台裝置。用同一組主密碼解鎖即可。');
+                    }, t('options_sync_adopted'));
                   }}
                 >
-                  從雲端還原到這台裝置
+                  {t('options_sync_adopt')}
                 </button>
               ) : null}
               {sync.deletedElsewhere ? (
@@ -874,11 +872,11 @@ export function Options() {
                   onClick={() => {
                     void runSync(
                       async () => request('vault/sync-resume', undefined),
-                      '已忽略那個刪除標記，改以這台裝置的資料繼續同步。',
+                      t('options_sync_resumed'),
                     );
                   }}
                 >
-                  忽略刪除、重新開始同步
+                  {t('options_sync_resume')}
                 </button>
               ) : null}
               {sync.remote !== 'absent' && sync.hasLocalVault ? (
@@ -888,17 +886,17 @@ export function Options() {
                   disabled={syncBusy || !sync.wouldFit}
                   title={
                     sync.wouldFit
-                      ? '讓雲端變成這台裝置的內容。另一台裝置上還沒同步過來的東西會取不回來。'
-                      : '本機這份超過同步額度，覆蓋一定會失敗（而且會先清掉雲端那份），所以停用'
+                      ? t('options_sync_overwrite_hint')
+                      : t('options_sync_overwrite_disabled')
                   }
                   onClick={() => {
                     void runSync(
                       async () => request('vault/sync-overwrite', undefined),
-                      '雲端副本已改成這台裝置的內容。',
+                      t('options_sync_overwritten'),
                     );
                   }}
                 >
-                  以這台裝置覆蓋雲端
+                  {t('options_sync_overwrite')}
                 </button>
               ) : null}
               {sync.remote !== 'absent' ? (
@@ -909,11 +907,11 @@ export function Options() {
                   onClick={() => {
                     void runSync(
                       async () => request('vault/sync-clear', undefined),
-                      '雲端副本已移除，本機資料不受影響。',
+                      t('options_sync_cleared'),
                     );
                   }}
                 >
-                  移除雲端副本並關閉同步
+                  {t('options_sync_clear')}
                 </button>
               ) : null}
             </div>
@@ -923,46 +921,46 @@ export function Options() {
         {syncStatusText !== null ? <p className="options__status">{syncStatusText}</p> : null}
 
         <details className="options__details">
-          <summary>同步的已知限制</summary>
+          <summary>{t('options_sync_limits')}</summary>
           <ul className="options__list">
             <li>
-              <strong>Firefox for Android 完全不同步 <code>storage.sync</code></strong>
-              （Mozilla bug 1625257）。手機上要取得資料只能用加密備份檔。
+              <Rich text={t('options_sync_limit_android')} />
+              
             </li>
             <li>
-              Firefox 的同步週期約 10 分鐘，不是即時。「立刻檢查雲端副本」只讓這台裝置
-              立刻讀寫本機的 <code>storage.sync</code> 並合併，
-              <strong>不會</strong>叫 Firefox 立刻上傳或下載。
+              <Rich text={t('options_sync_limit_schedule')} />
+              
+              
             </li>
             <li>
-              需要你已登入 Firefox 帳號並在同步設定裡勾選「附加元件」。
-              擴充套件<strong>無法得知</strong>這件事 —— 未登入時寫入照樣成功、只是傳不出去，
-              所以請看上面的「雲端副本最後更新時間」來判斷同步是否真的在動。
+              <Rich text={t('options_sync_limit_account')} />
+              
+              
             </li>
             <li>
-              若這份副本是在你還沒登入帳號（或還沒勾「附加元件」）之前寫下的，Firefox 可能
-              不會把它視為待上傳而永遠不傳。按一次「以這台裝置覆蓋雲端」重寫它即可。
+              {t('options_sync_limit_stale')}
+              
             </li>
             <li>
-              合併只在<strong>解鎖狀態</strong>下發生。上鎖時不推也不拉：沒有金鑰就解不開雲端那份，
-              這時上傳等於覆蓋，會弄丟另一台裝置的新資料。
+              <Rich text={t('options_sync_limit_unlocked')} />
+              
             </li>
             <li>
-              <strong>salt 與驗證器是明文放在同步資料裡的</strong>，因為換裝置時得靠它們才能
-              從主密碼派生出同一把金鑰。代價要講清楚：能存取你 Firefox 帳號的人可以拿它們
-              離線暴力猜密碼（書籤本身仍然是加密的）。所以主密碼要夠長 ——
-              這也是同步預設關閉的原因。
+              <Rich text={t('options_sync_limit_salt')} />
+              
+              
+              
             </li>
-            <li>額度是 100 KB。加密副本超過時同步會停下並在上面警告，本機資料不受影響。</li>
-            <li>預覽圖不同步（太大）。新裝置按一次「補抓預覽圖」即可。</li>
+            <li>{t('options_sync_limit_quota')}</li>
+            <li>{t('options_sync_limit_previews')}</li>
           </ul>
         </details>
       </section>
 
       <section>
-        <h2>自動上鎖</h2>
+        <h2>{t('options_autolock_title')}</h2>
         <div className="options__row">
-          閒置
+          {t('options_autolock_before')}
           <input
             type="number"
             min={1}
@@ -980,19 +978,19 @@ export function Options() {
             }}
             style={{ width: '5em' }}
           />
-          分鐘後上鎖
+          {t('options_autolock_after')}
         </div>
         <p className="options__hint">
-          從最後一次操作隱私空間起算。離開電腦時也會上鎖（整台電腦閒置同樣的分鐘數）。
+          {t('options_autolock_hint')}
         </p>
         <p className="options__hint">
-          關閉側邊欄也會上鎖。全頁瀏覽與這個設定頁也算「開著」—— 它們開著時關掉側邊欄
-          不會立刻上鎖，改由上面的計時收尾。
+          {t('options_autolock_hint2')}
+          
         </p>
       </section>
 
       <section>
-        <h2>預覽圖擷取</h2>
+        <h2>{t('options_capture_title')}</h2>
         <label className="options__check">
           <input
             type="checkbox"
@@ -1001,10 +999,10 @@ export function Options() {
               update({ captureEnabled: event.target.checked });
             }}
           />
-          瀏覽已加入書籤的頁面時自動產生預覽圖
+          {t('options_capture_enabled')}
         </label>
         <div className="options__row">
-          預覽圖超過
+          {t('options_recapture_before')}
           <input
             type="number"
             min={1}
@@ -1018,11 +1016,11 @@ export function Options() {
             }}
             style={{ width: '5em' }}
           />
-          天後重新擷取
+          {t('options_recapture_after')}
         </div>
 
-        <h2 style={{ marginTop: 16 }}>不擷取的網域</h2>
-        <p className="options__hint">一行一個，比對主機名稱的子字串。</p>
+        <h2 style={{ marginTop: 16 }}>{t('options_blocklist_title')}</h2>
+        <p className="options__hint">{t('options_blocklist_hint')}</p>
         <textarea
           value={blocklistText}
           onChange={(event) => {
@@ -1040,11 +1038,11 @@ export function Options() {
       </section>
 
       <section>
-        <h2>儲存空間</h2>
+        <h2>{t('options_storage_title')}</h2>
         <p>
           {usage === null
-            ? '計算中…'
-            : `${String(usage.count)} 張預覽圖，共 ${(usage.bytes / 1_048_576).toFixed(1)} MB`}
+            ? t('options_storage_counting')
+            : t('options_storage_usage', tn('unit_previews', usage.count), (usage.bytes / 1_048_576).toFixed(1))}
         </p>
         <div className="options__row">
           <button
@@ -1053,29 +1051,29 @@ export function Options() {
             onClick={() => {
               void request('thumbs/clear', undefined).then(
                 (result) => {
-                  setStatus(`已清除 ${String(result.removed)} 張預覽圖。`);
+                  setStatus(t('options_previews_cleared', tn('unit_previews', result.removed)));
                   setUsage({ count: 0, bytes: 0 });
                 },
                 () => undefined,
               );
             }}
           >
-            清除所有預覽圖
+            {t('options_clear_previews')}
           </button>
           <button
             type="button"
             className="chip"
-            title="擴充套件會記住哪些 og:image 是全站共用的 logo 並降級。網站改版後可以重置。"
+            title={t('options_reset_sitewide_hint')}
             onClick={() => {
               void request('site-stats/clear', undefined).then(
                 () => {
-                  setStatus('已重置「全站共用圖」的學習結果。');
+                  setStatus(t('options_sitewide_reset'));
                 },
                 () => undefined,
               );
             }}
           >
-            重置全站共用圖的判定
+            {t('options_reset_sitewide')}
           </button>
         </div>
         {status !== null ? <p className="options__status">{status}</p> : null}

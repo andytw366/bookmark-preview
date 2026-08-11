@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { t } from '@/shared/i18n';
+import { Rich } from '../lib/rich';
 
 interface RecoveryKeyPanelProps {
   recoveryKey: string;
@@ -36,14 +38,14 @@ export function RecoveryKeyPanel({
       <p>
         <strong>
           {reason === 'regenerated'
-            ? '這是新的救援金鑰，舊的那一串已經失效。'
-            : '把這串救援金鑰抄下來，收在安全的地方。'}
+            ? t('recovery_regenerated')
+            : t('recovery_write_it_down')}
         </strong>
       </p>
       <p className="notice__body">
-        忘記主密碼時，<strong>這是唯一能救回資料的東西</strong>。
-        兩個都沒有的話，隱私空間裡的書籤就永久打不開了 —— 沒有任何人能替你重設，
-        包括我們。
+        <Rich text={t('recovery_only_way')} />
+        {t('recovery_no_reset')}
+        
       </p>
 
       <code className="recovery__code">{recoveryKey}</code>
@@ -61,7 +63,7 @@ export function RecoveryKeyPanel({
             );
           }}
         >
-          {copied ? '已複製' : '複製'}
+          {copied ? t('action_copied') : t('action_copy')}
         </button>
         <button
           type="button"
@@ -71,7 +73,7 @@ export function RecoveryKeyPanel({
             const url = URL.createObjectURL(new Blob([`${recoveryKey}\n`], { type: 'text/plain' }));
             const anchor = document.createElement('a');
             anchor.href = url;
-            anchor.download = '隱私空間救援金鑰.txt';
+            anchor.download = t('recovery_filename');
             anchor.style.display = 'none';
             document.body.append(anchor);
             anchor.click();
@@ -81,20 +83,20 @@ export function RecoveryKeyPanel({
             }, 60_000);
           }}
         >
-          存成文字檔
+          {t('recovery_save_as_file')}
         </button>
       </div>
 
       <p className="notice__body">
-        <strong>不要和加密備份檔放在同一個地方。</strong>
-        兩者放在一起（例如同一個雲端硬碟或同一個 Google 帳號），誰拿到那個帳號就同時
-        拿到密文和鑰匙，兩層保護會一起失效。
+        <strong>{t('recovery_keep_apart')}</strong>
+        {t('recovery_keep_apart_why')}
+        
       </p>
 
       {onDismiss !== undefined ? (
         <div className="recovery__actions">
           <button type="button" className="chip" onClick={onDismiss}>
-            收起
+            {t('action_collapse')}
           </button>
         </div>
       ) : null}
@@ -109,7 +111,7 @@ export function RecoveryKeyPanel({
                 setAcknowledged(event.target.checked);
               }}
             />
-            我已經抄下來或存好了
+            {t('recovery_acknowledged')}
           </label>
           <button
             type="button"
@@ -117,7 +119,7 @@ export function RecoveryKeyPanel({
             disabled={!acknowledged}
             onClick={onAcknowledge}
           >
-            完成
+            {t('action_done')}
           </button>
         </>
       ) : null}

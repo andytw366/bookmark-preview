@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 import type { Bytes } from './bytes';
 
 /** AES-GCM 封裝。GCM 自帶認證標籤，因此篡改一定會在解密時被發現。 */
@@ -21,6 +23,6 @@ export async function unseal(key: CryptoKey, sealed: Sealed): Promise<ArrayBuffe
   } catch {
     // Web Crypto 對認證失敗只丟一個無資訊的 OperationError，
     // 換成使用者看得懂的訊息。密碼錯誤與資料損毀在密碼學上無法區分。
-    throw new Error('解密失敗：主密碼錯誤，或資料已損毀');
+    throw new Error(t('crypto_decrypt_failed'));
   }
 }

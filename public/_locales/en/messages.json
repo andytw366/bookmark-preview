@@ -1,0 +1,1719 @@
+{
+  "extension_name": {
+    "message": "Bookmark Preview",
+    "description": "擴充套件名稱。AMO 的上架頁也用這一條。"
+  },
+  "extension_description": {
+    "message": "Browse bookmarks as visual previews, with a password-encrypted vault for the ones you would rather not show.",
+    "description": "manifest 的簡介，出現在 about:addons 與 AMO。"
+  },
+  "command_toggle_sidebar": {
+    "message": "Open the Bookmark Preview sidebar",
+    "description": "about:addons 的「管理擴充套件捷徑」裡，這個快捷鍵的說明。"
+  },
+  "crypto_decrypt_failed": {
+    "message": "Decryption failed: wrong master password, or the data is damaged"
+  },
+  "crypto_chunk_size_invalid": {
+    "message": "Chunk size must be a positive number"
+  },
+  "crypto_no_compression_stream": {
+    "message": "This environment has no CompressionStream"
+  },
+  "crypto_no_decompression_stream": {
+    "message": "This environment has no DecompressionStream"
+  },
+  "crypto_password_empty": {
+    "message": "The master password cannot be empty"
+  },
+  "crypto_dek_length_invalid": {
+    "message": "The data key is the wrong length; the data may be damaged"
+  },
+  "crypto_recovery_key_length": {
+    "message": "That is not a valid recovery key (it should be $COUNT$ characters)",
+    "description": "使用者打的救援金鑰長度不對。$COUNT$ 是正確的字元數。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "32"
+      }
+    }
+  },
+  "crypto_recovery_key_format": {
+    "message": "That is not a valid recovery key"
+  },
+  "crypto_no_data": {
+    "message": "There is nothing to decode"
+  },
+  "crypto_data_truncated": {
+    "message": "The data is damaged: it is too short"
+  },
+  "crypto_unsupported_version": {
+    "message": "Unsupported data format version: $VERSION$",
+    "description": "加密資料的格式版本比這個擴充套件新。",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "msg_no_response": {
+    "message": "The background page did not answer $KIND$",
+    "description": "$KIND$ 是內部的訊息名稱，例如 vault/unlock。刻意不翻譯它。",
+    "placeholders": {
+      "kind": {
+        "content": "$1",
+        "example": "vault/unlock"
+      }
+    }
+  },
+  "msg_unknown_kind": {
+    "message": "Unknown message type: $KIND$",
+    "placeholders": {
+      "kind": {
+        "content": "$1",
+        "example": "vault/unlock"
+      }
+    }
+  },
+  "backup_invalid_json": {
+    "message": "This file is not valid JSON. It is either not a backup file, or it is damaged."
+  },
+  "backup_not_a_backup": {
+    "message": "This file is not a backup file."
+  },
+  "backup_wrong_extension": {
+    "message": "This file is not a vault backup made by this extension."
+  },
+  "backup_newer_version": {
+    "message": "This backup file is newer than the installed extension. Update the extension first."
+  },
+  "backup_missing_salt": {
+    "message": "The backup file has no salt, so it cannot be restored with a master password (the file is damaged)."
+  },
+  "backup_bad_iterations": {
+    "message": "The backup file's KDF iteration count is not valid (the file is damaged)."
+  },
+  "backup_missing_password_wrap": {
+    "message": "The backup file is missing the data key wrapped with the master password (the file is damaged)."
+  },
+  "backup_missing_recovery_wrap": {
+    "message": "The backup file is missing the data key wrapped with the recovery key (the file is damaged)."
+  },
+  "backup_missing_blob": {
+    "message": "The backup file has no payload (the file is damaged)."
+  },
+  "backup_filename": {
+    "message": "vault-backup-$DATE$.json",
+    "description": "匯出備份檔的預設檔名。$DATE$ 是 YYYY-MM-DD。只用檔名安全的字元。",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "2026-08-10"
+      }
+    }
+  },
+  "vault_untitled_folder": {
+    "message": "Untitled folder",
+    "description": "同步來的資料夾沒有名字時，補上的名稱。這會寫進資料裡。"
+  },
+  "backfill_already_running": {
+    "message": "A backfill is already running"
+  },
+  "backfill_needs_host_permission": {
+    "message": "Fetching preview images needs permission to access websites"
+  },
+  "folder_untitled": {
+    "message": "(untitled)"
+  },
+  "folder_untitled_folder": {
+    "message": "(untitled folder)"
+  },
+  "bookmark_not_found": {
+    "message": "That bookmark no longer exists"
+  },
+  "reason_unknown": {
+    "message": "no reason given"
+  },
+  "image_no_2d_context": {
+    "message": "Could not get a 2D drawing context"
+  },
+  "menu_set_as_preview": {
+    "message": "Set as this bookmark's preview"
+  },
+  "pick_all_strategies_failed": {
+    "message": "All three ways of grabbing the image failed (direct download, in-page download, screen crop)"
+  },
+  "pick_strategy_used": {
+    "message": "Grabbed by: $STRATEGY$",
+    "placeholders": {
+      "strategy": {
+        "content": "$1",
+        "example": "screenshot"
+      }
+    }
+  },
+  "capture_detail_not_open": {
+    "message": "The bookmark was just added and no tab has it open; using \"Fetch missing previews\" instead"
+  },
+  "capture_detail_no_cover": {
+    "message": "No cover image found, and the screenshot failed too"
+  },
+  "capture_skip_private_window": {
+    "message": "Private windows are never captured."
+  },
+  "capture_skip_inactive_tab": {
+    "message": "A background tab has not really been painted, so it is not captured — that would store a blank image."
+  },
+  "capture_skip_no_permission": {
+    "message": "Capturing the screen needs permission to access websites."
+  },
+  "capture_skip_api_unavailable": {
+    "message": "The permission was just granted and capture is being re-enabled. Visit the page again in a moment."
+  },
+  "capture_skip_disabled": {
+    "message": "Automatic capture is turned off in the settings."
+  },
+  "capture_skip_blocklisted": {
+    "message": "This domain is on the capture blocklist."
+  },
+  "capture_skip_not_open": {
+    "message": "The bookmark was just added and no tab has it open, so there was nothing to capture. \"Fetch missing previews\" can pull the og:image instead."
+  },
+  "capture_failed": {
+    "message": "Screen capture failed: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "找不到封面圖"
+      }
+    }
+  },
+  "capture_manual_ok": {
+    "message": "The image you picked is now this bookmark's preview."
+  },
+  "capture_manual_not_bookmarked": {
+    "message": "This page is not bookmarked, so it has no preview to set."
+  },
+  "capture_manual_failed": {
+    "message": "Could not set the preview: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "三種取圖方式都失敗了"
+      }
+    }
+  },
+  "refresh_needs_host_permission": {
+    "message": "Fetching preview images needs permission to access websites."
+  },
+  "refresh_done": {
+    "message": "The preview image has been fetched again."
+  },
+  "refresh_done_via_og": {
+    "message": "The preview image was fetched again from the page's og:image."
+  },
+  "refresh_no_cover_on_page": {
+    "message": "This page has no usable cover image, and the screenshot failed too."
+  },
+  "refresh_no_cover_no_server": {
+    "message": "This page has no usable cover image, and it could not be fetched from the server either."
+  },
+  "refresh_no_tab_no_server": {
+    "message": "No tab has this page open, and the preview could not be fetched from the server. Open the page in a tab and try again."
+  },
+  "sync_quota_exceeded": {
+    "message": "The encrypted copy is about $SIZE$ KB, over storage.sync's $QUOTA$ KB budget, so it was not uploaded. Nothing on this device is affected, but cross-device sync is stuck on the previous copy — use an encrypted backup file instead.",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "112"
+      },
+      "quota": {
+        "content": "$2",
+        "example": "100"
+      }
+    }
+  },
+  "sync_deleted_elsewhere": {
+    "message": "Another device deleted the vault, so sync is paused. Decide what to do in the settings."
+  },
+  "sync_salt_mismatch": {
+    "message": "The vault in the cloud was created separately (different salt) and the keys do not match, so they cannot be merged. Choose which one to keep in the settings."
+  },
+  "sync_remote_unreadable_fell_back": {
+    "message": "The copy in the cloud could not be opened ($REASON$), so this device's data was used instead.",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "解密失敗"
+      }
+    }
+  },
+  "sync_unavailable": {
+    "message": "This Firefox has no working storage.sync"
+  },
+  "sync_in_progress": {
+    "message": "A sync is already running. Try again shortly."
+  },
+  "sync_in_progress_seconds": {
+    "message": "A sync is already running. Try again in a few seconds."
+  },
+  "sync_no_local_vault": {
+    "message": "This device has no vault yet"
+  },
+  "sync_nothing_to_upload": {
+    "message": "There is nothing on this device to upload"
+  },
+  "vault_locked": {
+    "message": "The vault is locked"
+  },
+  "vault_not_created": {
+    "message": "No vault has been created yet"
+  },
+  "vault_already_created": {
+    "message": "The vault has already been created"
+  },
+  "vault_already_on_device": {
+    "message": "This device already has a vault"
+  },
+  "vault_legacy_format": {
+    "message": "This vault uses a development-era format that the current version no longer supports. Clear it with \"Give up the vault on this device\" in the settings, then create a new one."
+  },
+  "vault_remote_exists": {
+    "message": "There is already a vault in the cloud. Turn on sync in the settings, choose \"Restore from the cloud to this device\", and unlock with the same master password. (If you are sure you do not want the cloud copy, press \"Remove the cloud copy\" first.)"
+  },
+  "vault_remote_still_transferring": {
+    "message": "The encrypted copy in the cloud is still arriving — Firefox Sync sends it piece by piece. Try again shortly."
+  },
+  "vault_no_remote_copy": {
+    "message": "There is no usable encrypted copy in the cloud (it may still be arriving, or sync may not be on)."
+  },
+  "vault_remote_unreadable": {
+    "message": "The cloud copy could not be opened: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "主密碼錯誤"
+      }
+    }
+  },
+  "vault_secret_password": {
+    "message": "master password"
+  },
+  "vault_secret_recovery": {
+    "message": "recovery key"
+  },
+  "vault_secret_changed_elsewhere": {
+    "message": "The $SECRET$ was changed on another device, so this old one no longer works. Use the new $SECRET$.",
+    "placeholders": {
+      "secret": {
+        "content": "$1",
+        "example": "主密碼"
+      }
+    }
+  },
+  "vault_secret_wrong": {
+    "message": "Wrong $SECRET$",
+    "placeholders": {
+      "secret": {
+        "content": "$1",
+        "example": "主密碼"
+      }
+    }
+  },
+  "vault_new_password_empty": {
+    "message": "The new master password cannot be empty"
+  },
+  "vault_folder_not_found": {
+    "message": "That folder no longer exists"
+  },
+  "vault_private_folder_not_found": {
+    "message": "That vault folder no longer exists"
+  },
+  "vault_bookmark_not_found": {
+    "message": "That vault bookmark no longer exists."
+  },
+  "vault_folder_into_itself": {
+    "message": "A folder cannot be moved into itself or into one of its own subfolders"
+  },
+  "vault_root_folder_not_importable": {
+    "message": "\"Bookmarks Menu\" and \"Bookmarks Toolbar\" are built into Firefox and cannot be moved into the vault."
+  },
+  "vault_locked_during_merge": {
+    "message": "The vault locked while the merge was running, so the merge was abandoned."
+  },
+  "vault_nothing_to_export": {
+    "message": "There is nothing to export"
+  },
+  "thumbdb_open_failed": {
+    "message": "Could not open the thumbnail database"
+  },
+  "thumbdb_request_failed": {
+    "message": "A thumbnail database request failed"
+  },
+  "action_cancel": {
+    "message": "Cancel"
+  },
+  "action_create": {
+    "message": "Create"
+  },
+  "action_creating": {
+    "message": "Creating…"
+  },
+  "action_save": {
+    "message": "Save"
+  },
+  "action_done": {
+    "message": "Done"
+  },
+  "action_close": {
+    "message": "Close"
+  },
+  "action_retry": {
+    "message": "Try again"
+  },
+  "action_collapse": {
+    "message": "Collapse"
+  },
+  "action_copy": {
+    "message": "Copy"
+  },
+  "action_copied": {
+    "message": "Copied"
+  },
+  "action_copy_url": {
+    "message": "Copy address"
+  },
+  "action_open_in_new_tab": {
+    "message": "Open in a new tab"
+  },
+  "action_rename": {
+    "message": "Rename"
+  },
+  "action_delete": {
+    "message": "Delete"
+  },
+  "action_delete_confirm": {
+    "message": "Delete"
+  },
+  "action_move_to": {
+    "message": "Move to…"
+  },
+  "action_move_in": {
+    "message": "Move in"
+  },
+  "action_select_all": {
+    "message": "Select all"
+  },
+  "action_new_folder": {
+    "message": "New folder"
+  },
+  "action_refresh_thumb": {
+    "message": "Fetch the preview again"
+  },
+  "unit_bookmarks_one": {
+    "message": "$COUNT$ bookmark",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_bookmarks_other": {
+    "message": "$COUNT$ bookmarks",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_vault_bookmarks_one": {
+    "message": "$COUNT$ vault bookmark",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_vault_bookmarks_other": {
+    "message": "$COUNT$ vault bookmarks",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_folders_one": {
+    "message": "$COUNT$ folder",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_folders_other": {
+    "message": "$COUNT$ folders",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_items_one": {
+    "message": "$COUNT$ item",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_items_other": {
+    "message": "$COUNT$ items",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_failed_one": {
+    "message": "$COUNT$ failed",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_failed_other": {
+    "message": "$COUNT$ failed",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_history_entries_one": {
+    "message": "$COUNT$ history entry",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_history_entries_other": {
+    "message": "$COUNT$ history entries",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "html_lang": {
+    "message": "en"
+  },
+  "page_title_gallery": {
+    "message": "Bookmark Preview — full page"
+  },
+  "page_title_options": {
+    "message": "Bookmark Preview — settings"
+  },
+  "root_container_missing": {
+    "message": "The #root container is missing"
+  },
+  "search_placeholder": {
+    "message": "Search bookmarks…"
+  },
+  "search_label": {
+    "message": "Search bookmarks"
+  },
+  "search_results_one": {
+    "message": "$COUNT$ result",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "search_results_other": {
+    "message": "$COUNT$ results",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "search_truncated": {
+    "message": " (showing the maximum — narrow the search to see fewer)"
+  },
+  "search_no_match": {
+    "message": "No bookmarks match."
+  },
+  "folder_no_bookmarks": {
+    "message": "This folder has no bookmarks."
+  },
+  "folder_empty": {
+    "message": "This folder is empty."
+  },
+  "bookmarks_loading": {
+    "message": "Loading bookmarks…"
+  },
+  "bookmarks_read_failed": {
+    "message": "Could not read the bookmarks: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmark_open_failed": {
+    "message": "Could not open the bookmark: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "crumbs_label": {
+    "message": "Bookmark folder path"
+  },
+  "crumbs_all": {
+    "message": "All"
+  },
+  "folder_top_level": {
+    "message": "Top level"
+  },
+  "folder_name_placeholder": {
+    "message": "Folder name"
+  },
+  "folder_name_label": {
+    "message": "New folder name"
+  },
+  "folder_name_label_edit": {
+    "message": "Folder name"
+  },
+  "folders_loading": {
+    "message": "Loading folders…"
+  },
+  "folders_none": {
+    "message": "There are no folders to move to."
+  },
+  "new_folder_hint_root": {
+    "message": "New folder — the top level cannot hold one directly, so it goes into Other Bookmarks"
+  },
+  "new_folder_hint_nested": {
+    "message": "New subfolder inside this folder"
+  },
+  "new_folder_root_note": {
+    "message": "The top level cannot hold a folder directly, so it goes into Other Bookmarks."
+  },
+  "bookmark_name_label": {
+    "message": "Bookmark name"
+  },
+  "delete_confirm_named": {
+    "message": "Delete “$NAME$”",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "delete_confirm_folder_suffix": {
+    "message": " and everything in it?"
+  },
+  "tab_bookmarks": {
+    "message": "Bookmarks"
+  },
+  "tab_vault": {
+    "message": "Vault"
+  },
+  "tab_vault_unlocked": {
+    "message": "Vault (unlocked)"
+  },
+  "toolbar_selected_one": {
+    "message": "$COUNT$ selected",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toolbar_selected_other": {
+    "message": "$COUNT$ selected",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toolbar_select": {
+    "message": "Select"
+  },
+  "toolbar_select_hint": {
+    "message": "Tick several items and move them all at once, into a folder or into the vault"
+  },
+  "toolbar_gallery": {
+    "message": "Full page"
+  },
+  "toolbar_gallery_hint": {
+    "message": "Browse the bookmarks side by side across the whole window, in a new tab"
+  },
+  "toolbar_more": {
+    "message": "More options"
+  },
+  "density_cards": {
+    "message": "Large cards"
+  },
+  "density_list": {
+    "message": "Small list"
+  },
+  "density_text": {
+    "message": "No thumbnails"
+  },
+  "density_label": {
+    "message": "Display density"
+  },
+  "preview_source": {
+    "message": "Where previews come from"
+  },
+  "preview_cover_first": {
+    "message": "Cover first"
+  },
+  "preview_cover_first_hint": {
+    "message": "Prefer a cover image from the page (a book or comic cover, a video thumbnail) and fall back to a screenshot"
+  },
+  "preview_capture_first": {
+    "message": "Screenshot first"
+  },
+  "preview_capture_first_hint": {
+    "message": "Prefer a screenshot of the page and fall back to a cover image"
+  },
+  "backfill_start": {
+    "message": "Fetch missing previews"
+  },
+  "backfill_running": {
+    "message": "Fetching…"
+  },
+  "backfill_hint": {
+    "message": "Fetch the og:image for bookmarks that have no preview yet. This makes a request to each of those sites."
+  },
+  "backfill_needs_permission_hint": {
+    "message": "Needs permission to access websites first"
+  },
+  "backfill_progress": {
+    "message": "Fetching $DONE$ / $TOTAL$ ($OK$ so far)",
+    "placeholders": {
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "ok": {
+        "content": "$3"
+      }
+    }
+  },
+  "backfill_all_done": {
+    "message": "Every bookmark already has a preview."
+  },
+  "backfill_finished": {
+    "message": "Done: $OK$ of $TOTAL$ bookmarks got a preview.",
+    "placeholders": {
+      "ok": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "refresh_thumb_hint": {
+    "message": "Throw away the current preview and fetch it again. The result is best when the page is open in a tab, because the cover is read from the rendered page."
+  },
+  "refresh_thumb_running": {
+    "message": "Fetching the preview again…"
+  },
+  "permission_swatches_only": {
+    "message": "Only domain colour cards for now."
+  },
+  "permission_why": {
+    "message": "Real previews need permission to access all websites. Thumbnails stay on your device and are never uploaded."
+  },
+  "permission_reload_note": {
+    "message": "The extension restarts once after you grant it."
+  },
+  "permission_grant": {
+    "message": "Grant permission"
+  },
+  "permission_dismiss": {
+    "message": "Not now — keep the colour cards"
+  },
+  "row_open_folder": {
+    "message": "Open this folder"
+  },
+  "row_open_folder_named": {
+    "message": "Open the folder “$NAME$”",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "row_import": {
+    "message": "Move into the vault"
+  },
+  "row_import_named": {
+    "message": "Move “$NAME$” into the vault",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "row_import_folder": {
+    "message": "Move the whole folder into the vault"
+  },
+  "row_import_folder_named": {
+    "message": "Move the folder “$NAME$” into the vault",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "row_import_folder_hint": {
+    "message": "The folder goes in with everything inside it, and keeps its structure"
+  },
+  "movein_heading_one": {
+    "message": "Move into the vault?"
+  },
+  "movein_heading_many_one": {
+    "message": "Move $COUNT$ item in?",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "movein_heading_many_other": {
+    "message": "Move $COUNT$ items in?",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "movein_these": {
+    "message": "These items"
+  },
+  "movein_named": {
+    "message": "“$NAME$”",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "movein_scope": {
+    "message": "$FOLDERS$ and $BOOKMARKS$",
+    "placeholders": {
+      "folders": {
+        "content": "$1"
+      },
+      "bookmarks": {
+        "content": "$2"
+      }
+    }
+  },
+  "movein_scope_paren": {
+    "message": " ($SCOPE$)",
+    "placeholders": {
+      "scope": {
+        "content": "$1"
+      }
+    }
+  },
+  "movein_body": {
+    "message": "$SUBJECT$$SCOPE$ will be *removed* from Firefox's bookmarks, and only visible once the vault is unlocked.",
+    "placeholders": {
+      "subject": {
+        "content": "$1"
+      },
+      "scope": {
+        "content": "$2"
+      }
+    }
+  },
+  "movein_keeps_hierarchy": {
+    "message": " Folder structure is kept as it is."
+  },
+  "movein_and_more_one": {
+    "message": "…and $COUNT$ more",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "movein_and_more_other": {
+    "message": "…and $COUNT$ more",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "movein_purge_history_many": {
+    "message": "Also clear these addresses from history"
+  },
+  "movein_purge_history_one": {
+    "message": "Also clear this address from history"
+  },
+  "movein_history_permission_note": {
+    "message": "Pressing Move in will ask for permission to read history."
+  },
+  "picker_move_many_one": {
+    "message": "Move $COUNT$ item to…",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "picker_move_many_other": {
+    "message": "Move $COUNT$ items to…",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "picker_export_many_one": {
+    "message": "Move $COUNT$ item out to…",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "picker_export_many_other": {
+    "message": "Move $COUNT$ items out to…",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "moved_bookmarks": {
+    "message": "Moved $BOOKMARKS$.",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "moved_bookmarks_with_failures": {
+    "message": "Moved $BOOKMARKS$, $FAILED$.",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "moved_items": {
+    "message": "Moved $ITEMS$.",
+    "placeholders": {
+      "items": {
+        "content": "$1"
+      }
+    }
+  },
+  "moved_items_with_failures": {
+    "message": "Moved $ITEMS$, $FAILED$.",
+    "placeholders": {
+      "items": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "exported_items": {
+    "message": "Moved $ITEMS$ out.",
+    "placeholders": {
+      "items": {
+        "content": "$1"
+      }
+    }
+  },
+  "exported_items_with_failures": {
+    "message": "Moved $ITEMS$ out, $FAILED$.",
+    "placeholders": {
+      "items": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "vault_created_title": {
+    "message": "The vault is ready"
+  },
+  "vault_locked_title": {
+    "message": "The vault is locked"
+  },
+  "vault_create_title": {
+    "message": "Create a vault"
+  },
+  "vault_unlock_action": {
+    "message": "Unlock"
+  },
+  "vault_lock_now": {
+    "message": "Lock now"
+  },
+  "vault_unlock_recovery_title": {
+    "message": "Unlock with the recovery key"
+  },
+  "vault_unlock_recovery_hint": {
+    "message": "The eight groups of characters you were told to write down. Case and separators do not matter."
+  },
+  "vault_use_password_instead": {
+    "message": "Use the master password instead"
+  },
+  "vault_forgot_password": {
+    "message": "Forgotten the master password? Use the recovery key"
+  },
+  "vault_password_placeholder": {
+    "message": "Master password (at least $MIN$ characters)",
+    "placeholders": {
+      "min": {
+        "content": "$1"
+      }
+    }
+  },
+  "vault_password_again": {
+    "message": "Type it again"
+  },
+  "vault_password_too_short": {
+    "message": "The password needs at least $MIN$ characters.",
+    "placeholders": {
+      "min": {
+        "content": "$1"
+      }
+    }
+  },
+  "vault_password_mismatch": {
+    "message": "The two entries do not match."
+  },
+  "vault_create_warning": {
+    "message": "If you forget the master password, the recovery key is the only way back to your data."
+  },
+  "vault_create_body": {
+    "message": "The password is not stored anywhere and we cannot reset it for you. You will be given a *recovery key* — the only spare key there is. Write it down."
+  },
+  "vault_create_acknowledge": {
+    "message": "I understand that losing both the password and the recovery key means losing the data"
+  },
+  "vault_legacy_title": {
+    "message": "This vault uses the old format"
+  },
+  "vault_legacy_cannot_open": {
+    "message": "The current version can no longer open it."
+  },
+  "vault_legacy_why": {
+    "message": "The encryption format changed during development, to support recovery keys and password changes, and the old format was deliberately not migrated. Even the right password will not open it — clear it and create a new one."
+  },
+  "vault_legacy_how": {
+    "message": "Go to the settings and press “Give up the vault on this device”."
+  },
+  "vault_legacy_action": {
+    "message": "Clear it and start over"
+  },
+  "vault_empty_hint": {
+    "message": "No vault bookmarks yet. Press the lock icon on the right of any row in the bookmark list to move one in."
+  },
+  "vault_destroy_confirm": {
+    "message": "Delete the whole vault?"
+  },
+  "vault_destroy_warning": {
+    "message": "$BOOKMARKS$ and their previews will be deleted permanently. This cannot be undone.",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "vault_destroy_action": {
+    "message": "Delete the whole vault…"
+  },
+  "vault_bookmark_name_label": {
+    "message": "Vault bookmark name"
+  },
+  "vault_delete_folder_note": {
+    "message": "The bookmarks and subfolders inside move up one level; they are not deleted with it."
+  },
+  "vault_delete_bookmark_note": {
+    "message": "Deleted outright — it does not go back to being a normal bookmark."
+  },
+  "vault_refresh_thumb_hint": {
+    "message": "Throw away the current preview and fetch it again, encrypted with your master password. The result is best when the page is open in a tab."
+  },
+  "vault_export": {
+    "message": "Move out of the vault"
+  },
+  "vault_export_folder": {
+    "message": "Move the whole folder out"
+  },
+  "vault_export_hint": {
+    "message": "Back to normal bookmarks, into the default folder set in the settings"
+  },
+  "vault_export_folder_hint": {
+    "message": "The whole folder goes back to normal bookmarks, into the default folder set in the settings"
+  },
+  "vault_export_to": {
+    "message": "Move out to…"
+  },
+  "vault_export_to_hint": {
+    "message": "Back to normal bookmarks, into a folder you pick"
+  },
+  "vault_import_one_done": {
+    "message": "The bookmark is in the vault"
+  },
+  "vault_import_folder_done": {
+    "message": "The folder is in the vault ($FOLDERS$, $BOOKMARKS$)",
+    "placeholders": {
+      "folders": {
+        "content": "$1"
+      },
+      "bookmarks": {
+        "content": "$2"
+      }
+    }
+  },
+  "vault_import_many_done": {
+    "message": "Moved in $BOOKMARKS$ and $FOLDERS$",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      },
+      "folders": {
+        "content": "$2"
+      }
+    }
+  },
+  "vault_import_many_done_bookmarks": {
+    "message": "Moved in $BOOKMARKS$",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "vault_import_history_unavailable": {
+    "message": "$MOVED$, but without permission to read history the addresses are still in your history and address-bar suggestions.",
+    "placeholders": {
+      "moved": {
+        "content": "$1"
+      }
+    }
+  },
+  "vault_import_history_unavailable_part": {
+    "message": "without permission to read history, these addresses are still in your history and address-bar suggestions"
+  },
+  "vault_import_history_purged": {
+    "message": "$MOVED$, and cleared $ENTRIES$.",
+    "placeholders": {
+      "moved": {
+        "content": "$1"
+      },
+      "entries": {
+        "content": "$2"
+      }
+    }
+  },
+  "vault_import_history_purged_part": {
+    "message": "and cleared $ENTRIES$",
+    "placeholders": {
+      "entries": {
+        "content": "$1"
+      }
+    }
+  },
+  "recovery_write_it_down": {
+    "message": "Write this recovery key down and keep it somewhere safe."
+  },
+  "recovery_regenerated": {
+    "message": "This is a new recovery key. The old one no longer works."
+  },
+  "recovery_only_way": {
+    "message": "If you forget the master password, *this is the only thing that can get your data back*."
+  },
+  "recovery_no_reset": {
+    "message": "Without either one, the bookmarks in the vault can never be opened again. Nobody can reset it for you, including us."
+  },
+  "recovery_filename": {
+    "message": "vault-recovery-key.txt"
+  },
+  "recovery_save_as_file": {
+    "message": "Save as a text file"
+  },
+  "recovery_keep_apart": {
+    "message": "Do not keep this with the encrypted backup file."
+  },
+  "recovery_keep_apart_why": {
+    "message": "Keeping both in one place — the same cloud drive, the same account — means whoever gets into that account gets the ciphertext and the key together, and both layers fall at once."
+  },
+  "recovery_acknowledged": {
+    "message": "I have written it down or saved it"
+  },
+  "list_separator": {
+    "message": ", "
+  },
+  "merge_restored": {
+    "message": "restored $BOOKMARKS$",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "merge_added": {
+    "message": "added $BOOKMARKS$",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "merge_updated": {
+    "message": "updated $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "merge_folders": {
+    "message": "folders: $ADDED$ added, $UPDATED$ updated",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "updated": {
+        "content": "$2"
+      }
+    }
+  },
+  "merge_sentence": {
+    "message": "$PARTS$.",
+    "placeholders": {
+      "parts": {
+        "content": "$1"
+      }
+    }
+  },
+  "merge_reattached": {
+    "message": "$COUNT$ of them were in a folder that no longer exists after the merge, and were moved to the top level.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "merge_no_previews": {
+    "message": "The backup carries no preview images. Press “Fetch missing previews” in the sidebar to build them again."
+  },
+  "unit_previews_one": {
+    "message": "$COUNT$ preview",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "unit_previews_other": {
+    "message": "$COUNT$ previews",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "outcome_synced": {
+    "message": "Checked against the cloud copy, and anything newer there has been merged in. The actual upload and download to Firefox's servers is on Firefox's own schedule, not this button's."
+  },
+  "outcome_unavailable": {
+    "message": "This Firefox has no working storage.sync, so it cannot sync."
+  },
+  "outcome_disabled": {
+    "message": "Sync is off, so nothing was done."
+  },
+  "outcome_no_vault": {
+    "message": "This device has no vault yet, so there is nothing to sync."
+  },
+  "outcome_busy": {
+    "message": "A sync is already running."
+  },
+  "outcome_locked": {
+    "message": "The vault is locked, so there is no key to merge the cloud copy with — nothing was read or written this time. Unlock it in the sidebar first."
+  },
+  "outcome_waiting": {
+    "message": "The cloud copy is still arriving, so it was left alone this time rather than overwriting something not yet seen. It will finish on its own."
+  },
+  "outcome_deleted_elsewhere": {
+    "message": "Another device deleted the vault, so sync is paused until you decide."
+  },
+  "outcome_failed": {
+    "message": "The sync failed — see the message above for why."
+  },
+  "sync_requested": {
+    "message": "Sync requested. The state is shown above."
+  },
+  "options_loading": {
+    "message": "Loading settings…"
+  },
+  "options_lede": {
+    "message": "Everything stays on this device. Nothing is uploaded to any server."
+  },
+  "options_lede_sync": {
+    "message": "Everything stays on this device. The vault also has an encrypted copy in Firefox Sync that only your master password can open."
+  },
+  "options_entry_title": {
+    "message": "How to reach the vault"
+  },
+  "options_entry_hint": {
+    "message": "When it is hidden, typing the trigger string below into the search box is what brings up the password screen."
+  },
+  "options_entry_hidden": {
+    "message": "Hidden — reached with the trigger string"
+  },
+  "options_entry_tab": {
+    "message": "Show a tab"
+  },
+  "options_export_target_title": {
+    "message": "Where bookmarks land when moved out"
+  },
+  "options_export_target_hint": {
+    "message": "“Move out of the vault” puts them in this folder. “Move out to…” asks each time."
+  },
+  "options_default_folder": {
+    "message": "Default folder"
+  },
+  "options_firefox_default_folder": {
+    "message": "(Firefox default: Other Bookmarks)"
+  },
+  "options_export_target_fallback": {
+    "message": "If this folder is deleted, the Firefox default is used instead."
+  },
+  "options_trigger_title": {
+    "message": "Trigger string"
+  },
+  "options_trigger_hint": {
+    "message": "Typing this into the search box brings up the password screen. Any text will do."
+  },
+  "options_trigger_advice": {
+    "message": "*Change this.* The default is public, so anyone who types it once can tell whether this device has a vault."
+  },
+  "options_trigger_empty": {
+    "message": "Leaving it empty disables this way in. Switch the setting above to “Show a tab”, or there will be no way to reach the vault at all."
+  },
+  "options_remote_awaiting_restore": {
+    "message": "There is already an encrypted copy in the cloud. Under “Sync across devices” below, press “Restore from the cloud to this device” and unlock with *the same master password*. *Do not create a second one here* — the keys would differ and the two could never be merged."
+  },
+  "options_status_label": {
+    "message": "State: "
+  },
+  "options_status_unlocked": {
+    "message": "unlocked, $BOOKMARKS$",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_status_locked": {
+    "message": "locked"
+  },
+  "options_vault_manage_hint": {
+    "message": "Vault bookmarks are managed — moved out, deleted — from the sidebar once it is unlocked."
+  },
+  "options_keys_title": {
+    "message": "Master password and recovery key"
+  },
+  "options_keys_hint": {
+    "message": "Either one opens the same data. If you forget the master password, the recovery key is the only way back."
+  },
+  "options_reveal_recovery": {
+    "message": "Show the recovery key again"
+  },
+  "options_keys_need_unlock": {
+    "message": "Unlock in the sidebar first to see the recovery key or change the master password."
+  },
+  "options_change_password_title": {
+    "message": "Change the master password"
+  },
+  "options_change_password_hint": {
+    "message": "The recovery key does *not* change."
+  },
+  "options_current_password": {
+    "message": "Current master password"
+  },
+  "options_new_password": {
+    "message": "New master password (at least $MIN$ characters)",
+    "placeholders": {
+      "min": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_new_password_again": {
+    "message": "Type the new master password again"
+  },
+  "options_password_changed": {
+    "message": "The master password has been changed. Use the new one next time you unlock."
+  },
+  "options_need_current_password": {
+    "message": "Enter the current master password above first"
+  },
+  "options_regenerate_title": {
+    "message": "Generate a new recovery key"
+  },
+  "options_regenerate_hint": {
+    "message": "The old one *stops working immediately* — throw away the copy you wrote down."
+  },
+  "options_regenerate_action": {
+    "message": "Generate a new one (needs the current master password)"
+  },
+  "options_regenerated": {
+    "message": "A new recovery key has been generated and is shown above. The old one no longer works."
+  },
+  "options_forget_title": {
+    "message": "Give up the vault on this device"
+  },
+  "options_forget_hint": {
+    "message": "The only way out when both the master password and the recovery key are gone. Clearing the encrypted data on this device lets you start over, but *the bookmarks inside cannot be recovered*. The cloud copy is untouched."
+  },
+  "options_forgot": {
+    "message": "The vault on this device has been cleared."
+  },
+  "options_backup_title": {
+    "message": "Encrypted backup file"
+  },
+  "options_backup_hint": {
+    "message": "*Forget the master password and it can never be opened.* A backup keeps the data from disappearing with this computer, but it still needs the master password it was made with."
+  },
+  "options_backup_hint2": {
+    "message": "The file is encrypted (AES-256-GCM), so a cloud drive or a USB stick is fine. It carries *no preview images* — those can be fetched again."
+  },
+  "options_export_needs_unlock": {
+    "message": "Unlock the vault in the sidebar first — that also proves you still remember the password this backup will need"
+  },
+  "options_export_no_vault": {
+    "message": "This device has no vault yet, so there is nothing to export"
+  },
+  "options_export_action": {
+    "message": "Export an encrypted backup"
+  },
+  "options_exported": {
+    "message": "Exported $FILENAME$. If no download appeared, save the contents below yourself.",
+    "placeholders": {
+      "filename": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_download_fallback": {
+    "message": "No download appeared? Copy the contents here"
+  },
+  "options_download_fallback_hint": {
+    "message": "Select all, copy, and save it as a `.json` file. The contents are encrypted."
+  },
+  "options_restore_title": {
+    "message": "Restore from a backup"
+  },
+  "options_restore_hint": {
+    "message": "If this device has no vault yet, you will unlock with this backup's password from now on. If it already has one, *unlock in the sidebar first* — the restore merges entry by entry, keeping the newer of each."
+  },
+  "options_restore_with_password": {
+    "message": "With the master password"
+  },
+  "options_restore_with_recovery": {
+    "message": "With the recovery key"
+  },
+  "options_backup_file": {
+    "message": "Backup file"
+  },
+  "options_file_unreadable": {
+    "message": "That file could not be read."
+  },
+  "options_backup_recovery_key": {
+    "message": "That backup's recovery key"
+  },
+  "options_backup_password": {
+    "message": "That backup's master password"
+  },
+  "options_restore_action": {
+    "message": "Restore"
+  },
+  "options_restoring": {
+    "message": "Restoring…"
+  },
+  "options_restore_needs_unlock": {
+    "message": "This device already has a vault and it is locked. Restoring into an existing vault needs it unlocked, because the merged result has to be written back with this device's key."
+  },
+  "options_sync_title": {
+    "message": "Sync across devices"
+  },
+  "options_sync_hint": {
+    "message": "Put an *encrypted* copy into Firefox Sync. Other devices get it by ticking the same box and entering the same master password. The password itself is never synced."
+  },
+  "options_sync_not_seen": {
+    "message": "Other devices cannot see it yet?"
+  },
+  "options_sync_not_seen_1": {
+    "message": "This checkbox only writes the encrypted copy into this machine's `storage.sync`, which takes seconds. Getting it to the other device is Firefox's own schedule, roughly every 10 minutes. To skip the wait, press “Sync Now” in `about:preferences#sync` — *on the source device first, then on the receiving one*."
+  },
+  "options_sync_not_seen_2": {
+    "message": "Once the new device has the data, typing the trigger string into the search box should bring up the *unlock* screen. *Do not press “Create a vault”* — the keys would differ and the two could never be merged."
+  },
+  "options_sync_checkbox": {
+    "message": "Put an encrypted copy into Firefox Sync"
+  },
+  "options_sync_on": {
+    "message": "On. The encrypted copy is being uploaded."
+  },
+  "options_sync_off": {
+    "message": "Off. The cloud copy is still there — use the button below to remove it."
+  },
+  "options_sync_unreadable": {
+    "message": "Could not read the sync state: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_sync_loading": {
+    "message": "Reading the sync state…"
+  },
+  "options_sync_remote": {
+    "message": "Cloud copy"
+  },
+  "options_sync_remote_absent": {
+    "message": "not uploaded yet"
+  },
+  "options_sync_remote_partial": {
+    "message": "still arriving — some pieces are missing, so sync waits rather than overwriting"
+  },
+  "options_sync_remote_ok": {
+    "message": "complete, last updated $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_sync_quota": {
+    "message": "Quota used"
+  },
+  "options_sync_does_not_fit": {
+    "message": " (this device's copy does not fit)"
+  },
+  "options_sync_last": {
+    "message": "Last sync"
+  },
+  "options_sync_never": {
+    "message": "never"
+  },
+  "options_sync_last_attempt": {
+    "message": " (last attempt: $OUTCOME$)",
+    "placeholders": {
+      "outcome": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_sync_last_error": {
+    "message": "Problem with the last sync: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_sync_deleted_elsewhere": {
+    "message": "*Another device deleted the whole vault, so sync is paused.* The data on this device is still here and untouched — a flag from elsewhere should not be able to destroy local data. To keep syncing with this device's data, press “Ignore the deletion and sync again” below. If you want it gone here too, unlock in the sidebar and delete the vault."
+  },
+  "options_sync_over_quota": {
+    "message": "This device's encrypted copy is over the 100 KB sync budget, so sync stays on the previous copy. Nothing on this device is affected. With this many bookmarks, use the encrypted backup above instead."
+  },
+  "options_sync_different_vault": {
+    "message": "The cloud holds a *separately created* vault (a different salt). The keys do not match, so they cannot be merged automatically. Pick one: use “Overwrite the cloud with this device” below, or export a backup on the other device and restore it here."
+  },
+  "options_sync_now": {
+    "message": "Check the cloud copy now"
+  },
+  "options_sync_now_hint": {
+    "message": "Makes this device read, merge and write its local storage.sync right now. It does not make Firefox upload or download — that is “Sync Now” in about:preferences#sync."
+  },
+  "options_sync_needs_checkbox": {
+    "message": "Tick “Put an encrypted copy into Firefox Sync” above first"
+  },
+  "options_sync_adopt": {
+    "message": "Restore from the cloud to this device"
+  },
+  "options_sync_adopted": {
+    "message": "The cloud copy has been restored to this device. Unlock it with the same master password."
+  },
+  "options_sync_resume": {
+    "message": "Ignore the deletion and sync again"
+  },
+  "options_sync_resumed": {
+    "message": "The deletion marker was ignored. Syncing continues from this device's data."
+  },
+  "options_sync_overwrite": {
+    "message": "Overwrite the cloud with this device"
+  },
+  "options_sync_overwrite_hint": {
+    "message": "Makes the cloud copy match this device. Anything on another device that has not synced here yet is lost."
+  },
+  "options_sync_overwrite_disabled": {
+    "message": "This device's copy is over the sync budget, so overwriting would fail after clearing the cloud copy. Disabled for that reason."
+  },
+  "options_sync_overwritten": {
+    "message": "The cloud copy now matches this device."
+  },
+  "options_sync_clear": {
+    "message": "Remove the cloud copy and turn sync off"
+  },
+  "options_sync_cleared": {
+    "message": "The cloud copy has been removed. Nothing on this device is affected."
+  },
+  "options_sync_limits": {
+    "message": "Known limits of syncing"
+  },
+  "options_sync_limit_android": {
+    "message": "*Firefox for Android does not sync `storage.sync` at all* (Mozilla bug 1625257). On a phone, the encrypted backup file is the only way to get the data."
+  },
+  "options_sync_limit_schedule": {
+    "message": "Firefox syncs roughly every 10 minutes, not instantly. “Check the cloud copy now” only makes this device read, merge and write its local `storage.sync` — it does *not* make Firefox upload or download."
+  },
+  "options_sync_limit_account": {
+    "message": "You need to be signed in to a Firefox account with “Add-ons” ticked in the sync settings. The extension *cannot tell* whether that is the case — writes succeed while signed out, they just go nowhere. Use the cloud copy's last-updated time above to judge whether sync is really running."
+  },
+  "options_sync_limit_stale": {
+    "message": "If the copy was written before you signed in — or before “Add-ons” was ticked — Firefox may never treat it as pending and never send it. Pressing “Overwrite the cloud with this device” once rewrites it."
+  },
+  "options_sync_limit_unlocked": {
+    "message": "Merging only happens while *unlocked*. Locked, nothing is pushed or pulled: without the key the cloud copy cannot be opened, so uploading would be plain overwriting and would lose whatever another device added."
+  },
+  "options_sync_limit_salt": {
+    "message": "*The salt and verifier sit in the synced data in the clear*, because a new device needs them to derive the same key from your master password. The cost, stated plainly: anyone with access to your Firefox account can take them and guess the password offline. The bookmarks themselves stay encrypted. So make the master password long — and this is why sync is off by default."
+  },
+  "options_sync_limit_quota": {
+    "message": "The budget is 100 KB. If the encrypted copy exceeds it, sync stops and warns above; nothing on this device is affected."
+  },
+  "options_sync_limit_previews": {
+    "message": "Preview images are not synced — too large. Press “Fetch missing previews” once on the new device."
+  },
+  "options_autolock_title": {
+    "message": "Automatic locking"
+  },
+  "options_autolock_before": {
+    "message": "Lock after"
+  },
+  "options_autolock_after": {
+    "message": "minutes of inactivity"
+  },
+  "options_autolock_hint": {
+    "message": "Counted from the last time you did something in the vault. It also locks when you leave the computer, after the same number of minutes idle."
+  },
+  "options_autolock_hint2": {
+    "message": "Closing the sidebar locks it too. The full-page view and this settings page also count as “open” — with either of them open, closing the sidebar does not lock immediately, and the timer above takes over."
+  },
+  "options_capture_title": {
+    "message": "Capturing previews"
+  },
+  "options_capture_enabled": {
+    "message": "Make a preview automatically when you visit a page you have bookmarked"
+  },
+  "options_recapture_before": {
+    "message": "Capture again when a preview is older than"
+  },
+  "options_recapture_after": {
+    "message": "days"
+  },
+  "options_blocklist_title": {
+    "message": "Domains never captured"
+  },
+  "options_blocklist_hint": {
+    "message": "One per line, matched as a substring of the hostname."
+  },
+  "options_storage_title": {
+    "message": "Storage"
+  },
+  "options_storage_counting": {
+    "message": "Counting…"
+  },
+  "options_storage_usage": {
+    "message": "$PREVIEWS$, $MB$ MB in total",
+    "placeholders": {
+      "previews": {
+        "content": "$1"
+      },
+      "mb": {
+        "content": "$2"
+      }
+    }
+  },
+  "options_clear_previews": {
+    "message": "Clear every preview"
+  },
+  "options_previews_cleared": {
+    "message": "Cleared $PREVIEWS$.",
+    "placeholders": {
+      "previews": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_reset_sitewide": {
+    "message": "Reset the site-wide image judgement"
+  },
+  "options_reset_sitewide_hint": {
+    "message": "The extension remembers which og:images are site-wide logos and demotes them. Reset this after a site is redesigned."
+  },
+  "options_sitewide_reset": {
+    "message": "What was learned about site-wide images has been reset."
+  },
+  "size_small": {
+    "message": "S"
+  },
+  "size_medium": {
+    "message": "M"
+  },
+  "size_large": {
+    "message": "L"
+  },
+  "gallery_card_size": {
+    "message": "Card size"
+  },
+  "gallery_scope": {
+    "message": "What to browse"
+  },
+  "action_deselect": {
+    "message": "Stop selecting"
+  },
+  "gallery_select_hint": {
+    "message": "Tick several items and move them all into a folder at once"
+  },
+  "gallery_vault_empty_hint": {
+    "message": "No vault bookmarks yet. In the sidebar, use the lock icon on the right of a bookmark, or “Select”, to move some in."
+  }
+}

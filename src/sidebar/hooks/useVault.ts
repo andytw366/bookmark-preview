@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { request, subscribe } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder, VaultState } from '@/shared/types';
+import { t, tn } from '@/shared/i18n';
 
 const KEEPALIVE_PORT = 'vault-keepalive';
 
@@ -308,13 +309,13 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
       await refreshAll();
       const moved =
         report.folders > 0
-          ? `資料夾已移入隱私空間（${String(report.folders)} 個資料夾、${String(report.bookmarks)} 個書籤）`
-          : '書籤已移入隱私空間';
+          ? t('vault_import_folder_done', tn('unit_folders', report.folders), tn('unit_bookmarks', report.bookmarks))
+          : t('vault_import_one_done');
       if (report.historyUnavailable) {
-        return `${moved}，但因為沒有瀏覽記錄權限，網址仍留在瀏覽記錄與網址列自動完成中。`;
+        return t('vault_import_history_unavailable', moved);
       }
       return report.historyPurged > 0
-        ? `${moved}，並清除了 ${String(report.historyPurged)} 筆瀏覽記錄。`
+        ? t('vault_import_history_purged', moved, tn('unit_history_entries', report.historyPurged))
         : `${moved}。`;
     },
     moveInMany: async (bookmarkIds, purgeHistory) => {
@@ -326,16 +327,16 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
       await refreshAll();
       const parts = [
         report.folders > 0
-          ? `已移入 ${String(report.imported)} 個書籤與 ${String(report.folders)} 個資料夾`
-          : `已移入 ${String(report.imported)} 個書籤`,
+          ? t('vault_import_many_done', tn('unit_bookmarks', report.imported), tn('unit_folders', report.folders))
+          : t('vault_import_many_done_bookmarks', tn('unit_bookmarks', report.imported)),
       ];
       if (report.failed > 0) {
-        parts.push(`${String(report.failed)} 個失敗`);
+        parts.push(tn('unit_failed', report.failed));
       }
       if (report.historyUnavailable) {
-        parts.push('因為沒有瀏覽記錄權限，這些網址仍留在瀏覽記錄與網址列自動完成中');
+        parts.push(t('vault_import_history_unavailable_part'));
       } else if (report.historyPurged > 0) {
-        parts.push(`並清除了 ${String(report.historyPurged)} 筆瀏覽記錄`);
+        parts.push(t('vault_import_history_purged_part', tn('unit_history_entries', report.historyPurged)));
       }
       return `${parts.join('，')}。`;
     },

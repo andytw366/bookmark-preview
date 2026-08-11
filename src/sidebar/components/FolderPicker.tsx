@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { request, type FolderChoice } from '@/shared/messages';
 import { Popover } from './Popover';
+import { t } from '@/shared/i18n';
 
 interface FolderPickerProps {
   x: number;
@@ -21,7 +22,7 @@ interface FolderPickerProps {
 export function FolderPicker({
   x,
   y,
-  heading = '移動到…',
+  heading = t('action_move_to'),
   disabledId = null,
   onPick,
   onClose,
@@ -38,9 +39,9 @@ export function FolderPicker({
     <Popover x={x} y={y} className="rowmenu rowmenu--list" onClose={onClose}>
       <p className="rowmenu__heading">{heading}</p>
       {folders === null ? (
-        <p className="rowmenu__note">載入資料夾…</p>
+        <p className="rowmenu__note">{t('folders_loading')}</p>
       ) : folders.length === 0 ? (
-        <p className="rowmenu__note">沒有可用的資料夾。</p>
+        <p className="rowmenu__note">{t('folders_none')}</p>
       ) : (
         folders.map((folder) => (
           <button

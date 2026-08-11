@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { t } from '@/shared/i18n';
 
 interface SearchBarProps {
   value: string;
@@ -28,7 +29,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
         ref={inputRef}
         type="search"
         className="search__input"
-        placeholder="搜尋書籤…"
+        placeholder={t('search_placeholder')}
         value={value}
         autoComplete="off"
         spellCheck={false}
@@ -40,7 +41,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
             onChange('');
           }
         }}
-        aria-label="搜尋書籤"
+        aria-label={t('search_label')}
       />
     </div>
   );

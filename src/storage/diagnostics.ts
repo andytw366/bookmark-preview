@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 /**
  * 最近一次擷取嘗試的結果。
  *
@@ -67,32 +69,32 @@ export function describeCapture(diagnostic: CaptureDiagnostic): string | null {
     case 'ok':
       return null;
     case 'skipped:private-window':
-      return '隱私瀏覽視窗不擷取畫面。';
+      return t('capture_skip_private_window');
     case 'skipped:inactive-tab':
-      return '背景分頁未實際繪製，不擷取（避免存到空白畫面）。';
+      return t('capture_skip_inactive_tab');
     case 'skipped:no-permission':
-      return '缺少網站存取權限，無法擷取畫面。';
+      return t('capture_skip_no_permission');
     case 'skipped:api-unavailable':
-      return '剛取得權限，正在重新啟用畫面擷取，請稍候再瀏覽一次該頁面。';
+      return t('capture_skip_api_unavailable');
     case 'skipped:disabled':
-      return '自動擷取已在設定中關閉。';
+      return t('capture_skip_disabled');
     case 'skipped:blocklisted':
-      return '這個網域在擷取黑名單中。';
+      return t('capture_skip_blocklisted');
     case 'skipped:not-open':
       // 值得說一聲：使用者剛加了書籤卻沒有預覽圖，而下一步該做什麼並不明顯
-      return '剛加入的書籤沒有開啟中的分頁，無法擷取。可用「補抓預覽圖」抓 og:image。';
+      return t('capture_skip_not_open');
     case 'skipped:not-bookmarked':
     case 'skipped:fresh':
     case 'skipped:unsupported-url':
     case 'skipped:navigated-away':
       return null;
     case 'error':
-      return `擷取畫面失敗：${diagnostic.detail ?? '未知原因'}`;
+      return t('capture_failed', diagnostic.detail ?? t('reason_unknown'));
     case 'manual:ok':
-      return '已把你選的圖片設為這個書籤的預覽圖。';
+      return t('capture_manual_ok');
     case 'manual:not-bookmarked':
-      return '這個頁面還沒有加入書籤，無法設定預覽圖。';
+      return t('capture_manual_not_bookmarked');
     case 'manual:failed':
-      return `設定預覽圖失敗：${diagnostic.detail ?? '未知原因'}`;
+      return t('capture_manual_failed', diagnostic.detail ?? t('reason_unknown'));
   }
 }

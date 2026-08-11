@@ -99,7 +99,7 @@ describe('AES-GCM', () => {
     const tampered = new Uint8Array(sealed.ciphertext);
     tampered[0] = (tampered[0] ?? 0) ^ 0xff;
     await expect(unseal(k, { iv: sealed.iv, ciphertext: tampered.buffer })).rejects.toThrow(
-      /主密碼錯誤，或資料已損毀/,
+      /crypto_decrypt_failed/,
     );
   });
 
@@ -129,7 +129,7 @@ describe('金鑰派生', () => {
   });
 
   it('拒絕空密碼', async () => {
-    await expect(deriveKey('', randomSalt(), FAST_ITERATIONS)).rejects.toThrow(/不可為空/);
+    await expect(deriveKey('', randomSalt(), FAST_ITERATIONS)).rejects.toThrow(/crypto_password_empty/);
   });
 
   it('金鑰不可匯出', async () => {
@@ -216,7 +216,7 @@ describe('vault 編碼', () => {
     const right = await deriveKey('right', salt, FAST_ITERATIONS);
     const wrong = await deriveKey('wrong', salt, FAST_ITERATIONS);
     const chunks = await encodePayload(right, { secret: true });
-    await expect(decodePayload(wrong, chunks)).rejects.toThrow(/主密碼錯誤/);
+    await expect(decodePayload(wrong, chunks)).rejects.toThrow(/crypto_decrypt_failed/);
   });
 
   it('缺少任一塊都會失敗，不會靜默回傳部分資料', async () => {
@@ -234,7 +234,7 @@ describe('vault 編碼', () => {
 
   it('沒有塊時明確失敗', async () => {
     const k = await key();
-    await expect(decodePayload(k, [])).rejects.toThrow(/沒有可解碼的資料/);
+    await expect(decodePayload(k, [])).rejects.toThrow(/crypto_no_data/);
   });
 
   it('不支援的格式版本會明確失敗', async () => {
@@ -242,7 +242,7 @@ describe('vault 編碼', () => {
     const chunks = await encodePayload(k, { a: 1 });
     const bytes = fromBase64(fromChunks(chunks));
     bytes[0] = 99;
-    await expect(decodePayload(k, toChunks(toBase64(bytes)))).rejects.toThrow(/不支援的資料格式版本/);
+    await expect(decodePayload(k, toChunks(toBase64(bytes)))).rejects.toThrow(/crypto_unsupported_version/);
   });
 });
 

@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 import { utf8, type Bytes } from './bytes';
 
 /**
@@ -23,7 +25,7 @@ export async function deriveKey(
   iterations: number = KDF_ITERATIONS,
 ): Promise<CryptoKey> {
   if (password === '') {
-    throw new Error('主密碼不可為空');
+    throw new Error(t('crypto_password_empty'));
   }
   const base = await crypto.subtle.importKey('raw', utf8(password), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(

@@ -3,6 +3,7 @@ import { request } from '@/shared/messages';
 import type { BookmarkNode } from '@/shared/types';
 import { FolderPicker } from './FolderPicker';
 import { Popover } from './Popover';
+import { t } from '@/shared/i18n';
 
 export interface MenuTarget {
   node: BookmarkNode;
@@ -78,10 +79,10 @@ export function RowMenu({
             onChange={(event) => {
               setTitle(event.target.value);
             }}
-            aria-label="書籤名稱"
+            aria-label={t('bookmark_name_label')}
           />
           <button type="submit" className="chip chip--primary">
-            儲存
+            {t('action_save')}
           </button>
         </form>
       </Popover>
@@ -106,8 +107,8 @@ export function RowMenu({
     return (
       <Popover x={target.x} y={target.y} onClose={onClose}>
         <p className="rowmenu__heading">
-          刪除「{node.title || '（未命名）'}」
-          {node.kind === 'folder' ? '及其中所有內容' : ''}？
+          {t('delete_confirm_named', node.title || t('folder_untitled'))}
+          {node.kind === 'folder' ? t('delete_confirm_folder_suffix') : ''}
         </p>
         <button
           type="button"
@@ -116,14 +117,14 @@ export function RowMenu({
             run(async () => request('bookmarks/delete', { id: node.id }));
           }}
         >
-          確定刪除
+          {t('action_delete_confirm')}
         </button>
         {/* 焦點落在「取消」而不是排在前面的「確定刪除」：用鍵盤按下選單裡的
             「刪除」之後，焦點會自動進到這個確認框，若那是確定鈕，連按兩次
             Enter 就刪掉了 —— 不可逆的動作不該只隔一個重複鍵。
             用 data-autofocus 而不是 React 的 autoFocus，理由見 Popover */}
         <button type="button" className="rowmenu__item" data-autofocus="" onClick={onClose}>
-          取消
+          {t('action_cancel')}
         </button>
       </Popover>
     );
@@ -142,7 +143,7 @@ export function RowMenu({
               onClose();
             }}
           >
-            在新分頁開啟
+            {t('action_open_in_new_tab')}
           </button>
           <button
             type="button"
@@ -153,17 +154,17 @@ export function RowMenu({
               onClose();
             }}
           >
-            複製網址
+            {t('action_copy_url')}
           </button>
           <button
             type="button"
             role="menuitem"
             className="rowmenu__item"
-            title="刪掉現有預覽圖並重新抓。頁面開著時品質最好（會從已渲染的 DOM 找封面）。"
+            title={t('refresh_thumb_hint')}
             onClick={() => {
               const url = node.url;
               onClose();
-              onNotice('正在重新抓預覽圖…');
+              onNotice(t('refresh_thumb_running'));
               void request('thumbs/refresh', { url }).then(
                 (report) => {
                   onNotice(report.detail);
@@ -174,7 +175,7 @@ export function RowMenu({
               );
             }}
           >
-            重新抓預覽圖
+            {t('action_refresh_thumb')}
           </button>
         </>
       ) : null}
@@ -187,7 +188,7 @@ export function RowMenu({
           setRenaming(true);
         }}
       >
-        重新命名
+        {t('action_rename')}
       </button>
 
       <button
@@ -198,7 +199,7 @@ export function RowMenu({
           setChoosingFolder(true);
         }}
       >
-        移動到…
+        {t('action_move_to')}
       </button>
 
       {canMoveToVault ? (
@@ -212,7 +213,7 @@ export function RowMenu({
           }}
         >
           {/* 資料夾是整棵子樹一起移入，講清楚才不會以為只搬了資料夾這個殼 */}
-          {node.kind === 'folder' ? '把整個資料夾移入隱私空間' : '移入隱私空間'}
+          {node.kind === 'folder' ? t('row_import_folder') : t('row_import')}
         </button>
       ) : null}
 
@@ -224,7 +225,7 @@ export function RowMenu({
           setConfirmDelete(true);
         }}
       >
-        刪除
+        {t('action_delete')}
       </button>
     </Popover>
   );

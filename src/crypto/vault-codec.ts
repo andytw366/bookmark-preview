@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 import { seal, unseal, IV_BYTES } from './aead';
 import { concat, copyBytes, equalBytes, fromBase64, fromUtf8, toBase64, utf8 } from './bytes';
 import { toChunks, fromChunks } from './chunk';
@@ -45,16 +47,16 @@ export async function encodePayload(
 
 export async function decodePayload<T>(key: CryptoKey, chunks: readonly string[]): Promise<T> {
   if (chunks.length === 0) {
-    throw new Error('沒有可解碼的資料');
+    throw new Error(t('crypto_no_data'));
   }
   const envelope = fromBase64(fromChunks(chunks));
   if (envelope.length < HEADER_BYTES) {
-    throw new Error('資料已損毀：長度不足');
+    throw new Error(t('crypto_data_truncated'));
   }
 
   const version = envelope[0];
   if (version !== FORMAT_VERSION) {
-    throw new Error(`不支援的資料格式版本：${String(version)}`);
+    throw new Error(t('crypto_unsupported_version', String(version)));
   }
   const compressed = ((envelope[1] ?? 0) & FLAG_GZIP) !== 0;
   const iv = copyBytes(envelope.subarray(2, HEADER_BYTES));

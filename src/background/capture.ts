@@ -9,6 +9,7 @@ import { noteDeclaredImages } from '@/storage/site-image-stats';
 import { coverCandidatesFromTab, DECLARED_THRESHOLD, SITE_WIDE_PENALTY } from './cover';
 import { fetchCoverThumbnail } from './cover-fetch';
 import { makeThumbnail, type Thumbnail } from './image';
+import { t } from '@/shared/i18n';
 
 /**
  * 被動截圖管線：你正常瀏覽到已加入書籤的頁面時，在背景擷取縮圖。
@@ -91,7 +92,7 @@ async function captureForNewBookmark(node: browser.bookmarks.BookmarkTreeNode): 
       normalizeUrl(tab.url) === normalizeUrl(url),
   );
   if (target?.id === undefined) {
-    await skip('skipped:not-open', url, '剛加入的書籤沒有開啟中的分頁，改用「補抓預覽圖」');
+    await skip('skipped:not-open', url, t('capture_detail_not_open'));
     return;
   }
 
@@ -210,7 +211,7 @@ export async function produceThumbnailNow(
       return true;
     }
   }
-  await skip('error', url, '找不到封面圖，畫面擷取也失敗');
+  await skip('error', url, t('capture_detail_no_cover'));
   return false;
 }
 
@@ -272,7 +273,7 @@ async function tryCover(tabId: number, url: string, key: string): Promise<boolea
     broadcast('thumbs/updated', { key });
     return true;
   } catch (cause) {
-    console.warn('[書籤預覽] 擷取封面圖失敗', url, cause);
+    console.warn('[bookmark-preview] cover grab failed', url, cause);
     return false;
   }
 }
@@ -312,7 +313,7 @@ async function capture(tabId: number, url: string, key: string): Promise<void> {
     broadcast('thumbs/updated', { key });
   } catch (cause) {
     const detail = cause instanceof Error ? cause.message : String(cause);
-    console.warn('[書籤預覽] 擷取縮圖失敗', url, cause);
+    console.warn('[bookmark-preview] screenshot capture failed', url, cause);
     await skip('error', url, detail);
   }
 }
@@ -360,7 +361,7 @@ export function startPermissionWatcher(): void {
       const needsHistory =
         (await browser.permissions.contains({ permissions: ['history'] })) && !historyApiAvailable();
       if (needsCapture || needsHistory) {
-        console.info('[書籤預覽] 已取得新權限，重新載入擴充套件以啟用對應功能');
+        console.info('[bookmark-preview] new permission granted, reloading to enable the feature');
         browser.runtime.reload();
       }
     })();

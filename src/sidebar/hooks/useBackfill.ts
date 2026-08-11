@@ -6,6 +6,7 @@ import {
   onCaptureRecorded,
   type CaptureDiagnostic,
 } from '@/storage/diagnostics';
+import { t } from '@/shared/i18n';
 
 export type BackfillKind = 'thumbs/backfill' | 'vault/backfill';
 
@@ -53,7 +54,7 @@ export function useBackfill(): BackfillApi {
 
   const status =
     progress !== null && progress.total > 0
-      ? `補抓中 ${String(progress.done)} / ${String(progress.total)}（成功 ${String(progress.ok)}）`
+      ? t('backfill_progress', progress.done, progress.total, progress.ok)
       : (message ?? captureNote);
 
   return {
@@ -66,8 +67,8 @@ export function useBackfill(): BackfillApi {
         (report: BackfillReport) => {
           setMessage(
             report.total === 0
-              ? '每個書籤都已經有預覽圖了。'
-              : `補抓完成：${String(report.ok)} / ${String(report.total)} 個書籤取得預覽圖。`,
+              ? t('backfill_all_done')
+              : t('backfill_finished', report.ok, report.total),
           );
           setBusy(false);
           setProgress(null);

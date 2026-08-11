@@ -87,7 +87,7 @@ describe('備份檔往返', () => {
     const file = parseBackup(buildBackup(meta, fromChunks(await encodePayload(key, SAMPLE)), NOW));
 
     const wrong = await deriveKey('wrong password', fromBase64(file.vault.salt), file.vault.iterations);
-    await expect(unwrapDek(wrong, file.vault.passwordWrap)).rejects.toThrow(/解密失敗/);
+    await expect(unwrapDek(wrong, file.vault.passwordWrap)).rejects.toThrow(/crypto_decrypt_failed/);
   });
 
   it('備份檔裡沒有明文的網址或標題', async () => {
@@ -126,15 +126,15 @@ describe('parseBackup 的錯誤訊息', () => {
   };
 
   it('不是 JSON', () => {
-    expect(() => parseBackup('這不是 JSON')).toThrow(/JSON/);
+    expect(() => parseBackup('這不是 JSON')).toThrow(/backup_invalid_json/);
   });
 
   it('是 JSON 但不是這個擴充套件的備份檔', () => {
-    expect(() => parseBackup('{"hello":1}')).toThrow(/不是本擴充套件/);
+    expect(() => parseBackup('{"hello":1}')).toThrow(/backup_wrong_extension/);
   });
 
   it('版本比擴充套件新時明確要求更新，而不是硬解', () => {
-    expect(() => parseBackup(JSON.stringify({ ...valid, version: 99 }))).toThrow(/更新擴充套件/);
+    expect(() => parseBackup(JSON.stringify({ ...valid, version: 99 }))).toThrow(/backup_newer_version/);
   });
 
   it('缺 salt 時說清楚是缺 salt', () => {
@@ -146,20 +146,20 @@ describe('parseBackup 的錯誤訊息', () => {
   it('iterations 無效時擋下來（0 次迭代等於沒有 KDF）', () => {
     expect(() =>
       parseBackup(JSON.stringify({ ...valid, vault: { ...valid.vault, iterations: 0 } })),
-    ).toThrow(/迭代次數/);
+    ).toThrow(/backup_bad_iterations/);
   });
 
   it('缺任一個包裹都要明講，因為那決定了還原得不了', () => {
     expect(() =>
       parseBackup(JSON.stringify({ ...valid, vault: { ...valid.vault, passwordWrap: undefined } })),
-    ).toThrow(/主密碼包裹/);
+    ).toThrow(/backup_missing_password_wrap/);
     expect(() =>
       parseBackup(JSON.stringify({ ...valid, vault: { ...valid.vault, recoveryWrap: undefined } })),
-    ).toThrow(/救援金鑰包裹/);
+    ).toThrow(/backup_missing_recovery_wrap/);
   });
 
   it('沒有資料本體', () => {
-    expect(() => parseBackup(JSON.stringify({ ...valid, blob: '' }))).toThrow(/資料本體/);
+    expect(() => parseBackup(JSON.stringify({ ...valid, blob: '' }))).toThrow(/backup_missing_blob/);
   });
 
   it('合法的檔案原樣通過', () => {
@@ -169,7 +169,9 @@ describe('parseBackup 的錯誤訊息', () => {
 
 describe('backupFilename', () => {
   it('帶日期，讓多份備份看得出先後', () => {
-    expect(backupFilename(new Date(2026, 7, 4))).toBe('隱私空間備份-2026-08-04.json');
+    // 文案在 _locales，Node 裡沒有 browser.i18n，所以拿到的是「鍵名(代入的值)」——
+    // 這一條要釘住的本來就是日期算得對不對，不是檔名長什麼樣子
+    expect(backupFilename(new Date(2026, 7, 4))).toBe('backup_filename(2026-08-04)');
   });
 });
 

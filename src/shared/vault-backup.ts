@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { VaultMeta } from './types';
 
 /**
@@ -54,40 +55,40 @@ export function parseBackup(text: string): BackupFile {
   try {
     parsed = JSON.parse(text);
   } catch {
-    return fail('這個檔案不是有效的 JSON，可能不是備份檔或已經損毀。');
+    return fail(t('backup_invalid_json'));
   }
   if (typeof parsed !== 'object' || parsed === null) {
-    return fail('這個檔案不是備份檔。');
+    return fail(t('backup_not_a_backup'));
   }
 
   const file = parsed as Partial<BackupFile>;
   if (file.format !== BACKUP_FORMAT) {
-    return fail('這個檔案不是本擴充套件的隱私空間備份檔。');
+    return fail(t('backup_wrong_extension'));
   }
   if (typeof file.version !== 'number' || file.version > BACKUP_VERSION) {
-    return fail('這個備份檔的版本比目前的擴充套件新，請先更新擴充套件。');
+    return fail(t('backup_newer_version'));
   }
 
   const vault = file.vault as Partial<VaultMeta> | undefined;
   // salt 與 KDF 參數缺了就永遠派生不出金鑰，這時要明講而不是丟一個解密失敗
   if (typeof vault?.salt !== 'string' || vault.salt === '') {
-    return fail('備份檔缺少 salt，無法用主密碼還原（檔案已損毀）。');
+    return fail(t('backup_missing_salt'));
   }
   if (
     typeof vault.iterations !== 'number' ||
     !Number.isInteger(vault.iterations) ||
     vault.iterations < 1
   ) {
-    return fail('備份檔的 KDF 迭代次數無效（檔案已損毀）。');
+    return fail(t('backup_bad_iterations'));
   }
   if (typeof vault.passwordWrap?.ct !== 'string' || typeof vault.passwordWrap.iv !== 'string') {
-    return fail('備份檔缺少以主密碼包裹的資料金鑰（檔案已損毀）。');
+    return fail(t('backup_missing_password_wrap'));
   }
   if (typeof vault.recoveryWrap?.ct !== 'string' || typeof vault.recoveryWrap.iv !== 'string') {
-    return fail('備份檔缺少以救援金鑰包裹的資料金鑰（檔案已損毀）。');
+    return fail(t('backup_missing_recovery_wrap'));
   }
   if (typeof file.blob !== 'string' || file.blob === '') {
-    return fail('備份檔沒有資料本體（檔案已損毀）。');
+    return fail(t('backup_missing_blob'));
   }
 
   return {
@@ -103,5 +104,5 @@ export function parseBackup(text: string): BackupFile {
 export function backupFilename(at: Date = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0');
   const stamp = `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
-  return `隱私空間備份-${stamp}.json`;
+  return t('backup_filename', stamp);
 }

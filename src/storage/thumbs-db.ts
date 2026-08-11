@@ -1,4 +1,5 @@
 import type { ThumbRecord } from '@/shared/types';
+import { t } from '@/shared/i18n';
 
 /**
  * 縮圖的 IndexedDB 存取層。
@@ -31,7 +32,7 @@ function openDb(): Promise<IDBDatabase> {
     };
     request.onerror = () => {
       cached = null;
-      reject(request.error ?? new Error('無法開啟縮圖資料庫'));
+      reject(request.error ?? new Error(t('thumbdb_open_failed')));
     };
   });
   return cached;
@@ -47,7 +48,7 @@ function run<T>(mode: IDBTransactionMode, work: (store: IDBObjectStore) => IDBRe
           resolve(request.result);
         };
         request.onerror = () => {
-          reject(request.error ?? new Error('縮圖資料庫操作失敗'));
+          reject(request.error ?? new Error(t('thumbdb_request_failed')));
         };
       }),
   );

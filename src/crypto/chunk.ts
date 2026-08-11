@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 /**
  * 把一段 base64 切成能放進 storage.sync 的塊。
  *
@@ -13,7 +15,7 @@ export const SYNC_ITEM_LIMIT = 512;
 
 export function toChunks(text: string, size: number = CHUNK_CHARS): string[] {
   if (size <= 0) {
-    throw new Error('塊大小必須為正數');
+    throw new Error(t('crypto_chunk_size_invalid'));
   }
   if (text === '') {
     return [];

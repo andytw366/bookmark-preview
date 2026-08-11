@@ -25,6 +25,7 @@ import { useVault } from '../sidebar/hooks/useVault';
 import { contextMenuHandlers } from '../sidebar/lib/keys';
 import { buildIndex, countLinks, pathTo, searchLinks } from '../sidebar/lib/tree';
 import { vaultPathTo } from '../sidebar/lib/vault-tree';
+import { t, tn } from '@/shared/i18n';
 
 /**
  * 獨立分頁的全頁書籤瀏覽。
@@ -44,9 +45,9 @@ const COLUMN_CHOICES = [140, 200, 280] as const;
 type ColumnSize = (typeof COLUMN_CHOICES)[number];
 
 const SIZE_LABEL: Record<ColumnSize, string> = {
-  140: '小',
-  200: '中',
-  280: '大',
+  140: t('size_small'),
+  200: t('size_medium'),
+  280: t('size_large'),
 };
 
 type Mode = 'bookmarks' | 'vault';
@@ -344,15 +345,15 @@ export function Gallery() {
     mode === 'vault'
       ? [
           {
-            label: '移動到…',
+            label: t('action_move_to'),
             primary: true,
             onPick: (x, y) => {
               setVaultFolderPicker({ x, y });
             },
           },
           {
-            label: '移出到…',
-            title: '移回一般書籤，並選擇要放哪個資料夾',
+            label: t('vault_export_to'),
+            title: t('vault_export_to_hint'),
             onPick: (x, y) => {
               setExportPicker({ x, y, ids: [...vaultSelectedIds] });
             },
@@ -360,7 +361,7 @@ export function Gallery() {
         ]
       : [
           {
-            label: '移動到…',
+            label: t('action_move_to'),
             primary: true,
             onPick: (x, y) => {
               setFolderPicker({ x, y });
@@ -369,11 +370,11 @@ export function Gallery() {
           ...(vaultUnlocked
             ? [
                 {
-                  label: '移入隱私空間',
+                  label: t('row_import'),
                   // 資料夾連同子樹一起移入，只有「一個書籤都沒勾到」才無事可做
                   disabled: selectedLinkCount === 0,
                   title: selectedNodes.some((node) => node.kind === 'folder')
-                    ? '資料夾會連同裡面的內容一起移入，層級保留'
+                    ? t('row_import_folder_hint')
                     : undefined,
                   onPick: (x: number, y: number) => {
                     setPendingMove({ nodes: selectedNodes, x, y });
@@ -388,9 +389,9 @@ export function Gallery() {
     return (
       <div className="gallery">
         <div className="notice notice--error">
-          <p>無法讀取書籤：{error}</p>
+          <p>{t('bookmarks_read_failed', error)}</p>
           <button type="button" onClick={reload}>
-            重試
+            {t('action_retry')}
           </button>
         </div>
       </div>
@@ -429,8 +430,8 @@ export function Gallery() {
             <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
           </svg>
         </span>
-        <span className="card__title">{folder.name || '（未命名資料夾）'}</span>
-        <span className="card__meta">{vaultCountIn.get(folder.id) ?? 0} 個書籤</span>
+        <span className="card__title">{folder.name || t('folder_untitled_folder')}</span>
+        <span className="card__meta">{tn('unit_bookmarks', vaultCountIn.get(folder.id) ?? 0)}</span>
       </button>
       {vaultSelecting ? (
         <>
@@ -443,8 +444,8 @@ export function Gallery() {
           <button
             type="button"
             className="card__enter"
-            title="開啟這個資料夾"
-            aria-label={`開啟資料夾「${folder.name || '（未命名）'}」`}
+            title={t('row_open_folder')}
+            aria-label={t('row_open_folder_named', folder.name || t('folder_untitled'))}
             onClick={() => {
               setVaultFolderId(folder.id);
             }}
@@ -518,13 +519,13 @@ export function Gallery() {
         原本「選取」在書籤模式放第一列、在隱私空間放第二列，兩個模式長得不一樣。
       */}
       <header className="gallery__head">
-        <h1 className="gallery__title">書籤預覽</h1>
+        <h1 className="gallery__title">{t('extension_name')}</h1>
         <input
           className="gallery__search"
           type="search"
           value={query}
-          placeholder="搜尋書籤…"
-          aria-label="搜尋書籤"
+          placeholder={t('search_placeholder')}
+          aria-label={t('search_label')}
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => {
@@ -536,7 +537,7 @@ export function Gallery() {
             }
           }}
         />
-        <div className="segmented" role="group" aria-label="卡片大小">
+        <div className="segmented" role="group" aria-label={t('gallery_card_size')}>
           {COLUMN_CHOICES.map((choice) => (
             <button
               key={choice}
@@ -554,8 +555,8 @@ export function Gallery() {
         <button
           type="button"
           className="toolbar__action toolbar__action--icon"
-          title="更多選項"
-          aria-label="更多選項"
+          title={t('toolbar_more')}
+          aria-label={t('toolbar_more')}
           aria-haspopup="true"
           aria-expanded={optionsMenu !== null}
           onClick={(event) => {
@@ -579,7 +580,7 @@ export function Gallery() {
 
       <div className="gallery__modes">
         {showModes ? (
-          <div className="segmented" role="group" aria-label="瀏覽範圍">
+          <div className="segmented" role="group" aria-label={t('gallery_scope')}>
             <button
               type="button"
               className={`segmented__item${mode === 'bookmarks' ? ' segmented__item--active' : ''}`}
@@ -592,7 +593,7 @@ export function Gallery() {
                 setMode('bookmarks');
               }}
             >
-              書籤
+              {t('tab_bookmarks')}
             </button>
             <button
               type="button"
@@ -606,7 +607,7 @@ export function Gallery() {
                 setMode('vault');
               }}
             >
-              隱私空間
+              {t('tab_vault')}
             </button>
           </div>
         ) : null}
@@ -614,7 +615,7 @@ export function Gallery() {
         <button
           type="button"
           className="toolbar__action"
-          title="勾選多個項目，一次搬到其他資料夾"
+          title={t('gallery_select_hint')}
           onClick={() => {
             if (activeSelecting) {
               exitSelection();
@@ -627,7 +628,7 @@ export function Gallery() {
             setSelecting(true);
           }}
         >
-          {activeSelecting ? '取消選取' : '選取'}
+          {activeSelecting ? t('action_deselect') : t('toolbar_select')}
         </button>
 
         {/* 兩個模式都有：它建在「目前這個資料夾」裡，與模式無關 */}
@@ -636,14 +637,14 @@ export function Gallery() {
           className="toolbar__action"
           title={
             mode === 'bookmarks' && folderId === null
-              ? '新增資料夾（最上層不能直接建，會放進「其他書籤」）'
-              : '在目前的資料夾裡新增子資料夾'
+              ? t('new_folder_hint_root')
+              : t('new_folder_hint_nested')
           }
           onClick={() => {
             setCreatingFolder(true);
           }}
         >
-          新增資料夾
+          {t('action_new_folder')}
         </button>
 
         {mode === 'vault' ? (
@@ -654,16 +655,16 @@ export function Gallery() {
               void vault.lock();
             }}
           >
-            立即上鎖
+            {t('vault_lock_now')}
           </button>
         ) : null}
       </div>
 
       {activeSelecting ? (
         <div className="gallery__selection">
-          <span className="toolbar__count">已選 {activeSelectedCount} 個</span>
+          <span className="toolbar__count">{tn('toolbar_selected', activeSelectedCount)}</span>
           <button type="button" className="toolbar__action" onClick={selectAllInView}>
-            全選
+            {t('action_select_all')}
           </button>
           {selectionActions.map((action) => (
             <button
@@ -681,7 +682,7 @@ export function Gallery() {
             </button>
           ))}
           <button type="button" className="toolbar__action" onClick={exitSelection}>
-            取消
+            {t('action_cancel')}
           </button>
         </div>
       ) : null}
@@ -691,7 +692,7 @@ export function Gallery() {
         <div className="notice notice--error">
           <p>{vault.error}</p>
           <button type="button" onClick={vault.clearError}>
-            關閉
+            {t('action_close')}
           </button>
         </div>
       ) : null}
@@ -705,7 +706,7 @@ export function Gallery() {
               setNotice(null);
             }}
           >
-            關閉
+            {t('action_close')}
           </button>
         </div>
       ) : null}
@@ -714,7 +715,7 @@ export function Gallery() {
         <NewFolderForm
           hint={
             mode === 'bookmarks' && folderId === null
-              ? '最上層不能直接建，會放進「其他書籤」。'
+              ? t('new_folder_root_note')
               : undefined
           }
           onCancel={() => {
@@ -753,8 +754,8 @@ export function Gallery() {
           />
         ) : (
           <p className="gallery__hint">
-            {search.links.length} 筆結果
-            {search.truncated ? '（已達顯示上限，請輸入更精確的關鍵字）' : ''}
+            {tn('search_results', search.links.length)}
+            {search.truncated ? t('search_truncated') : ''}
           </p>
         )}
       </div>
@@ -763,8 +764,8 @@ export function Gallery() {
         vaultFolders.length === 0 && vaultBookmarks.length === 0 ? (
           <p className="empty">
             {vaultFolderId === null
-              ? '還沒有隱私書籤。在側邊欄用書籤右側的鎖圖示或「選取」可以把書籤移進來。'
-              : '這個資料夾是空的。'}
+              ? t('gallery_vault_empty_hint')
+              : t('folder_empty')}
           </p>
         ) : (
           <div
@@ -781,9 +782,9 @@ export function Gallery() {
           </div>
         )
       ) : roots === null ? (
-        <p className="empty">載入書籤…</p>
+        <p className="empty">{t('bookmarks_loading')}</p>
       ) : nodes.length === 0 ? (
-        <p className="empty">{search !== null ? '沒有符合的書籤。' : '這個資料夾沒有書籤。'}</p>
+        <p className="empty">{search !== null ? t('search_no_match') : t('folder_no_bookmarks')}</p>
       ) : (
         <div
           ref={gridRef}
@@ -825,8 +826,8 @@ export function Gallery() {
                       <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
                     </svg>
                   </span>
-                  <span className="card__title">{node.title || '（未命名資料夾）'}</span>
-                  <span className="card__meta">{countLinks(node.children)} 個書籤</span>
+                  <span className="card__title">{node.title || t('folder_untitled_folder')}</span>
+                  <span className="card__meta">{tn('unit_bookmarks', countLinks(node.children))}</span>
                 </button>
                 {selecting ? (
                   <>
@@ -839,8 +840,8 @@ export function Gallery() {
                     <button
                       type="button"
                       className="card__enter"
-                      title="開啟這個資料夾"
-                      aria-label={`開啟資料夾「${node.title || '（未命名）'}」`}
+                      title={t('row_open_folder')}
+                      aria-label={t('row_open_folder_named', node.title || t('folder_untitled'))}
                       onClick={() => {
                         setFolderId(node.id);
                         setQuery('');
@@ -932,7 +933,7 @@ export function Gallery() {
         <FolderPicker
           x={folderPicker.x}
           y={folderPicker.y}
-          heading={`把 ${String(selectedNodes.length)} 個項目移動到…`}
+          heading={tn('picker_move_many', selectedNodes.length)}
           onClose={() => {
             setFolderPicker(null);
           }}
@@ -944,8 +945,8 @@ export function Gallery() {
               (report) => {
                 setNotice(
                   report.failed === 0
-                    ? `已移動 ${String(report.moved)} 個書籤。`
-                    : `已移動 ${String(report.moved)} 個書籤，${String(report.failed)} 個失敗。`,
+                    ? t('moved_bookmarks', tn('unit_bookmarks', report.moved))
+                    : t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
                 );
                 reload();
               },
@@ -981,7 +982,7 @@ export function Gallery() {
           x={vaultFolderPicker.x}
           y={vaultFolderPicker.y}
           folders={vault.folders}
-          heading={`把 ${String(vaultSelectedIds.size)} 個項目移動到…`}
+          heading={tn('picker_move_many', vaultSelectedIds.size)}
           // 勾選中的資料夾（連同子樹）不是合法目標：搬進自己的子樹會造成環狀
           excludeIds={[...vaultSelectedIds].filter((id) =>
             vault.folders.some((folder) => folder.id === id),
@@ -997,8 +998,8 @@ export function Gallery() {
               (report) => {
                 setNotice(
                   report.failed === 0
-                    ? `已移動 ${String(report.done)} 個項目。`
-                    : `已移動 ${String(report.done)} 個項目，${String(report.failed)} 個失敗。`,
+                    ? t('moved_items', tn('unit_items', report.done))
+                    : t('moved_items_with_failures', tn('unit_items', report.done), tn('unit_failed', report.failed)),
                 );
                 void vault.reload();
               },
@@ -1014,7 +1015,7 @@ export function Gallery() {
         <FolderPicker
           x={exportPicker.x}
           y={exportPicker.y}
-          heading={`把 ${String(exportPicker.ids.length)} 個項目移出到…`}
+          heading={tn('picker_export_many', exportPicker.ids.length)}
           onClose={() => {
             setExportPicker(null);
           }}
@@ -1027,8 +1028,8 @@ export function Gallery() {
                 setNotice(
                   // 「項目」而不是「書籤」：一個項目可能是整個資料夾（連同子樹）
                   report.failed === 0
-                    ? `已移出 ${String(report.done)} 個項目。`
-                    : `已移出 ${String(report.done)} 個項目，${String(report.failed)} 個失敗。`,
+                    ? t('exported_items', tn('unit_items', report.done))
+                    : t('exported_items_with_failures', tn('unit_items', report.done), tn('unit_failed', report.failed)),
                 );
                 reload();
               },

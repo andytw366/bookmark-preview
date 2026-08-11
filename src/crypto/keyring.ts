@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 import { seal, unseal, type Sealed } from './aead';
 import { copyBytes, fromBase64, fromUtf8, toBase64, utf8, type Bytes } from './bytes';
 
@@ -76,7 +78,7 @@ export async function unwrapDek(kek: CryptoKey, wrapped: WrappedKey): Promise<By
   };
   const raw = new Uint8Array(await unseal(kek, sealed));
   if (raw.length !== DEK_BYTES) {
-    throw new Error('資料金鑰長度不正確，資料可能已損毀');
+    throw new Error(t('crypto_dek_length_invalid'));
   }
   return raw;
 }
@@ -194,11 +196,11 @@ export function normalizeRecoveryKey(input: string): string | null {
 export async function recoveryKek(code: string, salt: Bytes): Promise<CryptoKey> {
   const normalized = normalizeRecoveryKey(code);
   if (normalized === null) {
-    throw new Error(`救援金鑰的格式不正確（應該是 ${String(RECOVERY_CHARS)} 個字元）`);
+    throw new Error(t('crypto_recovery_key_length', RECOVERY_CHARS));
   }
   const raw = decodeBase32(normalized);
   if (raw === null) {
-    throw new Error('救援金鑰的格式不正確');
+    throw new Error(t('crypto_recovery_key_format'));
   }
   const base = await crypto.subtle.importKey('raw', raw, 'HKDF', false, ['deriveKey']);
   return crypto.subtle.deriveKey(

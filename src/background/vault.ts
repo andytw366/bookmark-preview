@@ -54,6 +54,7 @@ import {
   writeBlob,
   writeMeta,
 } from '@/storage/vault-store';
+import { t } from '@/shared/i18n';
 
 /**
  * 隱私空間的唯一擁有者。
@@ -75,7 +76,7 @@ function alive<T extends { deleted?: true }>(items: readonly T[]): T[] {
 
 function requireUnlocked(): { key: CryptoKey; payload: VaultPayload } {
   if (key === null || payload === null) {
-    throw new Error('隱私空間尚未解鎖');
+    throw new Error(t('vault_locked'));
   }
   return { key, payload };
 }
@@ -94,8 +95,7 @@ export function isLegacyMeta(meta: VaultMeta | null): boolean {
 function requireCurrentFormat(meta: VaultMeta): void {
   if (isLegacyMeta(meta)) {
     throw new Error(
-      '這個隱私空間是開發期間的舊格式，目前版本已不支援。' +
-        '請在設定頁按「放棄這台裝置上的隱私空間」清掉它，再重新建立一個。',
+      t('vault_legacy_format'),
     );
   }
 }
@@ -271,7 +271,7 @@ export async function vaultState(): Promise<VaultState> {
 export async function createVault(password: string): Promise<string> {
   return exclusive(async () => {
     if ((await readMeta()) !== null) {
-      throw new Error('隱私空間已經建立過了');
+      throw new Error(t('vault_already_created'));
     }
     /*
      * 雲端已有一份時不能另建，而且這道把關**不看同步有沒有啟用**。
@@ -281,8 +281,7 @@ export async function createVault(password: string): Promise<string> {
      */
     if (syncAvailable() && (await readSyncMeta()) !== null) {
       throw new Error(
-        '雲端已經有一份隱私空間了。請先在設定頁勾選同步再「從雲端還原到這台裝置」，' +
-          '然後用同一組主密碼解鎖。（若確定不要雲端那份，先按「移除雲端副本」。）',
+        t('vault_remote_exists'),
       );
     }
 
@@ -315,7 +314,7 @@ export async function createVault(password: string): Promise<string> {
 
 export async function unlockVault(password: string): Promise<void> {
   return unlockWith({
-    label: '主密碼',
+    label: t('vault_secret_password'),
     kek: async (meta) => deriveKey(password, fromBase64(meta.salt), meta.iterations),
     wrap: (meta) => meta.passwordWrap,
   });
@@ -329,7 +328,7 @@ export async function unlockVault(password: string): Promise<void> {
  */
 export async function unlockWithRecoveryKey(code: string): Promise<void> {
   return unlockWith({
-    label: '救援金鑰',
+    label: t('vault_secret_recovery'),
     kek: async (meta) => recoveryKek(code, fromBase64(meta.salt)),
     wrap: (meta) => meta.recoveryWrap,
   });
@@ -368,8 +367,8 @@ async function unlockWith(opener: Opener): Promise<void> {
     if (meta === null) {
       throw new Error(
         (await syncedVaultExists())
-          ? '雲端的加密副本還在傳輸中（Firefox 同步是逐筆傳的），請稍後再試。'
-          : '尚未建立隱私空間',
+          ? t('vault_remote_still_transferring')
+          : t('vault_not_created'),
       );
     }
     requireCurrentFormat(meta);
@@ -420,14 +419,14 @@ async function unlockWith(opener: Opener): Promise<void> {
         // 換成雲端那份，這樣下一次用新的秘密就進得來
         await writeMeta(cloud);
         throw new Error(
-          `${opener.label}已在另一台裝置更改，這組舊的已失效。請改用新的${opener.label}。`,
+          t('vault_secret_changed_elsewhere', opener.label),
         );
       }
       // 其餘情況：本機比雲端新（自己剛改還沒推上去），維持本機那份
     }
 
     if (dek === null) {
-      throw firstFailure ?? new Error(`${opener.label}錯誤`);
+      throw firstFailure ?? new Error(t('vault_secret_wrong', opener.label));
     }
 
     let dataKey: CryptoKey;
@@ -466,11 +465,11 @@ export async function changePassword(current: string, next: string): Promise<voi
   return exclusive(async () => {
     const meta = await readMeta();
     if (meta === null) {
-      throw new Error('尚未建立隱私空間');
+      throw new Error(t('vault_not_created'));
     }
     requireCurrentFormat(meta);
     if (next === '') {
-      throw new Error('新的主密碼不可為空');
+      throw new Error(t('vault_new_password_empty'));
     }
     const salt = fromBase64(meta.salt);
     const dek = await unwrapDek(await deriveKey(current, salt, meta.iterations), meta.passwordWrap);
@@ -495,7 +494,7 @@ export async function regenerateRecoveryKey(password: string): Promise<string> {
   return exclusive(async () => {
     const meta = await readMeta();
     if (meta === null) {
-      throw new Error('尚未建立隱私空間');
+      throw new Error(t('vault_not_created'));
     }
     requireCurrentFormat(meta);
     const salt = fromBase64(meta.salt);
@@ -521,7 +520,7 @@ export async function revealRecoveryKey(): Promise<string> {
   const { key: k } = requireUnlocked();
   const meta = await readMeta();
   if (meta === null) {
-    throw new Error('尚未建立隱私空間');
+    throw new Error(t('vault_not_created'));
   }
   requireCurrentFormat(meta);
   return unsealText(k, meta.recoveryCodeSealed);
@@ -604,11 +603,11 @@ export async function forgetVault(): Promise<void> {
 export async function adoptSyncedVault(): Promise<void> {
   return exclusive(async () => {
     if ((await readMeta()) !== null) {
-      throw new Error('這台裝置已經有隱私空間了');
+      throw new Error(t('vault_already_on_device'));
     }
     const remote = await syncedVault();
     if (remote === null) {
-      throw new Error('雲端沒有可用的加密副本（可能還在傳輸，或同步尚未啟用）。');
+      throw new Error(t('vault_no_remote_copy'));
     }
     await adoptCopy(remote.meta, remote.blob, remote.tag);
   });
@@ -629,7 +628,7 @@ export function listFolders(): PrivateFolder[] {
 function requireFolder(current: VaultPayload, id: string): PrivateFolder {
   const folder = current.folders.find((item) => item.id === id && item.deleted !== true);
   if (folder === undefined) {
-    throw new Error('找不到該資料夾');
+    throw new Error(t('vault_folder_not_found'));
   }
   return folder;
 }
@@ -723,7 +722,7 @@ async function moveFolderToParentLocked(id: string, parentId: string | null): Pr
   if (parentId !== null) {
     requireFolder(current, parentId);
     if (isWithin(current, parentId, id)) {
-      throw new Error('不能把資料夾搬進它自己或它的子資料夾');
+      throw new Error(t('vault_folder_into_itself'));
     }
   }
   folder.parentId = parentId;
@@ -740,7 +739,7 @@ async function moveBookmarkToFolderLocked(id: string, folderId: string | null): 
   const { payload: current } = requireUnlocked();
   const record = current.bookmarks.find((item) => item.id === id && item.deleted !== true);
   if (record === undefined) {
-    throw new Error('找不到該隱私書籤');
+    throw new Error(t('vault_bookmark_not_found'));
   }
   if (folderId !== null) {
     requireFolder(current, folderId);
@@ -777,7 +776,7 @@ function prune(): void {
  */
 export class RemoteBlobUnreadable extends Error {
   constructor(cause: string) {
-    super(`雲端副本解不開：${cause}`);
+    super(t('vault_remote_unreadable', cause));
     this.name = 'RemoteBlobUnreadable';
   }
 }
@@ -806,7 +805,7 @@ export async function mergeEncryptedBlob(blob: string): Promise<MergeReport> {
      * 而解密後的書籤就這樣留在記憶體裡。
      */
     if (key !== k) {
-      throw new Error('隱私空間在合併期間上鎖了，這次合併已放棄。');
+      throw new Error(t('vault_locked_during_merge'));
     }
 
     const merged = mergeVaults(current, incoming);
@@ -826,7 +825,7 @@ export async function mergeEncryptedBlob(blob: string): Promise<MergeReport> {
     }
 
     if (key !== k) {
-      throw new Error('隱私空間在合併期間上鎖了，這次合併已放棄。');
+      throw new Error(t('vault_locked_during_merge'));
     }
     payload = merged.payload;
     await persist();
@@ -869,12 +868,12 @@ export async function exportBackup(): Promise<{ filename: string; json: string }
   requireUnlocked();
   const meta = await readMeta();
   if (meta === null) {
-    throw new Error('尚未建立隱私空間');
+    throw new Error(t('vault_not_created'));
   }
   requireCurrentFormat(meta);
   const blob = await readBlob();
   if (blob === null) {
-    throw new Error('沒有可匯出的資料');
+    throw new Error(t('vault_nothing_to_export'));
   }
   return { filename: backupFilename(), json: buildBackup(meta, blob) };
 }
@@ -1104,7 +1103,7 @@ async function importOneLocked(bookmarkId: string, purgeHistory: boolean): Promi
     const nodes = await browser.bookmarks.get(bookmarkId);
     const node = nodes[0];
     if (node === undefined) {
-      throw new Error('找不到該書籤');
+      throw new Error(t('bookmark_not_found'));
     }
     // 資料夾走遞迴那條路：整棵子樹一起搬，結構保留
     if (node.url === undefined) {
@@ -1152,7 +1151,7 @@ async function assertImportableFolder(id: string): Promise<void> {
     ...(root?.children ?? []).map((child) => child.id),
   ]);
   if (permanent.has(id)) {
-    throw new Error('「書籤選單」「書籤工具列」這類根資料夾是 Firefox 內建的，不能移入隱私空間。');
+    throw new Error(t('vault_root_folder_not_importable'));
   }
 }
 
@@ -1172,7 +1171,7 @@ async function importFolderLocked(folderId: string, purgeHistory: boolean): Prom
 
   const subtree = (await browser.bookmarks.getSubTree(folderId))[0];
   if (subtree === undefined) {
-    throw new Error('找不到該資料夾');
+    throw new Error(t('vault_folder_not_found'));
   }
 
   const plan = planFolderImport(subtree, null, () => crypto.randomUUID());
@@ -1280,7 +1279,7 @@ export async function renameBookmark(id: string, title: string): Promise<void> {
     const { payload: current } = requireUnlocked();
     const record = current.bookmarks.find((item) => item.id === id && item.deleted !== true);
     if (record === undefined) {
-      throw new Error('找不到該隱私書籤');
+      throw new Error(t('vault_bookmark_not_found'));
     }
     record.title = title;
     record.updatedAt = Date.now();
@@ -1309,7 +1308,7 @@ async function exportOneLocked(id: string, parentId?: string): Promise<void> {
     }
     const record = current.bookmarks.find((item) => item.id === id && item.deleted !== true);
     if (record === undefined) {
-      throw new Error('找不到該隱私書籤');
+      throw new Error(t('vault_bookmark_not_found'));
     }
     const settings = await getSettings();
     const target = parentId ?? settings.vaultExportFolderId ?? undefined;
@@ -1343,7 +1342,7 @@ async function exportFolderLocked(folderId: string, parentId?: string): Promise<
   const plan = planFolderExport(current.folders, current.bookmarks, folderId);
   const rootFolder = plan.folders[0];
   if (rootFolder === undefined) {
-    throw new Error('找不到該隱私資料夾');
+    throw new Error(t('vault_private_folder_not_found'));
   }
 
   const settings = await getSettings();
@@ -1354,7 +1353,7 @@ async function exportFolderLocked(folderId: string, parentId?: string): Promise<
   for (const folder of plan.folders) {
     // 子樹裡的資料夾掛在剛建好的父底下；根那一層掛在使用者指定的落點
     const parent = folder.id === folderId ? target : nativeIds.get(folder.parentId ?? '');
-    const details = { title: folder.name || '（未命名資料夾）' };
+    const details = { title: folder.name || t('folder_untitled_folder') };
     let created;
     try {
       created = await browser.bookmarks.create(parent === undefined ? details : { ...details, parentId: parent });

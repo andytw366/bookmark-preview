@@ -6,6 +6,7 @@ import { bookmarkedUrls } from './bookmark-index';
 import { hasHostAccess } from './capture';
 import { fetchOgThumbnail } from './og-fetcher';
 import { listBookmarks, storeVaultThumbnail, vaultThumbKey } from './vault';
+import { t } from '@/shared/i18n';
 
 /**
  * 手動補抓：為還沒有任何縮圖的書籤抓 og:image。
@@ -23,10 +24,10 @@ let running = false;
 
 export async function backfillThumbnails(): Promise<BackfillReport> {
   if (running) {
-    throw new Error('補抓已在進行中');
+    throw new Error(t('backfill_already_running'));
   }
   if (!(await hasHostAccess())) {
-    throw new Error('需要網站存取權限才能抓取預覽圖');
+    throw new Error(t('backfill_needs_host_permission'));
   }
 
   running = true;
@@ -94,10 +95,10 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
  */
 export async function backfillVaultThumbnails(): Promise<BackfillReport> {
   if (running) {
-    throw new Error('補抓已在進行中');
+    throw new Error(t('backfill_already_running'));
   }
   if (!(await hasHostAccess())) {
-    throw new Error('需要網站存取權限才能抓取預覽圖');
+    throw new Error(t('backfill_needs_host_permission'));
   }
 
   running = true;

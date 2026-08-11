@@ -5,6 +5,7 @@ import { deleteThumb, putThumb } from '@/storage/thumbs-db';
 import { coverThumbnailFor, hasHostAccess, produceThumbnailNow } from './capture';
 import { fetchOgThumbnail } from './og-fetcher';
 import { findVaultBookmarkById, storeVaultThumbnail, vaultThumbKey } from './vault';
+import { t } from '@/shared/i18n';
 
 export interface RefreshReport {
   ok: boolean;
@@ -43,7 +44,7 @@ async function findOpenTab(url: string): Promise<number | undefined> {
  */
 export async function refreshThumbnail(url: string): Promise<RefreshReport> {
   if (!(await hasHostAccess())) {
-    return { ok: false, detail: '缺少網站存取權限，無法抓取預覽圖。' };
+    return { ok: false, detail: t('refresh_needs_host_permission') };
   }
 
   const key = await urlKey(url);
@@ -57,8 +58,8 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
     const settings = await getSettings();
     const produced = await produceThumbnailNow(openTabId, url, key, settings.previewSource);
     return produced
-      ? { ok: true, detail: '已重新抓取預覽圖。' }
-      : { ok: false, detail: '這個頁面找不到可用的封面圖，畫面擷取也失敗了。' };
+      ? { ok: true, detail: t('refresh_done') }
+      : { ok: false, detail: t('refresh_no_cover_on_page') };
   }
 
   // 頁面沒開著：退回伺服器端的 og:image
@@ -66,7 +67,7 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
   if (thumbnail === null) {
     return {
       ok: false,
-      detail: '沒有開啟中的分頁，且伺服器端抓不到預覽圖。請先在分頁中開啟該頁面再重試。',
+      detail: t('refresh_no_tab_no_server'),
     };
   }
   await putThumb({
@@ -81,7 +82,7 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
   // 畫面停在舊圖 —— 表現成「訊息說抓好了，但預覽圖沒變」。
   // 其他每一條寫入縮圖的路徑（capture、backfill、隱私空間）都有廣播，只有這裡漏掉。
   broadcast('thumbs/updated', { key });
-  return { ok: true, detail: '已從頁面的 og:image 重新抓取預覽圖。' };
+  return { ok: true, detail: t('refresh_done_via_og') };
 }
 
 /**
@@ -97,11 +98,11 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
  */
 export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> {
   if (!(await hasHostAccess())) {
-    return { ok: false, detail: '缺少網站存取權限，無法抓取預覽圖。' };
+    return { ok: false, detail: t('refresh_needs_host_permission') };
   }
   const record = findVaultBookmarkById(id);
   if (record === null) {
-    return { ok: false, detail: '找不到該隱私書籤。' };
+    return { ok: false, detail: t('vault_bookmark_not_found') };
   }
   const url = record.url;
 
@@ -116,7 +117,7 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
     const thumbnail = await coverThumbnailFor(openTabId, url);
     if (thumbnail !== null) {
       await store(thumbnail);
-      return { ok: true, detail: '已重新抓取預覽圖。' };
+      return { ok: true, detail: t('refresh_done') };
     }
   }
 
@@ -129,10 +130,10 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
       ok: false,
       detail:
         openTabId !== undefined
-          ? '這個頁面找不到可用的封面圖，伺服器端也抓不到。'
-          : '沒有開啟中的分頁，且伺服器端抓不到預覽圖。請先在分頁中開啟該頁面再重試。',
+          ? t('refresh_no_cover_no_server')
+          : t('refresh_no_tab_no_server'),
     };
   }
   await store(thumbnail);
-  return { ok: true, detail: '已從頁面的 og:image 重新抓取預覽圖。' };
+  return { ok: true, detail: t('refresh_done_via_og') };
 }

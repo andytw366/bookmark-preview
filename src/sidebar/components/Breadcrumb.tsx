@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 /**
  * 只要求 id 與標題，而不是完整的 `BookmarkFolder` —— 隱私空間的資料夾
  * （`PrivateFolder`）是另一套型別，靠這個最小形狀共用同一個麵包屑。
@@ -25,7 +27,7 @@ export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
   const visible = collapsed ? path.slice(-2) : path;
 
   return (
-    <nav className="crumbs" aria-label="書籤資料夾路徑">
+    <nav className="crumbs" aria-label={t('crumbs_label')}>
       <button
         type="button"
         className="crumbs__item"
@@ -33,7 +35,7 @@ export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
           onNavigate(null);
         }}
       >
-        全部
+        {t('crumbs_all')}
       </button>
 
       {collapsed ? <span className="crumbs__sep">/ …</span> : null}
@@ -45,7 +47,7 @@ export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
             <span className="crumbs__sep">/</span>
             {isLast ? (
               <span className="crumbs__item crumbs__item--current" aria-current="page">
-                {folder.title || '（未命名）'}
+                {folder.title || t('folder_untitled')}
               </span>
             ) : (
               <button
@@ -55,7 +57,7 @@ export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
                   onNavigate(folder.id);
                 }}
               >
-                {folder.title || '（未命名）'}
+                {folder.title || t('folder_untitled')}
               </button>
             )}
           </span>

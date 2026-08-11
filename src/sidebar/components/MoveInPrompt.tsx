@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { BookmarkNode } from '@/shared/types';
 import { hostnameOf } from '@/shared/url';
 import { Popover } from './Popover';
+import { t, tn } from '@/shared/i18n';
+import { Rich } from '../lib/rich';
 
 interface MoveInPromptProps {
   /** 要移入的項目；書籤或資料夾、一筆或多筆，文案會跟著變 */
@@ -76,7 +78,7 @@ export function MoveInPrompt({ nodes, x, y, onConfirm, onCancel }: MoveInPromptP
 
   const single = nodes.length === 1 ? nodes[0] : undefined;
   const label = (node: BookmarkNode): string =>
-    node.title || (node.kind === 'link' ? hostnameOf(node.url) : '（未命名資料夾）');
+    node.title || (node.kind === 'link' ? hostnameOf(node.url) : t('folder_untitled_folder'));
 
   /*
    * 資料夾要顯示**實際筆數**。
@@ -89,25 +91,29 @@ export function MoveInPrompt({ nodes, x, y, onConfirm, onCancel }: MoveInPromptP
   const scope =
     counts.folders === 0
       ? null
-      : `共 ${String(counts.folders)} 個資料夾、${String(counts.links)} 個書籤`;
+      : t('movein_scope', tn('unit_folders', counts.folders), tn('unit_bookmarks', counts.links));
 
   return (
     <Popover x={x} y={y} className="rowmenu rowmenu--prompt" onClose={onCancel}>
       <p className="rowmenu__heading">
-        {single === undefined ? `移入 ${String(nodes.length)} 個項目？` : '移入隱私空間？'}
+        {single === undefined ? tn('movein_heading_many', nodes.length) : t('movein_heading_one')}
       </p>
       <p className="rowmenu__note">
-        {single === undefined ? '這些項目' : `「${label(single)}」`}
-        {scope === null ? '' : `（${scope}）`}會從 Firefox 的書籤中<strong>移除</strong>，
-        解鎖隱私空間後才看得到。
-        {counts.folders > 0 ? '資料夾層級原樣保留。' : ''}
+        <Rich
+          text={t(
+            'movein_body',
+            single === undefined ? t('movein_these') : t('movein_named', label(single)),
+            scope === null ? '' : t('movein_scope_paren', scope),
+          )}
+        />
+        {counts.folders > 0 ? t('movein_keeps_hierarchy') : ''}
       </p>
       {single === undefined ? (
         <ul className="rowmenu__preview">
           {nodes.slice(0, PREVIEW_LIMIT).map((node) => (
             <li key={node.id}>{label(node)}</li>
           ))}
-          {nodes.length > PREVIEW_LIMIT ? <li>…還有 {nodes.length - PREVIEW_LIMIT} 個</li> : null}
+          {nodes.length > PREVIEW_LIMIT ? <li>{tn('movein_and_more', nodes.length - PREVIEW_LIMIT)}</li> : null}
         </ul>
       ) : null}
       <label className="gate__check">
@@ -118,17 +124,17 @@ export function MoveInPrompt({ nodes, x, y, onConfirm, onCancel }: MoveInPromptP
             setPurgeHistory(event.target.checked);
           }}
         />
-        同時清除{single === undefined ? '這些' : '該'}網址的瀏覽記錄
+        {single === undefined ? t('movein_purge_history_many') : t('movein_purge_history_one')}
       </label>
       {purgeHistory && !hasHistoryPermission ? (
-        <p className="rowmenu__note">按下「移入」時會請求瀏覽記錄權限。</p>
+        <p className="rowmenu__note">{t('movein_history_permission_note')}</p>
       ) : null}
       <div className="rowmenu__actions">
         <button type="button" className="chip chip--primary" onClick={confirm}>
-          移入
+          {t('action_move_in')}
         </button>
         <button type="button" className="chip" onClick={onCancel}>
-          取消
+          {t('action_cancel')}
         </button>
       </div>
     </Popover>

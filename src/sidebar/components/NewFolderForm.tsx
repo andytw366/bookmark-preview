@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from '@/shared/i18n';
 
 interface NewFolderFormProps {
   /** 說明會建在哪裡，例如「會建立在『其他書籤』」 */
@@ -33,8 +34,8 @@ export function NewFolderForm({ hint, onCreate, onCancel }: NewFolderFormProps) 
         className="rowmenu__input"
         value={name}
         autoFocus
-        placeholder="資料夾名稱"
-        aria-label="新資料夾名稱"
+        placeholder={t('folder_name_placeholder')}
+        aria-label={t('folder_name_label')}
         onChange={(event) => {
           setName(event.target.value);
         }}
@@ -45,10 +46,10 @@ export function NewFolderForm({ hint, onCreate, onCancel }: NewFolderFormProps) 
         }}
       />
       <button type="submit" className="chip chip--primary" disabled={name.trim() === ''}>
-        建立
+        {t('action_create')}
       </button>
       <button type="button" className="chip" onClick={onCancel}>
-        取消
+        {t('action_cancel')}
       </button>
       {hint === undefined ? null : <p className="newfolder__hint">{hint}</p>}
     </form>

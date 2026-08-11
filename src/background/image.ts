@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 /** 產生縮圖用的影像處理。背景事件頁有 DOM，可直接用 OffscreenCanvas。 */
 
 export interface Thumbnail {
@@ -24,7 +26,7 @@ export async function makeThumbnail(source: Blob): Promise<Thumbnail> {
     const canvas = new OffscreenCanvas(TARGET_WIDTH, height);
     const context = canvas.getContext('2d');
     if (context === null) {
-      throw new Error('無法取得 2D 繪圖脈絡');
+      throw new Error(t('image_no_2d_context'));
     }
 
     const scale = TARGET_WIDTH / bitmap.width;
@@ -75,7 +77,7 @@ export async function makeCoverThumbnail(source: Blob): Promise<Thumbnail> {
     const canvas = new OffscreenCanvas(width, height);
     const context = canvas.getContext('2d');
     if (context === null) {
-      throw new Error('無法取得 2D 繪圖脈絡');
+      throw new Error(t('image_no_2d_context'));
     }
     context.drawImage(bitmap, 0, 0, width, height);
 

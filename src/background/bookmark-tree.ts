@@ -1,6 +1,7 @@
 import type { FolderChoice } from '@/shared/messages';
 import type { BookmarkFolder, BookmarkNode } from '@/shared/types';
 import { isPreviewableUrl } from '@/shared/url';
+import { t } from '@/shared/i18n';
 
 /**
  * 讀取 Firefox 書籤樹，轉成側邊欄使用的統一型別。
@@ -69,7 +70,7 @@ export async function collectFolderChoices(): Promise<FolderChoice[]> {
       if (!isFolder) {
         continue;
       }
-      choices.push({ id: child.id, title: child.title || '（未命名）', depth });
+      choices.push({ id: child.id, title: child.title || t('folder_untitled'), depth });
       walk(child, depth + 1);
     }
   };

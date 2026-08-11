@@ -14,3 +14,6 @@ tests/fixtures/site/*.png
 
 # scripts/amo-paste.py 產生的送審用純文字（由 amo/*.md 轉出）
 amo/paste/
+
+# import scan-strings 當模組時會留下的（診斷腳本用得到）
+scripts/__pycache__/

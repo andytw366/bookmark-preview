@@ -9,6 +9,7 @@
  * 3. request 與 event 走不同 channel，因為兩邊都掛在 runtime.onMessage 上，
  *    必須能明確區分「這則訊息不是給我的」而回傳 undefined 不佔用回應。
  */
+import { t } from './i18n';
 import type {
   BookmarkFolder,
   OpenTarget,
@@ -306,7 +307,7 @@ export async function request<K extends RequestKind>(kind: K, payload: Req<K>): 
   const envelope: RequestEnvelope = { channel: 'request', kind, payload };
   const result = (await browser.runtime.sendMessage(envelope)) as Result<Res<K>> | undefined;
   if (result === undefined) {
-    throw new Error(`背景頁未回應 ${kind}`);
+    throw new Error(t('msg_no_response', kind));
   }
   if (!result.ok) {
     throw new Error(result.error);
@@ -341,7 +342,7 @@ export function serve(handlers: Handlers): void {
     }
     const handler = handlers[message.kind] as ((payload: unknown) => Promise<unknown>) | undefined;
     if (handler === undefined) {
-      return Promise.resolve<Result<never>>({ ok: false, error: `未知的訊息類型：${message.kind}` });
+      return Promise.resolve<Result<never>>({ ok: false, error: t('msg_unknown_kind', message.kind) });
     }
     return handler(message.payload).then(
       (data): Result<unknown> => ({ ok: true, data }),

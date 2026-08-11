@@ -58,7 +58,7 @@ describe('DEK 的包裹與解包', () => {
 
     await expect(
       unwrapDek(await deriveKey('wrong', salt, FAST_ITERATIONS), wrapped),
-    ).rejects.toThrow(/解密失敗/);
+    ).rejects.toThrow(/crypto_decrypt_failed/);
   });
 
   it('錯的救援金鑰解不開包', async () => {
@@ -67,7 +67,7 @@ describe('DEK 的包裹與解包', () => {
     const wrapped = await wrapDek(await recoveryKek(generateRecoveryKey(), salt), dek);
 
     await expect(unwrapDek(await recoveryKek(generateRecoveryKey(), salt), wrapped)).rejects.toThrow(
-      /解密失敗/,
+      /crypto_decrypt_failed/,
     );
   });
 
@@ -144,7 +144,7 @@ describe('救援金鑰的格式', () => {
   });
 
   it('格式不合時 recoveryKek 明確拒絕，而不是派生出一把沒用的金鑰', async () => {
-    await expect(recoveryKek('太短', randomSalt())).rejects.toThrow(/格式不正確/);
+    await expect(recoveryKek('太短', randomSalt())).rejects.toThrow(/crypto_recovery_key_length/);
   });
 
   it('大小寫與分隔符號不同的同一串碼，派生出同一把 KEK', async () => {

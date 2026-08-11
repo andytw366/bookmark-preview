@@ -1,5 +1,6 @@
 import type { PrivateFolder } from '@/shared/types';
 import { Popover } from './Popover';
+import { t } from '@/shared/i18n';
 
 interface VaultFolderPickerProps {
   x: number;
@@ -65,7 +66,7 @@ export function VaultFolderPicker({
   x,
   y,
   folders,
-  heading = '移動到…',
+  heading = t('action_move_to'),
   disabledId,
   excludeIds = [],
   onPick,
@@ -82,7 +83,7 @@ export function VaultFolderPicker({
           onPick(null);
         }}
       >
-        最上層
+        {t('folder_top_level')}
       </button>
       {flatten(folders, null, 0, excludeIds).map((choice) => (
         <button
@@ -95,7 +96,7 @@ export function VaultFolderPicker({
           }}
         >
           {' '.repeat(choice.depth * 2)}
-          {choice.name || '（未命名）'}
+          {choice.name || t('folder_untitled')}
         </button>
       ))}
     </Popover>

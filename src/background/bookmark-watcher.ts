@@ -22,7 +22,7 @@ function scheduleInvalidation(): void {
     broadcast('bookmarks/invalidated', undefined);
     // 書籤被刪除時順手清掉它的縮圖，避免快取無限膨脹
     void pruneOrphanThumbs().catch((cause: unknown) => {
-      console.warn('[書籤預覽] 清理孤兒縮圖失敗', cause);
+      console.warn('[bookmark-preview] failed to sweep orphaned thumbnails', cause);
     });
   }, DEBOUNCE_MS);
 }

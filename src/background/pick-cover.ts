@@ -5,6 +5,7 @@ import { putThumb } from '@/storage/thumbs-db';
 import { isBookmarked } from './bookmark-index';
 import { grabImage } from './image-grab';
 import { findVaultBookmarkByUrl, storeVaultThumbnail, vaultThumbKey } from './vault';
+import { t } from '@/shared/i18n';
 
 /**
  * 右鍵手動指定預覽圖。
@@ -24,7 +25,7 @@ export function registerPickCoverMenu(): void {
   void browser.menus.removeAll().then(() => {
     browser.menus.create({
       id: MENU_ID,
-      title: '設為這個書籤的預覽圖',
+      title: t('menu_set_as_preview'),
       contexts: ['image'],
     });
   });
@@ -54,14 +55,14 @@ async function applyManualCover(
       await recordCapture({
         ...stamp,
         stage: 'manual:failed',
-        detail: '三種取圖方式都失敗了（直接下載、頁面內下載、畫面裁切）',
+        detail: t('pick_all_strategies_failed'),
       });
       return;
     }
     const thumbnail = grabbed.thumbnail;
     // 記下是三段裡的哪一段成功的：失敗時才知道該往哪裡查（`grabImage` 已經算出來了，
     // 這裡原本把它丟掉，於是診斷只看得到「成功」而看不出走了哪條路）
-    const via = { detail: `取圖方式：${grabbed.strategy}` };
+    const via = { detail: t('pick_strategy_used', grabbed.strategy) };
 
     // 隱私書籤已經不在原生書籤樹裡，要分開判斷，而且縮圖必須加密
     const priv = findVaultBookmarkByUrl(pageUrl);

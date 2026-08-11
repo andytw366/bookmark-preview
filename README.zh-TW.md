@@ -45,6 +45,10 @@ npm run build
 
 需要 Firefox 140 以上，僅限桌面版（`sidebar_action` 在 Firefox for Android 上不存在）。
 
+介面有**正體中文與英文**兩種，跟著 Firefox 的介面語言走。要再加一種語言，把一個資料夾
+放進 `public/_locales/` 就好，`src/` 裡沒有任何地方寫死語系 —— 做法見
+[docs/development.md](docs/development.md#strings-and-translations)。
+
 ## 文件
 
 深入的技術文件在 `docs/`，**以英文撰寫**：
@@ -57,7 +61,7 @@ npm run build
 | [docs/interface.md](docs/interface.md) | 鍵盤對照表、虛擬滾動、工具列、全頁瀏覽 |
 | [docs/architecture.md](docs/architecture.md) | 建置架構、原始碼結構、動手改之前該知道的不變量 |
 | [docs/permissions.md](docs/permissions.md) | 每一個權限與它存在的理由 |
-| [docs/development.md](docs/development.md) | 建置、在 Windows 上測試、容器內的無頭測試 |
+| [docs/development.md](docs/development.md) | 建置、字串與翻譯、在 Windows 上測試、容器內的無頭測試 |
 
 中文文件：`PLAN.md` 是原始設計與分階段計畫，**`NEXT.md` 是接手指南** —— 目前狀態、
 哪些功能已在實機驗證過、以及測試環境的陷阱清單。要繼續開發先讀那一份。

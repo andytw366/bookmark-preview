@@ -1,3 +1,5 @@
+import { t } from '@/shared/i18n';
+
 import type { Bytes } from './bytes';
 
 /**
@@ -18,14 +20,14 @@ async function pipe(data: Bytes, stream: CompressionStream | DecompressionStream
 
 export async function gzip(data: Bytes): Promise<Bytes> {
   if (!COMPRESSION_AVAILABLE) {
-    throw new Error('此環境不支援 CompressionStream');
+    throw new Error(t('crypto_no_compression_stream'));
   }
   return pipe(data, new CompressionStream('gzip'));
 }
 
 export async function gunzip(data: Bytes): Promise<Bytes> {
   if (!COMPRESSION_AVAILABLE) {
-    throw new Error('此環境不支援 DecompressionStream');
+    throw new Error(t('crypto_no_decompression_stream'));
   }
   return pipe(data, new DecompressionStream('gzip'));
 }

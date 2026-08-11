@@ -1,6 +1,7 @@
 import type { PreviewSource } from '@/shared/types';
 import type { BackfillKind } from '../hooks/useBackfill';
 import { Popover } from './Popover';
+import { t } from '@/shared/i18n';
 
 interface PreviewOptionsMenuProps {
   x: number;
@@ -41,30 +42,30 @@ export function PreviewOptionsMenu({
 }: PreviewOptionsMenuProps) {
   return (
     <Popover x={x} y={y} onClose={onClose}>
-      <p className="rowmenu__heading">預覽圖來源</p>
+      <p className="rowmenu__heading">{t('preview_source')}</p>
       <button
         type="button"
         className={`rowmenu__item${previewSource === 'cover-first' ? ' rowmenu__item--on' : ''}`}
-        title="優先使用頁面上的封面圖（漫畫／書籍封面、影片縮圖），找不到才用網頁截圖"
+        title={t('preview_cover_first_hint')}
         aria-pressed={previewSource === 'cover-first'}
         onClick={() => {
           onPreviewSourceChange('cover-first');
           onClose();
         }}
       >
-        封面優先
+        {t('preview_cover_first')}
       </button>
       <button
         type="button"
         className={`rowmenu__item${previewSource === 'screenshot-first' ? ' rowmenu__item--on' : ''}`}
-        title="優先使用網頁截圖，找不到才用封面圖"
+        title={t('preview_capture_first_hint')}
         aria-pressed={previewSource === 'screenshot-first'}
         onClick={() => {
           onPreviewSourceChange('screenshot-first');
           onClose();
         }}
       >
-        截圖優先
+        {t('preview_capture_first')}
       </button>
 
       <hr className="rowmenu__divider" />
@@ -75,15 +76,15 @@ export function PreviewOptionsMenu({
         disabled={backfillBusy || !canBackfill}
         title={
           canBackfill
-            ? '為還沒有預覽圖的書籤抓取 og:image。會對這些網站發出請求。'
-            : '需要先授予網站存取權限'
+            ? t('backfill_hint')
+            : t('backfill_needs_permission_hint')
         }
         onClick={() => {
           onBackfill(backfillKind);
           onClose();
         }}
       >
-        {backfillBusy ? '補抓中…' : '補抓預覽圖'}
+        {backfillBusy ? t('backfill_running') : t('backfill_start')}
       </button>
     </Popover>
   );

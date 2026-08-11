@@ -31,6 +31,76 @@ Other scripts: `npm run typecheck`, `npm run lint:ext`, `npm run package`.
 The sidebar opens automatically on install (`open_at_install`); after that use
 `Ctrl+Shift+Period`, the switcher in the sidebar header, or `View → Sidebar`.
 
+## Strings and translations
+
+User-visible text lives in `public/_locales/<locale>/messages.json`. Read it through
+`t()` / `tn()` from `src/shared/i18n.ts` — never inline a string in a component or an
+`Error`:
+
+```ts
+import { t, tn } from '@/shared/i18n';
+
+throw new Error(t('crypto_decrypt_failed'));
+label = t('crypto_recovery_key_length', RECOVERY_CHARS);   // fills $COUNT$
+label = tn('unit_bookmarks', count);                        // picks _one / _other
+```
+
+Three things to know:
+
+- **A missing key renders as the key itself**, not as an empty string — `vault_locked`
+  showing up on a button is the intended symptom, because blank text reads as "there was
+  never a message here".
+- **In vitest there is no `browser`**, so `t()` returns `key(sub, sub)`. That is why the
+  pure-function tests assert on keys (`toThrow(/crypto_decrypt_failed/)`) rather than on
+  copy — rewording a sentence no longer breaks a test.
+- **`browser.i18n` has no plural support.** `tn()` looks up `<key>_one` / `<key>_other`
+  with the count as `$1`. Both entries are written even in Chinese, where they are
+  identical, so English does not have to settle for "1 bookmark(s)". When one sentence
+  has two counts, build each noun phrase with `tn()` and join them with `t()` — word
+  order is the translation's business, not the caller's.
+
+### Adding a locale
+
+Drop a folder into `public/_locales/` and translate. Nothing in `src/` names a locale, so
+nothing there changes; Vite copies `public/` into `dist/`, and Firefox picks the folder
+that matches the user's interface language.
+
+```bash
+cp -r public/_locales/en public/_locales/ja
+```
+
+A partial translation is fine — Firefox falls back to `default_locale` for any key a
+locale does not carry. `default_locale` is **`en`**, not zh-TW (the language the UI is
+written in first): a fallback should be the string the widest audience can read. Someone
+running a half-translated German build can guess at English; Chinese would just be a
+hole. zh-TW users never reach the fallback, because `zh_TW` is kept complete.
+
+`en` and `zh_TW` are the two locales this project maintains, and `tests/i18n.test.ts`
+fails if either is missing a key. Contributed locales only have to avoid keys that do not
+exist upstream and keep placeholders consistent.
+
+Note that AMO stores its own listing default locale (currently zh-TW), separate from the
+manifest. Check the listing's name and summary after the first upload that carries
+`_locales`.
+
+### Checking what is left
+
+`tests/i18n.test.ts` scans `src/` and the manifest and fails if a key is used but not
+defined, if a maintained locale is missing one, if placeholders differ, or if a key is no
+longer used by anything. To see how much is left to migrate:
+
+```bash
+python3 scripts/scan-strings.py src
+```
+
+That script strips comments before counting, so it reports the strings that actually
+reach a user — a plain `grep` for Chinese inflates the number by about a fifth.
+
+To check the English catalogue on a Firefox that only ships one locale, delete
+`dist/_locales/zh_TW` and point `dist/manifest.json`'s `default_locale` at `en`. Setting
+`intl.locale.requested` does nothing without a matching language pack, and the fallback
+looks exactly like "the English file is broken".
+
 ## Icons
 
 `assets/icon.svg` is the single source. Regenerate the PNGs after changing it:

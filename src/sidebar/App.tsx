@@ -21,6 +21,7 @@ import { useHostPermission } from './hooks/useHostPermission';
 import { useSettings } from './hooks/useSettings';
 import { useVault } from './hooks/useVault';
 import { buildIndex, countLinks, pathTo, searchLinks } from './lib/tree';
+import { t, tn } from '@/shared/i18n';
 
 type Tab = 'bookmarks' | 'vault';
 
@@ -214,9 +215,9 @@ export function App() {
     return (
       <div className="shell">
         <div className="notice notice--error">
-          <p>無法讀取書籤：{error}</p>
+          <p>{t('bookmarks_read_failed', error)}</p>
           <button type="button" onClick={reload}>
-            重試
+            {t('action_retry')}
           </button>
         </div>
       </div>
@@ -226,7 +227,7 @@ export function App() {
   if (roots === null || settings === null || vault.state === null) {
     return (
       <div className="shell">
-        <p className="empty">載入書籤…</p>
+        <p className="empty">{t('bookmarks_loading')}</p>
       </div>
     );
   }
@@ -251,7 +252,7 @@ export function App() {
               setTab('bookmarks');
             }}
           >
-            書籤
+            {t('tab_bookmarks')}
           </button>
           {/* 切換分頁時先退出多選：勾選的是書籤那一頁的項目，
               帶著它切到隱私空間只會留下一排無處可用的動作按鈕 */}
@@ -265,7 +266,7 @@ export function App() {
               setTab('vault');
             }}
           >
-            隱私空間{vaultUnlocked ? '（已解鎖）' : ''}
+            {vaultUnlocked ? t('tab_vault_unlocked') : t('tab_vault')}
           </button>
         </nav>
       ) : null}
@@ -274,7 +275,7 @@ export function App() {
         <div className="notice notice--error">
           <p>{vault.error}</p>
           <button type="button" onClick={vault.clearError}>
-            關閉
+            {t('action_close')}
           </button>
         </div>
       ) : null}
@@ -296,7 +297,7 @@ export function App() {
               setMoveResult(null);
             }}
           >
-            關閉
+            {t('action_close')}
           </button>
         </div>
       ) : null}
@@ -371,15 +372,15 @@ export function App() {
           selectedCount={vaultSelectedIds.size}
           selectionActions={[
             {
-              label: '移動到…',
+              label: t('action_move_to'),
               primary: true,
               onPick: (x, y) => {
                 setVaultFolderPicker({ x, y });
               },
             },
             {
-              label: '移出到…',
-              title: '移回一般書籤，並選擇要放哪個資料夾',
+              label: t('vault_export_to'),
+              title: t('vault_export_to_hint'),
               onPick: (x, y) => {
                 setExportPicker({ x, y, ids: [...vaultSelectedIds] });
               },
@@ -425,25 +426,25 @@ export function App() {
                   className="toolbar__action"
                   title={
                     folderId === null
-                      ? '新增資料夾（最上層不能直接建，會放進「其他書籤」）'
-                      : '在目前的資料夾裡新增子資料夾'
+                      ? t('new_folder_hint_root')
+                      : t('new_folder_hint_nested')
                   }
                   onClick={() => {
                     setNewFolder(true);
                   }}
                 >
-                  新增資料夾
+                  {t('action_new_folder')}
                 </button>
               </div>
             ) : (
               <p className="head__hint">
-                {search.links.length} 筆結果
-                {search.truncated ? '（已達顯示上限，請輸入更精確的關鍵字）' : ''}
+                {tn('search_results', search.links.length)}
+                {search.truncated ? t('search_truncated') : ''}
               </p>
             )}
             {newFolder ? (
               <NewFolderForm
-                hint={folderId === null ? '最上層不能直接建，會放進「其他書籤」。' : undefined}
+                hint={folderId === null ? t('new_folder_root_note') : undefined}
                 onCancel={() => {
                   setNewFolder(false);
                 }}
@@ -471,21 +472,21 @@ export function App() {
                     setNoticeDismissed(true);
                   }}
                 >
-                  先不要，繼續使用色卡
+                  {t('permission_dismiss')}
                 </button>
               </>
             ) : null}
 
             {openError !== null ? (
               <div className="notice notice--warn">
-                <p>開啟書籤失敗：{openError}</p>
+                <p>{t('bookmark_open_failed', openError)}</p>
                 <button
                   type="button"
                   onClick={() => {
                     setOpenError(null);
                   }}
                 >
-                  關閉
+                  {t('action_close')}
                 </button>
               </div>
             ) : null}
@@ -493,7 +494,7 @@ export function App() {
             <BookmarkList
               nodes={nodes}
               density={settings.density}
-              emptyMessage={search !== null ? '沒有符合的書籤。' : '這個資料夾沒有書籤。'}
+              emptyMessage={search !== null ? t('search_no_match') : t('folder_no_bookmarks')}
               onOpenFolder={(id) => {
                 setFolderId(id);
                 setQuery('');
@@ -546,7 +547,7 @@ export function App() {
             selectedCount={selectedNodes.length}
             selectionActions={[
               {
-                label: '移動到…',
+                label: t('action_move_to'),
                 primary: true,
                 onPick: (x, y) => {
                   setFolderPicker({ x, y });
@@ -555,12 +556,12 @@ export function App() {
               ...(vaultUnlocked
                 ? [
                     {
-                      label: '移入隱私空間',
+                      label: t('row_import'),
                       // 資料夾整棵一起移入，所以只有「勾到的東西裡一個書籤都沒有」才無事可做
                       disabled: selectedLinkCount === 0,
                       title:
                         selectedNodes.some((node) => node.kind === 'folder')
-                          ? '資料夾會連同裡面的內容一起移入，層級保留'
+                          ? t('row_import_folder_hint')
                           : undefined,
                       onPick: (x: number, y: number) => {
                         setPendingMove({ nodes: selectedNodes, x, y });
@@ -652,7 +653,7 @@ export function App() {
         <FolderPicker
           x={folderPicker.x}
           y={folderPicker.y}
-          heading={`把 ${String(selectedNodes.length)} 個項目移動到…`}
+          heading={tn('picker_move_many', selectedNodes.length)}
           onClose={() => {
             setFolderPicker(null);
           }}
@@ -664,8 +665,8 @@ export function App() {
               (report) => {
                 setMoveResult(
                   report.failed === 0
-                    ? `已移動 ${String(report.moved)} 個書籤。`
-                    : `已移動 ${String(report.moved)} 個書籤，${String(report.failed)} 個失敗。`,
+                    ? t('moved_bookmarks', tn('unit_bookmarks', report.moved))
+                    : t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
                 );
                 reload();
               },
@@ -682,7 +683,7 @@ export function App() {
           x={vaultFolderPicker.x}
           y={vaultFolderPicker.y}
           folders={vault.folders}
-          heading={`把 ${String(vaultSelectedIds.size)} 個項目移動到…`}
+          heading={tn('picker_move_many', vaultSelectedIds.size)}
           // 勾選中的資料夾（連同子樹）不是合法目標：搬進自己的子樹會造成環狀
           excludeIds={[...vaultSelectedIds].filter((id) =>
             vault.folders.some((folder) => folder.id === id),
@@ -698,8 +699,8 @@ export function App() {
               (report) => {
                 setMoveResult(
                   report.failed === 0
-                    ? `已移動 ${String(report.done)} 個項目。`
-                    : `已移動 ${String(report.done)} 個項目，${String(report.failed)} 個失敗。`,
+                    ? t('moved_items', tn('unit_items', report.done))
+                    : t('moved_items_with_failures', tn('unit_items', report.done), tn('unit_failed', report.failed)),
                 );
                 void vault.reload();
               },
@@ -715,7 +716,7 @@ export function App() {
         <FolderPicker
           x={exportPicker.x}
           y={exportPicker.y}
-          heading={`把 ${String(exportPicker.ids.length)} 個項目移出到…`}
+          heading={tn('picker_export_many', exportPicker.ids.length)}
           onClose={() => {
             setExportPicker(null);
           }}
@@ -728,8 +729,8 @@ export function App() {
                 setMoveResult(
                   // 「項目」而不是「書籤」：一個項目可能是整個資料夾（連同子樹）
                   report.failed === 0
-                    ? `已移出 ${String(report.done)} 個項目。`
-                    : `已移出 ${String(report.done)} 個項目，${String(report.failed)} 個失敗。`,
+                    ? t('exported_items', tn('unit_items', report.done))
+                    : t('exported_items_with_failures', tn('unit_items', report.done), tn('unit_failed', report.failed)),
                 );
                 reload();
               },

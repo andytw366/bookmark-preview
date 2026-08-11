@@ -27,6 +27,7 @@ import {
   vaultState,
 } from './vault';
 import type { VaultMeta } from '@/shared/types';
+import { t } from '@/shared/i18n';
 
 /**
  * 跨裝置同步。
@@ -146,9 +147,11 @@ export function scheduleVaultSync(): void {
 
 function quotaMessage(blob: string): string {
   return (
-    `加密副本約 ${String(Math.ceil(blob.length / 1024))} KB，` +
-    `超過 storage.sync 的 ${String(Math.floor(SYNC_TOTAL_BUDGET / 1024))} KB 額度，這次沒有上傳。` +
-    '本機資料完全不受影響，但跨裝置同步已停在上一份副本 —— 請改用加密檔備份。'
+    t(
+      'sync_quota_exceeded',
+      Math.ceil(blob.length / 1024),
+      Math.floor(SYNC_TOTAL_BUDGET / 1024),
+    )
   );
 }
 
@@ -185,7 +188,7 @@ export async function syncVault(): Promise<SyncOutcome> {
     if (gone !== null && gone.deviceId !== (await deviceId())) {
       // 另一台裝置刪掉了整個隱私空間。不自動刪本機那份（遠端的一個旗標不該有權
       // 銷毀本機資料），但也不能把它推回去 —— 那正是「刪了又自己回來」的成因。
-      lastError = '另一台裝置刪除了隱私空間，因此暫停同步。請在設定頁決定要怎麼處理。';
+      lastError = t('sync_deleted_elsewhere');
       return finish('deleted-elsewhere');
     }
 
@@ -195,8 +198,7 @@ export async function syncVault(): Promise<SyncOutcome> {
     // salt 不同代表兩邊是各自建立的隱私空間，金鑰互不相通 —— 沒有任何合併的可能
     if (remoteMeta !== null && !sameVault(remoteMeta, local)) {
       throw new Error(
-        '雲端那份隱私空間是另外建立的（salt 不同），金鑰互不相通，無法自動合併。' +
-          '請在設定頁選擇要保留哪一邊。',
+        t('sync_salt_mismatch'),
       );
     }
 
@@ -261,7 +263,7 @@ async function mergeRemote(remote: Extract<SyncRead, { kind: 'ok' }>): Promise<b
     if (!(error instanceof RemoteBlobUnreadable)) {
       throw error;
     }
-    lastError = `雲端那份副本解不開（${error.message}），已改以這台裝置的資料為準。`;
+    lastError = t('sync_remote_unreadable_fell_back', error.message);
     return false;
   }
   const changed =
@@ -323,20 +325,20 @@ async function push(local: VaultMeta, remote: SyncMeta | null): Promise<void> {
  */
 export async function overwriteRemote(): Promise<void> {
   if (!syncAvailable()) {
-    throw new Error('這個 Firefox 沒有可用的 storage.sync');
+    throw new Error(t('sync_unavailable'));
   }
   if (running) {
-    throw new Error('同步正在進行中，請稍後再試。');
+    throw new Error(t('sync_in_progress'));
   }
   running = true;
   try {
     const local = await readMeta();
     if (local === null) {
-      throw new Error('這台裝置還沒有隱私空間');
+      throw new Error(t('sync_no_local_vault'));
     }
     const { blob, tag } = await currentSnapshot();
     if (blob === null) {
-      throw new Error('本機沒有可上傳的資料');
+      throw new Error(t('sync_nothing_to_upload'));
     }
     const chunks = toChunks(blob);
     /*
@@ -379,7 +381,7 @@ export async function clearRemote(): Promise<void> {
    * 「已移除」而東西還在雲端。
    */
   if (running) {
-    throw new Error('同步正在進行中，請幾秒後再試。');
+    throw new Error(t('sync_in_progress_seconds'));
   }
   running = true;
   try {

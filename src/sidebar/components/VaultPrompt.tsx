@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { VaultState } from '@/shared/types';
 import { VaultGate } from './VaultGate';
+import { t } from '@/shared/i18n';
 
 interface VaultPromptProps {
   state: VaultState;
@@ -70,7 +71,7 @@ export function VaultPrompt({
         className="overlay__panel"
         role="dialog"
         aria-modal="true"
-        aria-label={state.status === 'absent' ? '建立隱私空間' : '解鎖隱私空間'}
+        aria-label={state.status === 'absent' ? t('vault_create_title') : t('vault_unlock_action')}
       >
         <VaultGate
           state={state}
@@ -85,7 +86,7 @@ export function VaultPrompt({
           </div>
         ) : null}
         <button type="button" className="link-button" onClick={onClose}>
-          取消
+          {t('action_cancel')}
         </button>
       </div>
     </div>

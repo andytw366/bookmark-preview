@@ -4,6 +4,7 @@ import { hostnameOf } from '@/shared/url';
 import { contextMenuHandlers } from '../lib/keys';
 import { countLinks } from '../lib/tree';
 import { FolderThumb, Thumb } from './Thumb';
+import { t, tn } from '@/shared/i18n';
 
 interface BookmarkRowProps {
   node: BookmarkNode;
@@ -76,8 +77,8 @@ export function BookmarkRow({
           >
             <FolderThumb />
             <span className="row__text">
-              <span className="row__title">{node.title || '（未命名資料夾）'}</span>
-              <span className="row__meta">{total} 個書籤</span>
+              <span className="row__title">{node.title || t('folder_untitled_folder')}</span>
+              <span className="row__meta">{tn('unit_bookmarks', total)}</span>
             </span>
             {onMoveToVault === undefined ? (
               <span className="row__chevron" aria-hidden="true">
@@ -91,8 +92,8 @@ export function BookmarkRow({
             <button
               type="button"
               className="row__lock"
-              title="把整個資料夾移入隱私空間"
-              aria-label={`把資料夾「${node.title || '（未命名）'}」移入隱私空間`}
+              title={t('row_import_folder')}
+              aria-label={t('row_import_folder_named', node.title || t('folder_untitled'))}
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 onMoveToVault(node, rect.left, rect.bottom + 4);
@@ -128,16 +129,16 @@ export function BookmarkRow({
         >
           <FolderThumb />
           <span className="row__text">
-            <span className="row__title">{node.title || '（未命名資料夾）'}</span>
-            <span className="row__meta">{total} 個書籤</span>
+            <span className="row__title">{node.title || t('folder_untitled_folder')}</span>
+            <span className="row__meta">{tn('unit_bookmarks', total)}</span>
           </span>
         </button>
         {check}
         <button
           type="button"
           className="row__enter"
-          title="開啟這個資料夾"
-          aria-label={`開啟資料夾「${node.title || '（未命名）'}」`}
+          title={t('row_open_folder')}
+          aria-label={t('row_open_folder_named', node.title || t('folder_untitled'))}
           onClick={() => {
             onOpenFolder(node.id);
           }}
@@ -208,8 +209,8 @@ export function BookmarkRow({
         <button
           type="button"
           className="row__lock"
-          title="移入隱私空間"
-          aria-label={`把「${node.title || hostname}」移入隱私空間`}
+          title={t('row_import')}
+          aria-label={t('row_import_named', node.title || hostname)}
           onClick={(event) => {
             // 確認提示要貼著這顆按鈕跳出，所以把它的位置一起傳上去
             const rect = event.currentTarget.getBoundingClientRect();

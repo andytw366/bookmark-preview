@@ -3,6 +3,7 @@ import type { Density, PreviewSource } from '@/shared/types';
 import { useBackfill, type BackfillKind } from '../hooks/useBackfill';
 import { DensityToggle } from './DensityToggle';
 import { PreviewOptionsMenu } from './PreviewOptionsMenu';
+import { t, tn } from '@/shared/i18n';
 
 interface ToolbarProps {
   density: Density;
@@ -79,13 +80,13 @@ export function Toolbar({
     return (
       <footer className="toolbar">
         <div className="toolbar__bar toolbar__bar--wrap">
-          <span className="toolbar__count">已選 {selectedCount} 個</span>
+          <span className="toolbar__count">{tn('toolbar_selected', selectedCount)}</span>
           <div className="toolbar__group">
             <button type="button" className="toolbar__action" onClick={onSelectAll}>
-              全選
+              {t('action_select_all')}
             </button>
             <button type="button" className="toolbar__action" onClick={onToggleSelecting}>
-              取消
+              {t('action_cancel')}
             </button>
           </div>
         </div>
@@ -124,27 +125,27 @@ export function Toolbar({
             <button
               type="button"
               className="toolbar__action"
-              title="勾選多個項目，一次搬到其他資料夾或移入隱私空間"
+              title={t('toolbar_select_hint')}
               onClick={onToggleSelecting}
             >
-              選取
+              {t('toolbar_select')}
             </button>
           ) : null}
           <button
             type="button"
             className="toolbar__action"
-            title="在新分頁以整個視窗的寬度並排瀏覽書籤"
+            title={t('toolbar_gallery_hint')}
             onClick={() => {
               void browser.tabs.create({ url: browser.runtime.getURL('gallery/index.html') });
             }}
           >
-            全頁瀏覽
+            {t('toolbar_gallery')}
           </button>
           <button
             type="button"
             className="toolbar__action toolbar__action--icon"
-            title="更多選項"
-            aria-label="更多選項"
+            title={t('toolbar_more')}
+            aria-label={t('toolbar_more')}
             // haspopup="true" 而不是 "menu"：裡面是一個標題加幾個切換鈕
             // （aria-pressed），不是 menuitem 結構。宣告成 menu 會與實際內容不符。
             aria-haspopup="true"

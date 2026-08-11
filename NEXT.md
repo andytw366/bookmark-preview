@@ -1,6 +1,7 @@
 # 接手指南 / 待辦
 
-最後更新：2026-08-07（第三輪。**已送出 AMO 審查**。等審查結果；通過後的下一件事是介面英文化，見「從這裡開始」第 4 項）
+最後更新：2026-08-10（**AMO 審查已通過、1.0.0 公開上架**。所以介面英文化解禁了，現在就是
+「從這裡開始」的第 1 順位。上架頁那句安全性警語不是缺陷，見下面「上架狀態」）
 
 給下一個 session 的交接文件。設計背景讀 [PLAN.md](PLAN.md)；操作與架構已拆成英文的
 [`docs/`](docs/)（architecture、vault、previews、interface、sync-and-backup、permissions、
@@ -18,15 +19,92 @@ development 七份），[README.md](README.md) 只留簡介。
 
 ---
 
+## 上架狀態（2026-08-10 從 AMO API 查的）
+
+| 欄位 | 值 |
+|---|---|
+| `status` / `file_status` | `public` / `public` —— 已通過審查、公開上架 |
+| `slug` | `bookmarkpreview`（送審時填的 ID 仍是 `bookmark-preview@andytw366.github.io`） |
+| `current_version` | `1.0.0` |
+| `promoted` | `[]` |
+| 每日使用者 / 評分 | 3 / 0 則 |
+| 建立 / 最後更新 | 2026-08-07 / 2026-08-10 |
+
+查法（不必登入）：
+
+```bash
+curl -s "https://addons.mozilla.org/api/v5/addons/addon/bookmark-preview@andytw366.github.io/"
+```
+
+### 「此附加元件未經 Mozilla 主動檢查安全性」不是缺陷
+
+上架頁那句警語的判斷依據就是上面的 `promoted: []` —— AMO 對**每一個**不在推廣計畫裡的
+擴充套件都貼同一句話，與程式碼、權限、審查結果都無關。1.0.0 是實際通過審查才變成
+`public` 的；那句話講的是「Mozilla 沒有持續盯著後續的每一次更新」，不是「這次沒檢查」。
+
+拿掉它只有一條路：進 **Recommended Extensions**（Mozilla 員工在論壇上的正式回覆就是這個）。
+寄信到 `amo-featured@mozilla.org`，附上架頁連結與理由；判準是功能水準、使用者體驗、安全性
+（會再做一次嚴格的技術審查）、以及**對廣泛的國際使用者有吸引力**。官方沒有公布使用者數門檻，
+但代價是進去之後每次更新可能被壓在人工審查佇列裡。
+
+**現在還不要提名。** 3 位使用者、0 則評分、上架三天，而且「對廣泛的國際使用者有吸引力」
+那條原本卡在介面只有中文上，i18n 做完之後不再是問題 —— 但仍要先把新版送上架、累積
+使用者與評價之後再提名。
+
+---
+
 ## 從這裡開始（下一個 session 的待辦）
 
-功能開發已經結束。剩下的是**收尾與送審**，照下面的順序做。
+功能開發已經結束，**送審也過了**。剩下的照下面的順序做。
 
 **已經做完的（不用再碰）：** 改寫過的歷史已經推上去（`origin/main` 現在是英文訊息那顆）；
 精簡過的文案三處都實機看過了；右鍵「設為這個書籤的預覽圖」的三段策略全部驗完；
 自動上鎖與快捷鍵那兩個缺陷已修並實機複驗（見下面「2026-08-07 第二輪」）。
 
-### 1. 清掉剩下的 ⬜（只剩六條，都要靠 console 模擬或刻意延後過）
+### 1. ✅ 介面英文化（i18n）—— 完成
+
+介面現在有**正體中文與英文**兩種，跟著 Firefox 的介面語言走。`amo/listing.md` 英文
+Description 第二段那句「介面只有中文」已經換成「兩種語言、跟著 Firefox 走」，兩份 README
+與 `docs/development.md` 也都改了。這條清掉之後，Recommended Extensions 的「對廣泛的
+國際使用者有吸引力」就不再卡在語言上（見上面「上架狀態」）。
+
+**這件事還沒送上架** —— 版本仍是 1.0.0，AMO 上的還是純中文那顆。下一版要走一次
+`amo/README.md` 的送審清單（含原始碼壓縮檔）。
+
+當初的規模（2026-08-10 量的，量法見下）：
+
+| | |
+|---|---|
+| 使用者看得到的中文行 | 起初 **523 行**，散在 45 個檔案 |
+| 最大的四個檔 | `options/Options.tsx` 177、`gallery/Gallery.tsx` 55、`sidebar/App.tsx` 32、`sidebar/components/VaultGate.tsx` 25 |
+
+2026-08-07 記的「79 個檔、583 行」是拿 grep 直接數的，把**註解**也算進去了（`crypto/bytes.ts`
+整份都是註解，卻榜上有名）。重量的腳本會先把 `//`、`/* */` 消掉再數，所以剩下的才是真的
+要搬的字串。量法：
+
+```bash
+python3 scripts/scan-strings.py src        # 逐檔行數 + 總數
+```
+
+**進度**：✅ **全部搬完了**（`scripts/scan-strings.py` 回報 0 行）。介面現在有正體中文與英文兩種，
+跟著 Firefox 的介面語言走。細節與踩過的坑見下面「i18n 進度」。
+
+兩個容易低估的地方：
+
+1. **帶變數的字串不能直接搬**（例如「已移入 ${n} 個書籤與 ${m} 個資料夾」）。要拆成
+   `messages.json` 的 placeholder，而中英語序不同，有些句子得重寫而不是直譯。
+   **英文還有單複數**，`browser.i18n` 沒有 plural 支援，得自己處理。
+2. **有測試在比對中文的錯誤訊息**（`keyring`、`crypto`、`vault-backup` 三個檔的 `toThrow`），
+   抽換文案會弄壞它們。其餘測試檔裡的中文是**測試資料**（書籤標題）或斷言說明，不受影響 ——
+   這比 2026-08-07 估的「10 個測試檔」小很多。
+
+manifest 也有四處中文要 `__MSG__` 化：`name`、`description`、`sidebar_action.default_title`、
+`commands._execute_sidebar_action.description`，並補上 `default_locale`。
+
+建議做法：先建 `_locales/` 骨架與一層薄的取字串包裝，再分批搬（一個目錄一批），每批跑
+`npm run verify`。不要一次全改 —— 五百多處一起動，壞了很難二分搜尋。
+
+### 2. 清掉剩下的 ⬜（只剩六條，都要靠 console 模擬或刻意延後過）
 
 2026-08-07 第三輪已經清掉：跨頁面同步、全頁瀏覽關掉分頁會上鎖、無痕視窗的縮圖、
 設定頁的觸發字串（三種情況）、移出落點（預設值與自訂資料夾）、不擷取的網域、
@@ -43,7 +121,7 @@ development 七份），[README.md](README.md) 只留簡介。
 去讀截圖或改程式碼 —— 那段空檔本身就會讓系統閒置而先觸發上鎖，看起來像是在測的那條路生效了。
 我第一次跑就是這樣拿到一組無效的資料。
 
-### 2. ✅ 重拍截圖（2026-08-07 第三輪做完）
+### 3. ✅ 重拍截圖（2026-08-07 第三輪做完）
 
 四張都用 `SEED_SHOWCASE=1` 那組知名網站書籤重拍了（GitHub、ChatGPT、YouTube、Wikipedia、
 Google、Hacker News…），預覽圖全部是真的抓下來的：有 og:image 的走補抓，沒有的（Google
@@ -53,48 +131,277 @@ Google、Hacker News…），預覽圖全部是真的抓下來的：有 og:image
 順手修掉 `store-shot.sh` 的一個瑕疵：`CHROME_H` 多算了 6px，於是沙盒提示列最左邊那條**橘色
 強調直條**會留在接縫上（四張舊截圖都有）。現在改成量出來的 89 / 51，腳本註解裡寫了取樣指令。
 
-### 3. 送審
+### 4. ✅ 送審（2026-08-07 送出，2026-08-10 通過）
 
 `amo/README.md` 有送審檢查清單與「送審表單要填的值」對照表（名稱、版本、ID、授權、
 首頁、支援網址六欄）。原始碼壓縮檔也要一起上傳，理由與建置步驟在 `amo/reviewer-notes.md`。
+**下一次送 1.0.1 時同一份清單再走一次**，尤其是原始碼壓縮檔那條。
 
-### 4. 介面英文化（i18n）—— 審查通過後才動
+---
 
-**送審中的版本不要再改程式碼**，所以這件事排在審查之後。
+## i18n 進度（2026-08-10 起）
 
-商店頁的英文版已經上了（文案在 `amo/listing.md`），但**介面還是全中文**。因為英文商店文案
-會把英文使用者帶進來、然後撞上中文介面，英文 Description 第二段已經明說這件事；i18n 做完
-之後要把那句拿掉。
+### ✅ 骨架（做完了，之後每一批都照這個模式）
 
-現況與規模（2026-08-07 量的）：
+**先讀 `.claude/skills/i18n-batch/`** —— 一批怎麼跑、哪些要搬哪些不搬、踩過的坑都在那裡。
 
-| | |
+| 東西 | 位置 |
 |---|---|
-| `_locales/` | 不存在 |
-| `browser.i18n` 呼叫 | 0 次 |
-| `default_locale` | manifest 裡沒有 |
-| 含中文的原始碼檔 | 79 個 |
-| 使用者看得到的中文行 | 約 583 行 |
-| 需要 placeholder 的字串 | 58 條 |
+| 文案本體 | `public/_locales/<語系>/messages.json` |
+| 取字串 | `src/shared/i18n.ts` 的 `t()` 與 `tn()` |
+| 句子中間要粗體 | `src/sidebar/lib/rich.tsx` 的 `<Rich>`（訊息裡用 `*` 夾住那一段） |
+| `<html lang>` 與分頁標題 | `src/shared/document-locale.ts` 的 `applyDocumentLocale()` |
+| **搬一批的工具** | `scripts/i18n-add.py`（換字面值 + 寫進所有語系 + 補 import，吃一份 JSON） |
+| 靜態檢查 | `tests/i18n.test.ts`（10 項） |
+| 數還剩多少 | `python3 scripts/scan-strings.py src` |
 
-兩個容易低估的地方：
+manifest 四處都 `__MSG__` 化了。`sidebar_action.default_title` 直接共用
+`__MSG_extension_name__`，不另開一條鍵 —— 兩條同義的文案遲早會漂走。
+`public/` 是 Vite 的 `publicDir`，`_locales/` 自動複製到 `dist/`，不必改建置設定。
 
-1. **那 58 條帶變數的字串不能直接搬**（例如「已移入 ${n} 個書籤與 ${m} 個資料夾」）。要拆成
-   `messages.json` 的 placeholder，而中英語序不同，有些句子得重寫而不是直譯。
-2. **有 10 個測試檔在比對中文字串**（`vault-merge`、`keyboard-entry`、`url` 等），抽換文案
-   會弄壞它們，得一起改。
+### 加語系不用動 `src/`
 
-manifest 也有四處中文要 `__MSG__` 化：`name`、`description`、`sidebar_action.default_title`、
-`commands._execute_sidebar_action.description`，並補上 `default_locale`。
+`src/` 裡**一個語系名稱都沒有**（grep 過）—— 程式碼只認鍵名，語系只出現在 manifest 的
+`default_locale` 與測試檔裡。加一個語系就是：
 
-建議做法：先建 `_locales/` 骨架與一層薄的取字串包裝，再分批搬（一個目錄一批），每批跑
-`npm run verify`。不要一次全改 —— 583 處一起動，壞了很難二分搜尋。
+```bash
+cp -r public/_locales/en public/_locales/ja   # 翻完跑 npm run verify
+```
+
+實測過：只放一份**只翻了 3 條**的日文進去、`src/` 一個字沒改，側邊欄標題就變成
+「ブックマークプレビュー」（`.test-shots/ja-only.png`；示範完撤掉了）。
+
+**`default_locale` 是 `en`，不是 `zh_TW`。** 介面的原稿語言是中文，但退路要挑**最多人
+讀得懂的**那一份：日後收到一份翻一半的日文或德文時，沒翻到的鍵會退回這裡，對那些
+使用者來說英文至少猜得出來，中文等於整段消失。正體中文使用者不受影響 —— `zh_TW`
+是補齊的，永遠走不到退路（改完實機確認過，側邊欄仍是「書籤預覽」）。
+
+**測試分兩層規則**（`LOCALES` 從磁碟讀，不寫死）：
+
+| | 規則 |
+|---|---|
+| `en`（default_locale） | 每個用到的鍵都必須有。所有退路的終點 |
+| `zh_TW`（我們維護） | 少一條就是缺陷 |
+| 其他語系（外部貢獻） | **允許翻一半**。仍要通過「不能有多餘的鍵」與「placeholder 一致」 |
+
+允許翻一半是刻意的：Firefox 對缺的鍵自動退回 `default_locale`，半份翻譯本來就能用，
+要求 100% 只會把想幫忙的人擋在門外。
+
+⚠️ **AMO 的上架頁另外有一個 default locale，目前是 `zh-TW`**（API 查得到，與 manifest
+是兩回事）。上架頁的 name / summary 現在是送審時手填的兩份（en-US 與 zh-TW 都有）。
+**第一次上傳帶 `_locales` 的版本之後要回去確認上架頁的名稱與摘要沒有被改壞。**
+
+**三個當初定下來、之後別推翻的決定：**
+
+1. **`t()` 查不到就回鍵名，不回空字串。** `getMessage` 對未知的鍵回 `''`，在畫面上是一片
+   空白 —— 看起來像「本來就沒有訊息」而不是像壞了。回鍵名的話 `vault_locked` 會直接
+   出現在按鈕上，一眼就知道漏翻。
+2. **退路要把代入的值帶著走**（`backup_filename(2026-08-04)`）。純函式層在 vitest 裡沒有
+   `browser`，只回鍵名的話帶參數的函式會退化成一個常數 —— `backupFilename()` 的日期
+   算錯也照樣回同一個字串，那條測試就白寫了。寫這一版時真的踩到，才補上參數。
+3. **測試改成比對鍵名，不比對文案**（`toThrow(/crypto_decrypt_failed/)`）。順帶的好處是
+   之後改一個字的措辭不會再弄壞測試。
+
+**單複數**：`browser.i18n` 完全沒有 plural 支援，所以 `tn(key, n)` 去查 `<key>_one` /
+`<key>_other`，數量固定是 `$1`。中文兩條寫一樣的內容就好。**一句話裡有兩個數量時不要硬塞
+進一個 `tn()`**（「已移入 3 個書籤與 1 個資料夾」）—— 各自 `tn()` 成詞組，再用 `t()` 把詞組
+組起來，語序才留給各語言自己決定。這一條在搬 `background/vault.ts` 那批時會第一次用到。
+
+`tests/i18n.test.ts` 掃 `src/` 與 `manifest.json`，守四件事：**用到的鍵都存在**、**兩個語系的
+鍵一致**、**placeholder 數目一致且都有宣告**、**沒有沒人用的鍵**。四種都故意改壞確認過抓得到
+（打錯鍵名、英文刪一條、英文拿掉 placeholder、多一條孤兒鍵）。
+
+### 驗過的實機行為
+
+- **中文**：Firefox 顯示「書籤預覽」（`.test-shots/loaded-zh.png`）。
+- **英文**：顯示「Bookmark Preview」（`.test-shots/en-only.png`）。
+
+**要驗英文得繞一下，記下來**：容器裡的 Firefox 是 zh-TW 的單語系建置，**`intl.locale.requested`
+設成 `en-US` 沒有用**（沒有語言包，會退回 zh-TW，而且畫面上看起來就像「英文那份沒生效」）。
+改成把 `dist/_locales/zh_TW` 刪掉、`dist/manifest.json` 的 `default_locale` 改成 `en` 再啟動 ——
+只剩一份可用時，顯示出來的就一定是那一份。驗完 `npm run build` 就還原了。
+這條路驗的是「英文那份 JSON 解析得了、鍵查得到」，語系挑選那段是 Firefox 的事，不是我們的。
+
+### 批次
+
+| 批次 | 範圍 | 狀態 |
+|---|---|---|
+| 1 | `src/crypto/`＋`src/shared/`（24 條，全是錯誤訊息與備份檔檔名） | ✅ 完成 |
+| 2 | `src/background/`＋`src/storage/`（85 條） | ✅ 完成 |
+| 3 | `src/sidebar/`（App、20 個元件與 hook，191 條）＋三個 `index.html` | ✅ 完成 |
+| 4 | `src/options/Options.tsx`（177，最大的一塊） | ✅ 完成 |
+| 5 | `src/gallery/Gallery.tsx`（55，大半重用第 3 批的鍵） | ✅ 完成 |
+| 6 | 三個 `index.html` 的 `<title>`（第 3 批做了）；CSS 沒有任何 `content:` 中文 | ✅ 完成 |
+| 7 | 收尾：`amo/listing.md`、兩份 README、`docs/development.md` 都改了 | ✅ 完成 |
+
+每批做完跑 `npm run verify`。批次順序照「愈晚做的檔案愈大」排 —— 前面幾批把命名慣例
+與 `tn()` 的用法定下來，最大的 `Options.tsx` 才不會邊搬邊改慣例。
+
+**鍵名慣例**：`<區域>_<用途>`，全小寫加底線。目前的區域前綴是 `crypto_`、`msg_`、
+`backup_`、`vault_`、`sync_`、`capture_`、`refresh_`、`backfill_`、`pick_`、`image_`、
+`thumbdb_`、`folder_`、`menu_`、`extension_`、`command_`；之後會加 `options_`、
+`sidebar_`、`gallery_`。
+
+### 第 2 批的三個判斷（照抄到後面幾批）
+
+1. **`console.warn` / `console.info` 不進 `_locales`，改寫成英文字面值。** 那是給維護者
+   看的診斷輸出，不是介面；翻譯它只會多幾條沒人讀的鍵，還讓 console 難以 grep。
+   前綴一併從 `[書籤預覽]` 換成 `[bookmark-preview]`。
+2. **`opener.label`（主密碼／救援金鑰）自己也是一條訊息**，再當成 placeholder 代進去。
+   中文可以直接黏成「主密碼錯誤」，英文得是「Wrong master password」—— 語序不同，
+   所以那個名詞必須是可翻譯的一條，而不是字串相接。
+3. **`diagnostics.ts` 跟著 `capture.ts` 一起搬**，即使它在 `src/storage/`。`capture.ts` 的
+   `skip(..., detail)` 會被 `describeCapture` 接進「擷取畫面失敗：$REASON$」，兩邊分批
+   搬的話中途會出現中英夾雜的句子。
+
+### 這一批修掉的兩個工具瑕疵
+
+- **`scripts/scan-strings.py` 少算了一半、也多算了一堆。** `cover.ts` 有一行正則字面值
+  `/url\((['"]?)…/`，裡面那個 `'` 落單，狀態機從那裡一路吃到檔案結尾，**之後的註解
+  全都消不掉** —— `cover.ts` 憑空多出 24 行「待搬」，而它們一條都不用搬。
+  修法不是去認得正則（試過，JSX 的 `</div>` 開頭也是 `<` 加 `/`，`.tsx` 反而開始多算），
+  而是**讓 `'` 與 `"` 的字串在行尾結束** —— 它們本來就不能跨行，而這條規則把任何誤判的
+  影響限制在一行之內。總數因此從 571 修正為 **523**。
+- **`tests/i18n.test.ts` 的 placeholder 檢查沒有去重。** 同一個 `$SECRET$` 在一句話裡
+  出現兩次是合法的（「$SECRET$已在另一台裝置更改…請改用新的$SECRET$」），但宣告只有
+  一條，於是誤報。
+
+### 第 2 批的實機驗證
+
+✅ **背景頁的 `t()` 會動**：右鍵圖片，選單最下面顯示「設為這個書籤的預覽圖」
+（`.test-shots/ctxmenu-image.png`）—— 那條字串是 `pick-cover.ts` 在背景頁註冊選單時取的。
+
+⬜ **`describeCapture` 那條路沒走通**：點下該選單項之後，工具列的 `toolbar__status` 沒有
+出現任何訊息，無法確認是點擊沒落在選單項上、還是別的原因。第 3 批也沒補到（那一輪驗的是
+選取與隱私空間的門）。**仍然待驗** —— 要授予 `<all_urls>` 權限之後右鍵一張圖、選「設為這個
+書籤的預覽圖」，看工具列有沒有出現那句話。
+
+## 第 3 批（`src/sidebar/`，191 條）
+
+一次搬完 App、20 個元件與 hook，加上三個 `index.html`。剩下的只有 `Options.tsx`（177）
+與 `Gallery.tsx`（55）。
+
+### 這一批長出來的三樣東西（後面兩批直接用）
+
+1. **`scripts/i18n-add.py`** —— 吃一份 JSON，做三件手刻會出錯的事：換字面值（次數必須
+   完全對上）、寫進所有語系目錄、補 import。用法與格式在腳本檔頭。
+   - **只有文字的 JSX 行用 `@line` 比對**：比的是去掉縮排之後的內容。JSX 的縮排深度
+     沒有規律，連著縮排一起比對的話每一條都要先去數空白，數錯就是「預期 1 實際 0」。
+   - **次數必須對上**是刻意的：`'取消'` 這種短字串在同一個檔案裡常出現好幾次，其中一次
+     可能是別的意思。數字對不上就代表比對範圍不是你以為的那樣。
+2. **`<Rich>`（`src/sidebar/lib/rich.tsx`）** —— 一句話裡有一段要粗體時，訊息裡用 `*` 夾住。
+   原本想直接寫成 `{前半}<strong>{那個詞}</strong>{後半}`，但那會把一句話切成三條互不
+   相干的訊息，**而順序被程式碼寫死了** —— 中文的「建立後會給你一串救援金鑰」與英文的
+   「you'll be given a recovery key」裡那個詞的位置不一樣，翻譯的人只能硬塞。整句留在
+   同一條訊息裡，`*` 的位置才是翻譯的人說了算。三處用到（MoveInPrompt、VaultGate、
+   RecoveryKeyPanel）。
+3. **`applyDocumentLocale()`（`src/shared/document-locale.ts`）** —— `index.html` 是靜態檔，
+   `browser.i18n` 碰不到它、`__MSG_x__` 也只有 manifest 認得，所以三個 HTML 留英文的
+   靜態值（JS 還沒跑起來時的樣子，剛好就是 `default_locale`），掛載前再改掉。
+   **`<html lang>` 一起改** —— 那不是裝飾，它決定字型、斷行與螢幕閱讀器用哪種語言唸。
+
+### 靜態檢查抓到的兩件事（都是真的缺陷）
+
+- **`t('movein_and_more', n)` 應該是 `tn()`。** 我把訊息寫成 `_one` / `_other` 兩條卻用
+  `t()` 去取，畫面上會變成鍵名。
+- **鍵名不能當成別的函式的參數。** 一開始寫的是 `applyDocumentLocale('page_title_options')`，
+  於是那兩條鍵在靜態檢查眼中「沒有人用」—— 掃的是原始碼裡的 `t('…')`，鍵名一旦離開
+  `t(` 就同時對「漏翻」與「孤兒鍵」兩道檢查失效。改成 `applyDocumentLocale(t('page_title_options'))`。
+
+### 實機驗證
+
+| | 中文 | 英文 |
+|---|---|---|
+| 側邊欄整體 | ✅ `b3-zh.png` | ✅ `b3-en.png` |
+| 建立隱私空間（`<Rich>` 的粗體、`$MIN$` 代入） | ✅ `b3-gate.png` | ✅ `b3-gate-en.png` |
+| 複數 | —— | ✅ `_other`：「2 bookmarks」「20 bookmarks」；`_one`：「1 selected」「**Move 1 item to…**」 |
+
+英文那份仍然用「只留 `dist/_locales/en`」的手法驗（見上面）。**`Move 1 item to…` 是最有價值的
+那一張** —— 它同時證明了 `tn()` 選到 `_one`、placeholder 代得進去、而中文那份是
+「把 1 個項目移動到…」沒有單複數問題。
+
+## 第 4 批（`src/options/Options.tsx`，177 條）
+
+最大的單一檔案，一次搬完。訊息目錄到 **408 條**。
+
+### 兩個新的句型
+
+1. **句子中間夾一個輸入框**（「閒置 `[5]` 分鐘後上鎖」）→ 拆成 `_before` / `_after` 兩條。
+   那個空位可以落在任一端，所以英文的「Lock after `[5]` minutes of inactivity」照樣成立 ——
+   實機兩張圖擺在一起看最清楚：中文的數字在句子中段，英文在句首之後。
+2. **`<code>` 也交給 `<Rich>`**，訊息裡用反引號夾住。同步那幾段說明有好幾個
+   `storage.sync`、`about:preferences#sync`，各自拆成前後段的話會碎成十幾條。
+
+### 順手修掉的重複
+
+主密碼最短長度 `8` 原本在 `VaultGate.tsx` 與 `Options.tsx` 各寫一份，而**兩邊都在把關**
+（建立表單與更改密碼表單）。改動時很容易只改到一邊，症狀是「建立時要 10 個字、改密碼
+8 個就過」，兩邊都沒有錯誤訊息。搬到 `shared/vault-entry.ts` 的 `MIN_PASSWORD_LENGTH` ——
+文案也會提到這個數字（「至少 $MIN$ 字」），所以它同時是規則與說明，更不該有兩份。
+
+### 實機抓到一個型別檢查與測試都看不到的缺陷
+
+`<Rich>` 原本不處理巢狀，而 `*Firefox for Android 完全不同步 `storage.sync`*` 是粗體裡面
+包等寬 —— 畫面上那兩個反引號**原樣印出來**。輸出仍然是一個合法的字串，所以 typecheck
+與 197 項測試全綠，只有真的看畫面才發現。現在支援「粗體裡面放等寬」這一層（反過來不行，
+也沒有需要）。
+
+### 實機驗證
+
+| | 中文 | 英文 |
+|---|---|---|
+| 設定頁全頁 | ✅ `opt-zh.png` | ✅ `opt-en.png` |
+| 同步的已知限制（巢狀標記） | ✅ `opt-fixed.png` | ✅ `opt-en-limits.png` |
+| 分頁標題（`applyDocumentLocale`） | ✅「書籤預覽 — 設定」 | ✅「Bookmark Preview — settings」 |
+
+**順帶確認 `<html lang>` 改對了**：英文那次 Firefox 自己跳出翻譯提示（原始語言判定為英文），
+中文那次沒有。
+
+**設定頁的網址每次都要重抓 UUID**：`./scripts/ff.sh start` 不帶 `KEEP_PROFILE=1` 會建新的
+profile，內部 UUID 跟著換。用舊的網址會停在空白分頁，看起來像頁面壞了。
+
+## 第 5 批（`src/gallery/Gallery.tsx`，55 條）＋ 收尾
+
+53 條裡有 45 條直接重用第 3 批的鍵（全頁瀏覽與側邊欄本來就是同一套操作），只新增 8 條：
+卡片大小的 小/中/大（英文用 S/M/L）、兩個 `aria-label`、「取消選取」，以及兩句與側邊欄
+措辭不同的說明。**`scripts/scan-strings.py` 現在回報 0 行。**
+
+### 又一個只有看畫面才會發現的缺陷
+
+中文介面打開全頁瀏覽時，**Firefox 跳出翻譯提示，還說「原始語言：英文」**。原因是三個
+`index.html` 的 `<html lang="en">`（當初刻意對齊 `default_locale`）—— Firefox 在 JS 改掉它
+之前就把那個屬性讀走了。分頁標題是對的（`applyDocumentLocale` 確實跑了），所以從程式碼
+完全看不出問題。
+
+**修法是不寫 `lang`。** MV3 的 CSP 禁止 inline script，沒辦法在 `<head>` 裡搶先改；完全
+不寫的話 Firefox 改用內容判斷（那是對的），接著 `applyDocumentLocale()` 再補上正確的值。
+複驗：中文那次不再跳提示，英文那次也不跳（內容本來就是英文）。
+
+### 實機驗證
+
+| | 中文 | 英文 |
+|---|---|---|
+| 全頁瀏覽 | ✅ `gallery-zh2.png` | ✅ `gallery-en.png` |
+| 分頁標題 | ✅「書籤預覽 — 全頁瀏覽」 | ✅「Bookmark Preview — full page」 |
+| 卡片大小 | ✅ 小／中／大 | ✅ S／M／L |
+
+---
+
+```bash
+python3 -c "
+import re, json
+s = open('.test-profile/prefs.js', encoding='utf-8').read()
+m = re.search(r'\"extensions\.webextensions\.uuids\",\s*\"(.*?)\"\);', s, re.S)
+d = json.loads(m.group(1).encode().decode('unicode_escape'))
+print([v for k,v in d.items() if 'bookmark-preview@' in k][0])"
+```
 
 ---
 
 ## 目前的基準
 
-四項指令全綠：typecheck 0 錯、**187 項測試**、`web-ext lint` 0 errors / 3 warnings。
+四項指令全綠：typecheck 0 錯、**197 項測試**（i18n 那一批加了 10 項）、
+`web-ext lint` 0 errors / 3 warnings。
 
 再往下是各階段的來龍去脈與踩過的坑，需要時再讀：**2026-08-07 第二輪** 自動上鎖與快捷鍵
 （使用者回報的兩個缺陷，含一條「語意對了但觸發條件錯了」的教訓）、**2026-08-07** M5-3

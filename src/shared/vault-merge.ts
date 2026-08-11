@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { PrivateBookmark, PrivateFolder, VaultPayload } from './types';
 
 /**
@@ -244,7 +245,7 @@ export function sanitizeVaultPayload(value: unknown): VaultPayload {
     }
     const record: PrivateFolder = {
       id,
-      name: typeof item.name === 'string' ? item.name : '未命名資料夾',
+      name: typeof item.name === 'string' ? item.name : t('vault_untitled_folder'),
       parentId: asParent(item.parentId),
       updatedAt,
     };
