@@ -2,7 +2,12 @@ import { broadcast } from '@/shared/messages';
 import { isSamePage, urlKey } from '@/shared/url';
 import { getSettings } from '@/storage/settings';
 import { deleteThumb, putThumb } from '@/storage/thumbs-db';
-import { coverThumbnailFor, hasHostAccess, produceThumbnailNow } from './capture';
+import {
+  coverThumbnailFor,
+  hasHostAccess,
+  produceThumbnailNow,
+  screenshotThumbnailFor,
+} from './capture';
 import { fetchOgThumbnail } from './og-fetcher';
 import { findVaultBookmarkById, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
@@ -92,9 +97,14 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
  * 而隱私書籤的縮圖必須加密 —— 明文躺在 IndexedDB 裡的話，任何能翻擴充套件
  * 儲存目錄的人看圖就知道內容，整個加密設計就白做了。
  *
- * 也**刻意沒有截圖退路**（一般書籤有）。截圖那條路會先把明文寫進 IndexedDB
- * 再加密、刪除明文，等於為了一張縮圖在磁碟上開一個明文的時間窗；
- * 對已經在隱私空間裡的書籤來說，那個窗本來不存在，不該由重抓功能製造出來。
+ * **截圖退路是有的，但走的是不落地的那條。** 原本這裡沒有截圖，理由是「截圖會先把
+ * 明文寫進 IndexedDB 再加密、刪除明文，等於為了一張縮圖在磁碟上開一個明文的時間窗」——
+ * 那個理由是 `capture()` 當時實作方式綁的，不是本質限制。`screenshotThumbnailFor`
+ * 只回傳位元組，交給 `storeVaultThumbnail` 直接加密寫入，明文從頭到尾不存在。
+ *
+ * 少了它的代價是實際遇到的：Cloudflare 之類會擋掉背景頁的無 cookie 請求，於是
+ * 封面判定與伺服器端 og 兩條同時失效，而那正是截圖唯一能派上用場的時候 ——
+ * 使用者只能把書籤移出隱私空間、抓好圖、再移回去。
  */
 export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> {
   if (!(await hasHostAccess())) {
@@ -111,13 +121,26 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
     broadcast('thumbs/updated', { key: vaultThumbKey(id) });
   };
 
-  // 頁面開著時走完整的封面判定（從已渲染的 DOM 找），品質最好
+  /*
+   * 頁面開著時走完整的判定：封面與截圖，順序照設定頁的「預覽圖來源」——
+   * 與一般書籤的 `produceThumbnailNow` 同一個規則，隱私書籤沒有理由不一樣。
+   *
+   * 兩者都只回傳位元組，由 `store` 加密寫入，明文不落地。
+   */
   const openTabId = await findOpenTab(url);
   if (openTabId !== undefined) {
-    const thumbnail = await coverThumbnailFor(openTabId, url);
-    if (thumbnail !== null) {
-      await store(thumbnail);
-      return { ok: true, detail: t('refresh_done') };
+    const { previewSource } = await getSettings();
+    const order: ('cover' | 'capture')[] =
+      previewSource === 'cover-first' ? ['cover', 'capture'] : ['capture', 'cover'];
+    for (const attempt of order) {
+      const thumbnail =
+        attempt === 'cover'
+          ? await coverThumbnailFor(openTabId, url)
+          : await screenshotThumbnailFor(openTabId, url);
+      if (thumbnail !== null) {
+        await store(thumbnail);
+        return { ok: true, detail: t('refresh_done') };
+      }
     }
   }
 

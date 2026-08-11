@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>嵌入式播放器測試（前端渲染）</title>
+    <!--
+      與 embed.html 的差別只有一個，但那一個就是「補抓抓到 logo、擷取抓到封面」
+      的成因：
+
+        embed.html      <iframe src="/player?poster=…">     ← 原始 HTML 裡就有網址
+        embed-spa.html  <iframe :src="currentEpisode?.url"> ← 框架綁定，等 JS 才有
+
+      真實案例（123av.com）是後者。那個頁面用 Vue，iframe 的 src 是綁定，
+      屬性上根本沒有網址；播放器網址連同 ?poster= 被序列化進下面那個
+      data-page 屬性裡（引號跳脫成 &quot;、poster 的值整個 URL 編碼過）。
+
+      所以：
+      - **擷取**（頁面開著）看得到渲染後的 iframe src，一直都抓得對
+      - **補抓**（頁面沒開）只有原始 HTML —— 解析 iframe[src] 什麼都拿不到，
+        必須整份掃文字才找得到那個 poster 參數
+
+      這一頁存在的目的就是把後者釘住。og:image 一樣是整站共用的 logo，
+      所以「有沒有修好」的判準很清楚：抓到 cover.png 是對的，抓到 logo.png 是錯的。
+    -->
+    <meta property="og:image" content="http://127.0.0.1:8899/logo.png" />
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <nav style="background: #333; color: #fff; padding: 10px">首頁 | 分類 | 排行</nav>
+
+    <!--
+      模擬 Vue / Inertia 把初始資料序列化進屬性。poster 的值是 URL 編碼過的，
+      因為它本來就是塞在另一個網址的 query 裡。
+    -->
+    <div
+      id="app"
+      data-page="{&quot;episodes&quot;:[{&quot;number&quot;:1,&quot;url&quot;:&quot;http:\/\/127.0.0.1:8899\/player?id=XK6VZ7&amp;poster=http%3A%2F%2F127.0.0.1%3A8899%2Fcover.png&quot;}]}"
+    >
+      <h1>測試影片標題（前端渲染）</h1>
+      <div style="width: 640px; height: 360px; background: #eee">
+        <!-- src 是綁定，不是網址 —— 沒有 JS 的話這個 iframe 永遠是空的 -->
+        <iframe :src="currentEpisode?.url" width="640" height="360" frameborder="0"></iframe>
+      </div>
+    </div>
+
+    <h2>其他影片</h2>
+    <!--
+      推薦縮圖：合法的 <img>，尺寸過得了門檻。它們不帶封面參數，
+      所以掃文字那條規則不該把它們選進來。
+    -->
+    <img src="http://127.0.0.1:8899/poster.png" width="360" height="200" alt="推薦一" />
+    <img src="http://127.0.0.1:8899/poster.png" width="360" height="200" alt="推薦二" />
+  </body>
+</html>
