@@ -17,3 +17,6 @@ amo/paste/
 
 # import scan-strings 當模組時會留下的（診斷腳本用得到）
 scripts/__pycache__/
+
+# Claude Code 的 worktree（工作目錄，不是專案內容）
+.claude/worktrees/

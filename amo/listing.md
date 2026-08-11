@@ -135,7 +135,31 @@ bookmarks, thumbnails, preview, privacy, encryption
 
 ---
 
-## 版本說明（首次送審）
+## 版本說明（1.1.0）
+
+送審表單的「版本說明」欄，中英各一份。
+
+```
+・介面新增英文，跟著 Firefox 的介面語言自動切換。
+・「補抓預覽圖」現在找得到只寫在頁面初始資料裡的封面（嵌入式播放器的 poster 參數、
+　JSON-LD、video poster），不再只看 og:image。
+・隱私書籤重新抓預覽圖時多了截圖退路，供無法從伺服器端取得封面的網站使用；
+　截圖同樣經過加密，不會以明文寫入。
+```
+
+```
+・The interface is now available in English, following your Firefox language.
+・"Fetch missing previews" now finds covers that only appear in a page's initial
+  data — an embedded player's poster parameter, JSON-LD, a video poster — instead
+  of looking only at og:image.
+・Vault bookmarks can now fall back to a screenshot when a site's cover cannot be
+  fetched from the server. The screenshot is encrypted like everything else in the
+  vault; no plaintext is written.
+```
+
+---
+
+## 版本說明（1.0.0，首次送審）
 
 ```
 首次發布。
