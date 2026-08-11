@@ -8,7 +8,7 @@ import { textDigest } from '@/shared/vault-merge';
  * 版面配置：
  *
  * ```
- * vaultSync       中介資料（明文）：salt / iterations / verifier / 塊數 / 指紋
+ * vaultSync       中介資料（明文）：salt / iterations / 兩份金鑰包裹 / 塊數 / 指紋
  * vaultSyncC0     加密 base64 的第 0 塊
  * vaultSyncC1     ...
  * vaultSyncGone   刪除標記：某台裝置刪掉了整個隱私空間

@@ -134,7 +134,7 @@
     "message": "That bookmark no longer exists"
   },
   "reason_unknown": {
-    "message": "no reason given"
+    "message": "unknown error"
   },
   "image_no_2d_context": {
     "message": "Could not get a 2D drawing context"
@@ -1614,7 +1614,7 @@
     "message": "Merging only happens while *unlocked*. Locked, nothing is pushed or pulled: without the key the cloud copy cannot be opened, so uploading would be plain overwriting and would lose whatever another device added."
   },
   "options_sync_limit_salt": {
-    "message": "*The salt and verifier sit in the synced data in the clear*, because a new device needs them to derive the same key from your master password. The cost, stated plainly: anyone with access to your Firefox account can take them and guess the password offline. The bookmarks themselves stay encrypted. So make the master password long — and this is why sync is off by default."
+    "message": "*The salt, the KDF iteration count and the wrapped data key sit in the synced data in the clear*, because a new device needs them to derive the same key from your master password and to tell that it derived the right one. The cost, stated plainly: anyone with access to your Firefox account can take them and guess the password offline. The bookmarks themselves stay encrypted. So make the master password long — and this is why sync is off by default."
   },
   "options_sync_limit_quota": {
     "message": "The budget is 100 KB. If the encrypted copy exceeds it, sync stops and warns above; nothing on this device is affected."
@@ -1705,10 +1705,10 @@
     "message": "Card size"
   },
   "gallery_scope": {
-    "message": "What to browse"
+    "message": "What to show"
   },
   "action_deselect": {
-    "message": "Stop selecting"
+    "message": "Cancel"
   },
   "gallery_select_hint": {
     "message": "Tick several items and move them all into a folder at once"

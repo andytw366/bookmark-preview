@@ -19,6 +19,72 @@ development 七份），[README.md](README.md) 只留簡介。
 
 ---
 
+## 下一件事：補抓抓不到影片封面（已分析完，還沒動手）
+
+**症狀**：嵌入式影片頁按「補抓預覽圖」拿到站台 logo；同一頁**開著分頁**時按右鍵
+「重新抓預覽圖」則正確拿到影片封面。
+
+**分界不是「補抓 vs 右鍵」，是「頁面開著沒」。** [refresh-thumb.ts:56](src/background/refresh-thumb.ts:56)
+的右鍵重新抓是條件式的：有分頁走 `produceThumbnailNow`（從已渲染的 DOM 找），沒分頁就
+退回 `fetchOgThumbnail` —— 與補抓同一條。補抓則永遠走弱的那條，這是刻意的
+（[backfill.ts:16](src/background/backfill.ts:16)：不去開幾百個分頁）。
+
+**兩條路看的東西差很多：**
+
+| 層 | 擷取（渲染後） | 補抓（`fetchOgThumbnail`） |
+|---|---|---|
+| 1050 嵌入播放器的 `?poster=` | ✅ | ❌ |
+| 1000 og:image / twitter:image | ✅ | ✅ **只有這個** |
+| 950 JSON-LD | ✅ | ❌ |
+| 900 `<video poster>` | ✅ | ❌ |
+| 500/480/460 版面上的圖（按面積排名） | ✅ | ❌ 原理上做不到 |
+| 找不到時截圖 | ✅ | ❌ 沒有分頁可截 |
+
+[og-fetcher.ts:110](src/background/og-fetcher.ts:110) 的 `IMAGE_SELECTORS` 只有 6 個 meta 選擇器。
+
+### 真實案例的原始 HTML（2026-08-11 實際抓下來看的）
+
+`https://123av.com/en/v/fc2-ppv-4953235`：
+
+- `og:image` = `123av.com/assets/123av/logo-square.png` —— 就是使用者看到的 logo
+- `<video poster>` 沒有、JSON-LD 0 個
+- `<iframe>` 寫的是 `:src="currentEpisode?.url"` —— **Vue 綁定，不是網址**
+
+**所以「解析 `iframe[src]` 的參數」這個修法對這一頁完全沒用。** 但封面確實在原始 HTML 裡，
+藏在一段序列化的 JSON（Vue 初始資料，`"` 跳脫過）：
+
+```
+https://javplayer.cc/e/9N28D8?poster=https%3A%2F%2Ficdn.123av.me%2F…%2Ffc2-ppv-4953235%2Fcover.jpg
+```
+
+**修法因此要放寬一階：掃整份 HTML 文字找封面類的 query 參數**，用 `cover.ts` 現有的同一組
+鍵名（`poster` / `thumbnail` / `thumb` / `image` / `img` / `preview` / `cover`），URL 解碼後當候選。
+判準不變 —— 只看參數名稱與值的形狀，不看網域。
+
+**精確度在這一頁剛好很好**（數過）：整份 HTML 只有**一個**符合的參數，指向 `s500` 大圖、
+slug 正好是這一頁的；另外 12 個 `cover.jpg` 是推薦列表的 `s360` 縮圖，走普通 `<img src>`，
+不帶 poster 參數，不會被誤選。
+
+### 做法
+
+1. 把 `cover.ts` 的封面參數規則抽成純函式（一邊吃 DOM 屬性、一邊吃 HTML 文字），
+   **不要在 og-fetcher 複製一份** —— `capture.ts` 的註解已經為同樣的理由警告過
+   （「全站共用圖的降級邏輯一分岔就會開始各自漂移」）。
+2. `extractImageUrls` 一併補上 `<video poster>` 與 JSON-LD（兩者都在原始 HTML 裡讀得到）。
+3. 用 fixture 釘住，**不要打真的站台**：把上面那段 JSON 的形狀（跳脫過的 `"`、
+   URL 編碼的 poster 值）做成一個 fixture。
+4. 可選：補抓完的訊息分開報「N 個抓到內容封面、M 個只找到站台共用圖（開啟頁面後按右鍵
+   重新抓可改善）」。`noteDeclaredImages` 已經在判定全站共用圖，資訊本來就有 ——
+   現在批量補抓完一排 logo，使用者不知道還有下一步。
+
+### 修完仍然做不到的（要對使用者誠實，別在文案上暗示能）
+
+- **視覺層**要 `getBoundingClientRect`，沒有渲染就沒有版面。
+- **真正前端渲染的站台**（封面靠後續 XHR 才拿到）原始 HTML 裡什麼都沒有。
+- **截圖退路**補抓沒有。
+
+---
+
 ## 上架狀態（2026-08-10 從 AMO API 查的）
 
 | 欄位 | 值 |
