@@ -152,3 +152,4 @@ browser.
 | `/embed` | The cover exists only in an iframe's `?poster=` parameter and must beat a site-wide `og:image` logo |
 | `/deep-thumbs` | A CSS background cover at the top must beat recommendation thumbnails further down |
 | `/hotlink` | The cover's CDN answers 403 without a same-site `Referer`, so the bytes can only be had from inside the page |
+| `/carousel` | The slides that are not showing — parked off-screen, or `visibility: hidden` — are larger and portrait, and must still lose to the one on screen |

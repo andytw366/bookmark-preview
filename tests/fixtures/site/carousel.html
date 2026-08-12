@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>輪播：沒輪到的那幾張不算</title>
+    <!--
+      這一頁驗「看不見的圖不該代表這一頁」。
+
+      輪播的常見兩種藏法都放進來了：
+        - 沒輪到的那張**停在視窗右邊外面**（transform 推出去）
+        - 另一張用 `visibility: hidden` 藏起來
+
+      兩張都比正在顯示的那張**大而且是直式**（直式加成 1.4），所以判定要是只看
+      `getBoundingClientRect()` 的尺寸，它們一定贏 —— 而使用者根本沒看到它們。
+
+      正解是目前顯示的那一張 `poster.png`（VIDEO POSTER）。判準：那一列的預覽圖
+      必須是 VIDEO POSTER，不是 COVER。
+
+      刻意不放 og:image，讓視覺層自己決定。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0; overflow-x: hidden">
+    <nav style="background: #333; color: #fff; padding: 10px">首頁 | 分類 | 排行</nav>
+
+    <div style="padding: 16px">
+      <h1>輪播</h1>
+      <div style="position: relative; width: 640px; height: 360px">
+        <!-- 正解：正在顯示的那一張 -->
+        <img src="/poster.png" width="640" height="360" alt="第一張" />
+        <!-- 沒輪到：推到視窗外面 -->
+        <img
+          src="/cover.png"
+          width="400"
+          height="600"
+          alt="第二張"
+          style="position: absolute; top: 0; left: 0; transform: translateX(4000px)"
+        />
+        <!-- 沒輪到：藏起來 -->
+        <img
+          src="/content-a.png"
+          width="400"
+          height="600"
+          alt="第三張"
+          style="position: absolute; top: 0; left: 0; visibility: hidden"
+        />
+      </div>
+      <p>上面是一個輪播，現在顯示第一張。</p>
+    </div>
+  </body>
+</html>

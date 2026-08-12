@@ -74,6 +74,7 @@ cat <<INFO
   http://127.0.0.1:$PORT/text-only    完全沒有圖 —— 截圖是唯一出路（驗隱私書籤的截圖退路）
   http://127.0.0.1:$PORT/deep-thumbs  頂端的背景封面要勝過頁面深處的推薦縮圖
   http://127.0.0.1:$PORT/hotlink      封面的 CDN 擋掉沒有本站 Referer 的請求（背景頁抓不到，頁面內抓得到）
+  http://127.0.0.1:$PORT/carousel     輪播沒輪到的那幾張（推到視窗外／藏起來）不該勝出
 
 /guarded.png 的請求會印在下面（狀態碼 + Referer），那就是防盜連那條路的判準：
 一個沒有 Referer 的 403，接著一個帶 Referer 的 200。

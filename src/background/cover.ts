@@ -179,6 +179,19 @@ function collectCoverCandidates(): { url: string; score: number }[] {
     if (rect.top > 2_000) {
       return null;
     }
+    /*
+     * 橫向落在視窗外的不算。
+     *
+     * 這一層的前提是「使用者實際看到多大」，而輪播沒輪到的那幾張是**停在視窗右邊
+     * 外面**的：它們的 `getBoundingClientRect()` 一樣有體面的尺寸，於是照樣參賽，
+     * 甚至可能贏過正在顯示的那一張。垂直方向本來就有 `rect.top` 那道關卡，
+     * 橫向這一道原本漏了。
+     *
+     * 這不是啟發式，是把前提補齊 —— 看不到的東西不該代表這一頁。
+     */
+    if (rect.right <= 0 || rect.left >= viewportWidth) {
+      return null;
+    }
     const ratio = naturalWidth / naturalHeight;
     /*
      * 橫幅廣告、版面裝飾條、寬幅輪播。
@@ -215,6 +228,15 @@ function collectCoverCandidates(): { url: string; score: number }[] {
   for (const image of Array.from(document.images)) {
     const source = image.currentSrc === '' ? image.src : image.currentSrc;
     if (source === '') {
+      continue;
+    }
+    /*
+     * 看不見的不算。`display: none` 的 rect 是零（上面已經擋掉），但
+     * `visibility: hidden` 與 `opacity: 0` 的 rect 一樣有尺寸 —— 輪播與分頁式版面
+     * 就是這樣藏起沒輪到的那幾張的。
+     */
+    const shown = getComputedStyle(image);
+    if (shown.visibility === 'hidden' || shown.opacity === '0') {
       continue;
     }
     const score = scoreVisual(
