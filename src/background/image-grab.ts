@@ -28,6 +28,14 @@ export interface GrabResult {
 
 export interface GrabOptions {
   /**
+   * 低於這個邊緣比例就當成「這不是圖」而換下一個候選（見
+   * `shared/image-structure.ts`）。預設 0 ＝不判斷。
+   *
+   * **手動指定的圖不要設它。** 使用者對著一張圖右鍵說「就用這張」，程式沒有立場
+   * 否決 —— 他可能真的想用一張純色圖當標記。這條線是給自動判定的。
+   */
+  minEdges?: number;
+  /**
    * 允許第三段（畫面裁切）。預設允許。
    *
    * **自動判定那條路要關掉它**：裁切前得先 `scrollIntoView` 把那張圖捲進可見範圍，
@@ -63,22 +71,26 @@ async function injectWithArgs<T>(
 export async function grabImage(
   tabId: number | undefined,
   imageUrl: string,
-  { allowScreenshot = true }: GrabOptions = {},
+  { allowScreenshot = true, minEdges = 0 }: GrabOptions = {},
 ): Promise<GrabResult | null> {
-  const direct = await tryDirectFetch(imageUrl);
+  const direct = await tryDirectFetch(imageUrl, minEdges);
   if (direct !== null) {
     return { thumbnail: direct, strategy: 'fetch' };
   }
   if (tabId === undefined) {
     return null;
   }
-  const viaPage = await tryPageFetch(tabId, imageUrl);
+  const viaPage = await tryPageFetch(tabId, imageUrl, minEdges);
   if (viaPage !== null) {
     return { thumbnail: viaPage, strategy: 'page-fetch' };
   }
   if (!allowScreenshot) {
     return null;
   }
+  /*
+   * 畫面裁切**不套邊緣門檻**：走到這一段時前面兩段都失敗了，而它裁下來的就是
+   * 使用者眼前那塊畫面。這時候再挑三揀四只會變成「什麼都拿不到」。
+   */
   const viaScreen = await tryScreenshotCrop(tabId, imageUrl);
   if (viaScreen !== null) {
     return { thumbnail: viaScreen, strategy: 'screenshot' };
@@ -86,18 +98,20 @@ export async function grabImage(
   return null;
 }
 
-async function decode(blob: Blob): Promise<Thumbnail | null> {
+async function decode(blob: Blob, minEdges = 0): Promise<Thumbnail | null> {
   if (blob.size === 0 || blob.size > MAX_IMAGE_BYTES) {
     return null;
   }
   try {
-    return await makeCoverThumbnail(blob);
+    const thumbnail = await makeCoverThumbnail(blob);
+    // 純色、平滑漸層、被拉開的裝飾條 —— 換下一個候選（`shared/image-structure.ts`）
+    return thumbnail.edges < minEdges ? null : thumbnail;
   } catch {
     return null;
   }
 }
 
-async function tryDirectFetch(imageUrl: string): Promise<Thumbnail | null> {
+async function tryDirectFetch(imageUrl: string, minEdges = 0): Promise<Thumbnail | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
@@ -114,7 +128,7 @@ async function tryDirectFetch(imageUrl: string): Promise<Thumbnail | null> {
     if (!response.ok) {
       return null;
     }
-    return await decode(await response.blob());
+    return await decode(await response.blob(), minEdges);
   } catch {
     return null;
   } finally {
@@ -161,14 +175,14 @@ function fetchInPage(url: string): Promise<string | null> {
     .catch(() => null);
 }
 
-async function tryPageFetch(tabId: number, imageUrl: string): Promise<Thumbnail | null> {
+async function tryPageFetch(tabId: number, imageUrl: string, minEdges = 0): Promise<Thumbnail | null> {
   try {
     const dataUrl = await injectWithArgs<string>(tabId, fetchInPage as never, [imageUrl]);
     if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
       return null;
     }
     // data: URL 不走網路，這個 fetch 只是把它變回位元組（截圖那一段也是這樣做的）
-    return await decode(await (await fetch(dataUrl)).blob());
+    return await decode(await (await fetch(dataUrl)).blob(), minEdges);
   } catch {
     return null;
   }

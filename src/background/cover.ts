@@ -180,8 +180,18 @@ function collectCoverCandidates(): { url: string; score: number }[] {
       return null;
     }
     const ratio = naturalWidth / naturalHeight;
-    // 橫幅廣告與細長裝飾
-    if (ratio > 4 || ratio < 0.25) {
+    /*
+     * 橫幅廣告、版面裝飾條、寬幅輪播。
+     *
+     * 上限 2.2 而不是 4：**內容封面幾乎不會比 16:9（1.78）寬多少** —— 書籍與漫畫是
+     * 直式、影片封面是 16:9。實測 eyny 論壇挑錯的那張就在這個區間：
+     * `grouplist_body.gif`，550×200（2.75），是群組列表面板的底圖。它又大又靠上，
+     * 分數自然最高，而它的內容判準也擋不住（邊緣比例 0.0215，與一個只有字樣的
+     * logo 相同量級 —— 那條線再往上就會開始殺真的 logo）。
+     *
+     * 形狀是這裡唯一乾淨的判準，代價是失去全景照這種罕見的封面。
+     */
+    if (ratio > 2.2 || ratio < 0.25) {
       return null;
     }
 
@@ -200,7 +210,7 @@ function collectCoverCandidates(): { url: string; score: number }[] {
     return displayedArea * portraitBonus * positionBonus * fullBleedPenalty * titleBonus;
   };
 
-  const pool: { url: string; visual: number }[] = [];
+  const pool: { url: string; visual: number; width: number; height: number }[] = [];
 
   for (const image of Array.from(document.images)) {
     const source = image.currentSrc === '' ? image.src : image.currentSrc;
@@ -214,7 +224,8 @@ function collectCoverCandidates(): { url: string; score: number }[] {
       `${image.alt} ${image.title}`,
     );
     if (score !== null) {
-      pool.push({ url: source, visual: score });
+      const rect = image.getBoundingClientRect();
+      pool.push({ url: source, visual: score, width: rect.width, height: rect.height });
     }
   }
 
@@ -245,18 +256,44 @@ function collectCoverCandidates(): { url: string; score: number }[] {
       element.getAttribute('aria-label') ?? element.title,
     );
     if (score !== null) {
-      pool.push({ url: raw, visual: score * 0.75 });
+      pool.push({ url: raw, visual: score * 0.75, width: rect.width, height: rect.height });
     }
   }
+
+  /*
+   * ── 把「一整排長得一樣的圖」整組丟掉 ──────────────────────────
+   *
+   * 這是「抓到畫面上第一張圖」的根源：資訊流、推薦列表、影片牆裡的縮圖每一張都是
+   * 真的圖片，尺寸還很體面，於是排在最前面的那一張就贏了 —— 但它代表的是**別的**
+   * 頁面，不是這一頁。這一頁根本沒有封面。
+   *
+   * 判準不看網域也不看選擇器：**封面是單一的，資訊流是重複的。** 顯示尺寸相近的
+   * 圖有三張以上，那就是一組列表，整組退出競爭。
+   *
+   * 只對「小於視窗四成寬」的那種列表生效 —— 漫畫閱讀頁也是一連串同尺寸的圖，
+   * 但那些圖幾乎佔滿版面寬度，而且其中任何一張都是這一頁的合理封面。
+   */
+  const CLUSTER_MIN = 3;
+  const sizeKey = (width: number, height: number): string =>
+    `${String(Math.round(width / 10))}x${String(Math.round(height / 10))}`;
+  const cluster = new Map<string, number>();
+  for (const candidate of pool) {
+    if (candidate.width < viewportWidth * 0.4) {
+      cluster.set(sizeKey(candidate.width, candidate.height), (cluster.get(sizeKey(candidate.width, candidate.height)) ?? 0) + 1);
+    }
+  }
+  const singular = pool.filter(
+    (candidate) => (cluster.get(sizeKey(candidate.width, candidate.height)) ?? 0) < CLUSTER_MIN,
+  );
 
   // 視覺分數只決定池內順序，不直接當最終分數 —— 它是面積量級的數字，
   // 跟宣告層的 900/1000 不可比。前三名映射到固定的 500/480/460，
   // 讓「宣告層 vs 視覺層」的相對位置保持穩定，例如降級後的全站共用圖
   // （1000 − 600 = 400）仍然墊在所有視覺候選之下。
   const BAND = [500, 480, 460];
-  pool.sort((a, b) => b.visual - a.visual);
+  singular.sort((a, b) => b.visual - a.visual);
   const takenVisual = new Set<string>();
-  for (const candidate of pool) {
+  for (const candidate of singular) {
     if (takenVisual.has(candidate.url)) {
       continue;
     }

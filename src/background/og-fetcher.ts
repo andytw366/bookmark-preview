@@ -1,5 +1,6 @@
 import * as coverParams from '@/shared/cover-params';
 import { imagesInJsonLd } from '@/shared/json-ld';
+import { MIN_COVER_EDGES } from '@/shared/image-structure';
 import { noteDeclaredImages } from '@/storage/site-image-stats';
 import { makeCoverThumbnail, type Thumbnail } from './image';
 
@@ -44,7 +45,14 @@ export async function fetchOgThumbnail(pageUrl: string): Promise<Thumbnail | nul
     }
     try {
       // og:image 是內容圖而非網頁畫面，維持原始長寬比不裁切
-      return await makeCoverThumbnail(image);
+      const thumbnail = await makeCoverThumbnail(image);
+      // 純色、平滑漸層、被拉開的裝飾條都不是圖（`shared/image-structure.ts`）。
+      // 這條路與分頁擷取那條套同一條線 —— 兩邊不一致的話，「補抓」與「開著頁面抓」
+      // 會對同一張圖給出不同答案，而那種差異最難查。
+      if (thumbnail.edges < MIN_COVER_EDGES) {
+        continue;
+      }
+      return thumbnail;
     } catch {
       // 這張解碼失敗（可能是 SVG 或壞檔），換下一張
       continue;

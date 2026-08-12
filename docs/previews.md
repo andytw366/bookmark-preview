@@ -38,6 +38,36 @@ The two cannot each get their own flat score. That would let "the obvious cover 
 the very top of the page, drawn as a background" lose to "a small thumbnail in a
 recommendations list a thousand pixels down".
 
+Three rules keep this layer from picking things that are technically images but represent
+nothing:
+
+- **Nothing wider than about 2.2:1.** A content cover is portrait or roughly 16:9; wider
+  than that and it is a banner, a carousel slide, or a panel background. A forum's
+  550×200 panel gradient used to win outright — big, near the top, and unremarkable in
+  every other respect.
+- **A repeated size means a feed, not a cover.** Three or more images sharing a displayed
+  size are a listing — each one represents a *different* page. This is why "the first
+  image on screen" used to win on home pages and forum indexes. The rule ignores clusters
+  wider than 40% of the viewport, so a comic reader's column of page images is untouched.
+- **It has to look like a picture.** After the bytes arrive they are sampled and scored on
+  how much they change from pixel to pixel; solid colours, smooth gradients and
+  lazy-loading placeholders score essentially zero and are skipped. The bar is set low
+  (0.5%) on purpose: a logo that is mostly whitespace with a small wordmark measures around
+  1.5%, and a logo is exactly what should win when a page has no cover of its own.
+
+## When a page genuinely has no cover
+
+App-like pages — a home feed, a chat interface, a login wall — have no cover to find, and
+the honest answer is the site's own identity rather than an arbitrary image scraped off the
+screen. Because a site-wide `og:image` is demoted rather than discarded, that is what
+happens automatically once the rules above remove the junk: the logo the site declares for
+every page sits below any trustworthy content image and above nothing at all. Failing that,
+a screenshot.
+
+This is the same mechanism that keeps a logo *out* of the way on a video page, read from
+the other end: there the player's poster parameter and the page's own `og:image` outrank it.
+Nothing is site-specific; the ordering does the work.
+
 ## Choosing the image is only half of it: getting the bytes
 
 Picking the right image and downloading it are separate problems, and the second one has

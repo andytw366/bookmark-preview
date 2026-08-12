@@ -1,3 +1,4 @@
+import { MIN_COVER_EDGES } from '@/shared/image-structure';
 import { grabImage } from './image-grab';
 import { type Thumbnail } from './image';
 
@@ -36,11 +37,14 @@ export async function grabCoverThumbnail(
   tabId: number,
 ): Promise<Thumbnail | null> {
   for (const candidate of candidates) {
-    const grabbed = await grabImage(tabId, candidate, { allowScreenshot: false });
+    const grabbed = await grabImage(tabId, candidate, {
+      allowScreenshot: false,
+      minEdges: MIN_COVER_EDGES,
+    });
     if (grabbed !== null) {
       return grabbed.thumbnail;
     }
-    // 取不下來或解不出圖片 —— 換下一個候選
+    // 取不下來、解不出圖片、或那根本不是圖（純色／漸層）—— 換下一個候選
   }
   return null;
 }

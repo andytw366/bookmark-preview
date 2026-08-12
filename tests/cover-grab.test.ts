@@ -19,9 +19,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * 然後被 catch 成 null）。那一段只有真的瀏覽器驗得到，fixture 是
  * `tests/fixtures/site/hotlink.html`。下面用靜態檢查把已知的地雷釘住。
  */
+/** 解碼結果的「邊緣比例」，由各案例決定（見 `shared/image-structure.ts`）。 */
+let stubEdges = 0.5;
+
 vi.mock('@/background/image', () => ({
   makeCoverThumbnail: (blob: Blob) =>
-    Promise.resolve({ bytes: new ArrayBuffer(blob.size), mime: 'image/webp', width: 400, height: 600 }),
+    Promise.resolve({
+      bytes: new ArrayBuffer(blob.size),
+      mime: 'image/webp',
+      width: 400,
+      height: 600,
+      edges: stubEdges,
+    }),
 }));
 
 type Grab = typeof import('@/background/image-grab');
@@ -44,6 +53,7 @@ beforeEach(async () => {
   injected = 0;
   captured = 0;
   requested = [];
+  stubEdges = 0.5;
 
   vi.stubGlobal('fetch', (url: string) => {
     /*
@@ -191,6 +201,26 @@ describe('依候選順序取封面', () => {
 
   it('全部失敗回 null，交給截圖那條退路', async () => {
     expect(await coverGrab.grabCoverThumbnail([FIRST, SECOND], 7)).toBeNull();
+  });
+
+  /**
+   * 純色與平滑漸層不是圖，是裝飾。實測 eyny 論壇的版面底圖就是這樣贏過整排真的縮圖的
+   * （那一張最後是靠長寬比擋掉的，但懶載入的灰底佔位圖只有這條線擋得住）。
+   */
+  it('解出來根本不是圖（純色／漸層）就換下一個候選', async () => {
+    stubEdges = 0.001;
+    direct.set(FIRST, { status: 200, type: 'image/jpeg' });
+
+    expect(await coverGrab.grabCoverThumbnail([FIRST], 7)).toBeNull();
+    // 有去抓，只是抓回來之後判定它不是圖
+    expect(requested).toEqual([FIRST]);
+  });
+
+  it('手動指定不套那條線 —— 使用者說要這張就是這張', async () => {
+    stubEdges = 0.001;
+    direct.set(FIRST, { status: 200, type: 'image/jpeg' });
+
+    expect(await grab.grabImage(7, FIRST)).not.toBeNull();
   });
 
   /** 自動那條路必須關掉畫面裁切，理由見上面。 */
