@@ -1,7 +1,8 @@
 # 接手指南 / 待辦
 
-最後更新：2026-08-11（**1.1.0 待送審**：介面英文化、補抓找得到藏在初始資料裡的封面、
-隱私書籤補上加密的截圖退路。AMO 上仍是 1.0.0。上架頁那句安全性警語不是缺陷，見「上架狀態」）
+最後更新：2026-08-11（**1.1.0 已送出 AMO 審查**：介面英文化、補抓找得到藏在初始資料裡的
+封面、隱私書籤補上加密的截圖退路。**下一件事見下面「1.1.1 的待辦」——第一條是已經確認
+機制、只差動手的缺陷。** 上架頁那句安全性警語不是缺陷，見「上架狀態」）
 
 給下一個 session 的交接文件。設計背景讀 [PLAN.md](PLAN.md)；操作與架構已拆成英文的
 [`docs/`](docs/)（architecture、vault、previews、interface、sync-and-backup、permissions、
@@ -16,6 +17,70 @@ development 七份），[README.md](README.md) 只留簡介。
 | `.claude/skills/firefox-e2e/` | 實機驗證的 skill：座標速查表、每一條踩過的坑、DevTools 釘住事件頁的手法 |
 
 另外 `.claude/settings.json` 掛了一個 Stop hook（`scripts/hook-typecheck.sh`），回答結束前自動跑 typecheck —— 掛在 Stop 而不是每次編輯之後，因為重構途中本來就會有一段編不過的狀態。
+
+---
+
+## 1.1.1 的待辦（1.1.0 送審後整理，照這個順序做）
+
+### 1. ⬜ 負向快取沒有作廢 —— 補抓成功了，畫面還是色卡
+
+**已經確認機制，不是猜測。** 這是「每一條寫入或刪除縮圖的路徑都必須廣播」那條規則的
+**第三個漏網處**（前兩個是 `refresh-thumb.ts` 的 og 退路、設定頁的「清除所有預覽圖」），
+但這次不同：**廣播有發，是接收端不在**。
+
+[`thumb-cache.ts:12`](src/sidebar/lib/thumb-cache.ts:12) 的 `image: null` 是「查過了，
+這個書籤沒有縮圖」，與「還沒查過」是兩件事 —— 那個區分本身是對的。問題在
+[`useThumb.ts:120`](src/sidebar/hooks/useThumb.ts:120)：訂閱 `thumbs/updated` 寫在
+`useEffect` 裡，**只有元件掛載中才聽得到**；而卸載時 [`releaseThumb`](src/sidebar/lib/thumb-cache.ts:76)
+只把 `users` 減一，那筆 `{ image: null, stale: false }` 原封不動留著。
+
+```
+1. 看過那一列        → 快取記下「這個 key 沒有縮圖」
+2. 捲走／換搜尋      → 元件卸載，訂閱消失，快取項目還在
+3. 補抓成功          → 寫進 IndexedDB → 廣播 → 沒有人在聽
+4. 再看那一列        → holdThumb 回傳 null（不是 undefined）
+                      → useThumb.ts:95 判定「快取有答案」→ setThumb(null) 後 return
+                      → 根本不去讀 IndexedDB
+```
+
+關鍵是第 4 步 [`useThumb.ts:97`](src/sidebar/hooks/useThumb.ts:97) 那個 `return`：命中快取
+就不讀資料庫了。所以圖明明在 IndexedDB 裡，畫面永遠是色卡，**要關掉側邊欄重開**
+（清空模組層快取）才會出現。手動右鍵重抓之所以正常，是因為那時那一列掛載中。
+
+**修法**：作廢要和快取同一層。`thumb-cache.ts` 是模組層狀態，就該自己訂閱一次
+`thumbs/updated` / `thumbs/cleared`，不要依賴剛好有元件掛著。約 10 行。
+
+**複驗**（順序很重要，做錯就測不到）：先搜尋讓那幾列算繪一次 → 離開那個搜尋 →
+按「補抓預覽圖」→ **不重開側邊欄**，搜尋回去 → 應該直接看到圖。
+
+### 2. ⬜ `deep-thumbs` 那一列也是色卡 —— 解釋不了
+
+它有 `og:image`，補抓照理該成功；而且**上面第 1 條解釋不了它**（那一列在補抓之前
+沒有被算繪過，不會有負向快取）。修完第 1 條之後要重新確認這一條還在不在 ——
+很可能是同一個原因的另一條觸發路徑，也可能是別的。
+
+下一步不要再從截圖猜：用背景頁 console（`about:debugging` → 檢測，記得確認 context
+指到 `_generated_background_page.html`）看 `putThumb` 對那個 key 到底有沒有被呼叫。
+
+### 3. ⬜ 缺陷 3：自動路徑抓不到防盜連的圖（早於這次，一直開著）
+
+`fetchCoverThumbnail`（自動）只做一次背景 fetch；`image-grab.ts` 的手動路徑有三段策略
+（直接下載、**頁面內下載**、畫面裁切）。頁面內下載是在頁面的脈絡裡抓，帶得到 cookie，
+那正是突破 Cloudflare 與防盜連的關鍵 —— 所以「手動右鍵可以、自動不行」。
+
+實際案例：`https://m.happymh.com/…` 整站在 Cloudflare 後面，對無 cookie 的請求回
+**403 + captcha**（容器實測，換瀏覽器 UA 也一樣）。於是封面判定與伺服器端 og 同時失效。
+
+**修法**：`fetchCoverThumbnail` 改用 `grabImage` 的三段策略，並拿掉 content-type 硬檢查
+（`image-grab.ts` 自己的註解就寫了「不少 CDN 對圖片回 `application/octet-stream`」）。
+一般書籤與隱私書籤都會受惠。比第 1 條大，所以排在後面。
+
+### 4. ⬜ 沒有直接驗證「IndexedDB 裡確實沒有明文縮圖」
+
+隱私書籤的截圖退路是 1.1.0 新加的。目前的依據是 `storeVaultThumbnail` 先 `seal` 再
+`putThumb`（讀過程式碼）加上 `tests/vault-thumb-privacy.test.ts` 的靜態檢查 ——
+**沒有真的去翻過 IndexedDB**。做法：背景頁 console 開 `thumbs` 這個 object store，
+確認隱私書籤那筆 `encrypted: true`、而且同一個網址的明文鍵不存在。
 
 ---
 
@@ -216,8 +281,8 @@ Description 第二段那句「介面只有中文」已經換成「兩種語言�
 與 `docs/development.md` 也都改了。這條清掉之後，Recommended Extensions 的「對廣泛的
 國際使用者有吸引力」就不再卡在語言上（見上面「上架狀態」）。
 
-**這件事還沒送上架** —— 版本仍是 1.0.0，AMO 上的還是純中文那顆。下一版要走一次
-`amo/README.md` 的送審清單（含原始碼壓縮檔）。
+**1.1.0 已於 2026-08-11 送出審查**（含 i18n 與兩個預覽圖修正），等結果。
+下一版的待辦見最上面的「1.1.1 的待辦」。
 
 當初的規模（2026-08-10 量的，量法見下）：
 
@@ -461,9 +526,9 @@ cp -r public/_locales/en public/_locales/ja   # 翻完跑 npm run verify
 （`.test-shots/ctxmenu-image.png`）—— 那條字串是 `pick-cover.ts` 在背景頁註冊選單時取的。
 
 ⬜ **`describeCapture` 那條路沒走通**：點下該選單項之後，工具列的 `toolbar__status` 沒有
-出現任何訊息，無法確認是點擊沒落在選單項上、還是別的原因。第 3 批也沒補到（那一輪驗的是
-選取與隱私空間的門）。**仍然待驗** —— 要授予 `<all_urls>` 權限之後右鍵一張圖、選「設為這個
-書籤的預覽圖」，看工具列有沒有出現那句話。
+出現任何訊息。**後來查出很可能就是最上面第 1 條那個負向快取**（`useBackfill` 的 status
+也是掛載中才更新），修完那條之後回來重驗。要授予 `<all_urls>` 之後右鍵一張圖、選「設為
+這個書籤的預覽圖」，看工具列有沒有出現那句話。
 
 ## 第 3 批（`src/sidebar/`，191 條）
 
