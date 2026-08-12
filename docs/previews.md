@@ -38,6 +38,30 @@ The two cannot each get their own flat score. That would let "the obvious cover 
 the very top of the page, drawn as a background" lose to "a small thumbnail in a
 recommendations list a thousand pixels down".
 
+## Choosing the image is only half of it: getting the bytes
+
+Picking the right image and downloading it are separate problems, and the second one has
+its own ladder — tried in order, first success wins:
+
+1. **Fetch from the background page.** One request, no page involved.
+2. **Fetch from inside the page.** Injected into the tab the candidate came from, so the
+   request carries the correct `Referer` and the site's cookies.
+3. **Crop it out of a screenshot.** The image is already on screen, so this needs no
+   network request at all and nothing can refuse it.
+
+Stage 2 exists because an extension cannot set a cross-origin `Referer` itself — `fetch`'s
+`referrer` option is dropped — so a CDN that checks it answers 403 no matter what the
+background page does. Stage 3 is for the rest: images bound to a session, or a CDN behind
+a challenge page.
+
+**The automatic path uses stages 1 and 2; the manual override uses all three.** Stage 3
+has to scroll the image into view first, and automatic capture runs merely because you
+visited a page you had bookmarked — the page should not jump on its own. Nothing is lost:
+when every cover candidate fails, the pipeline falls back to a screenshot of the page.
+
+A candidate is accepted when it **decodes as an image**, not when its `content-type` says
+so; plenty of CDNs serve images as `application/octet-stream`.
+
 ## Site-wide `og:image` is demoted automatically
 
 Many sites use one `og:image` — usually a logo — for every page. As a preview that is
@@ -97,3 +121,4 @@ browser.
 | `/shared-a`, `/shared-b` | Two pages share one `og:image`; after the second is visited it must be demoted as site-wide |
 | `/embed` | The cover exists only in an iframe's `?poster=` parameter and must beat a site-wide `og:image` logo |
 | `/deep-thumbs` | A CSS background cover at the top must beat recommendation thumbnails further down |
+| `/hotlink` | The cover's CDN answers 403 without a same-site `Referer`, so the bytes can only be had from inside the page |

@@ -7,7 +7,7 @@ import { getThumb, putThumb } from '@/storage/thumbs-db';
 import { isBookmarked } from './bookmark-index';
 import { noteDeclaredImages } from '@/storage/site-image-stats';
 import { coverCandidatesFromTab, DECLARED_THRESHOLD, SITE_WIDE_PENALTY } from './cover';
-import { fetchCoverThumbnail } from './cover-fetch';
+import { grabCoverThumbnail } from './cover-grab';
 import { makeThumbnail, type Thumbnail } from './image';
 import { t } from '@/shared/i18n';
 
@@ -252,7 +252,9 @@ export async function coverThumbnailFor(tabId: number, url: string): Promise<Thu
     .sort((a, b) => b.score - a.score)
     .map((candidate) => candidate.url);
 
-  return fetchCoverThumbnail(ranked, url);
+  // 帶著 tabId 進去：候選是從這個分頁的 DOM 讀出來的，而那個分頁也正是取得圖片
+  // 位元組的第二條路 —— 防盜連與 Cloudflare 只有在頁面的脈絡裡才穿得過去。
+  return grabCoverThumbnail(ranked, tabId);
 }
 
 async function tryCover(tabId: number, url: string, key: string): Promise<boolean> {

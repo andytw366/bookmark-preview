@@ -51,6 +51,15 @@ if [[ ! -f "$SITE/cover.png" ]]; then
     -annotate +0-30 'CONTENT B' -pointsize 24 -annotate +0+30 'portrait' "$SITE/content-b.png"
 fi
 
+# 防盜連測試的封面。自己一個 if：cover.png 早就存在的既有工作目錄不會跑上面那一段，
+# 而少了這張圖 /hotlink 會靜靜地變成「頁面上根本沒有封面」，測到的就不是防盜連了。
+if [[ ! -f "$SITE/guarded.png" ]]; then
+  convert -size 400x600 gradient:'#7c2d12-#fdba74' \
+    -gravity center -pointsize 40 -fill white -annotate +0-60 'HOTLINK' \
+    -pointsize 40 -annotate +0-10 'GUARDED' \
+    -pointsize 22 -annotate +0+50 'needs a same-site Referer' "$SITE/guarded.png"
+fi
+
 cat <<INFO
 測試頁（每一頁對應封面擷取的一種情況）：
   http://127.0.0.1:$PORT/             無中介資料的直式封面（要勝過橫幅與圖示）
@@ -64,6 +73,10 @@ cat <<INFO
   http://127.0.0.1:$PORT/embed-spa    同上，但 iframe 的 src 是框架綁定 —— 封面只在序列化的初始資料裡
   http://127.0.0.1:$PORT/text-only    完全沒有圖 —— 截圖是唯一出路（驗隱私書籤的截圖退路）
   http://127.0.0.1:$PORT/deep-thumbs  頂端的背景封面要勝過頁面深處的推薦縮圖
+  http://127.0.0.1:$PORT/hotlink      封面的 CDN 擋掉沒有本站 Referer 的請求（背景頁抓不到，頁面內抓得到）
+
+/guarded.png 的請求會印在下面（狀態碼 + Referer），那就是防盜連那條路的判準：
+一個沒有 Referer 的 403，接著一個帶 Referer 的 200。
 INFO
 
 exec node -e "
@@ -82,13 +95,39 @@ http
       requested += '.html';
     }
     const file = path.join(root, path.basename(requested));
+    /*
+     * 防盜連的模擬：沒有本站 Referer 就 403。
+     *
+     * no-store 是必要的，不是保險 —— 頁面自己載入這張圖時是成功的，少了它背景頁
+     * 那次 fetch 會直接命中快取拿到 200，於是防盜連根本沒被測到。
+     */
+    const guarded = path.basename(requested) === 'guarded.png';
+    if (guarded) {
+      const referer = req.headers.referer ?? '';
+      const ok = referer.includes('127.0.0.1:${PORT}');
+      /*
+       * 一併印 sec-fetch-dest：頁面自己載入那張圖是 \`image\`，而擴充套件在頁面裡
+       * 用 fetch() 抓是 \`empty\`。少了這一欄，兩種請求的 Referer 一模一樣，
+       * 分不出「第二段策略成功了」與「只是頁面自己又載入一次」。
+       */
+      const dest = req.headers['sec-fetch-dest'] ?? '(無)';
+      console.log('/guarded.png →', ok ? 200 : 403, 'dest:', dest, 'referer:', referer === '' ? '(無)' : referer);
+      if (!ok) {
+        res.writeHead(403, { 'cache-control': 'no-store', 'content-type': 'text/plain' });
+        res.end('hotlinking not allowed');
+        return;
+      }
+    }
     fs.readFile(file, (error, data) => {
       if (error) {
         res.writeHead(404);
         res.end('not found');
         return;
       }
-      res.writeHead(200, { 'content-type': types[path.extname(file)] ?? 'application/octet-stream' });
+      res.writeHead(200, {
+        'content-type': types[path.extname(file)] ?? 'application/octet-stream',
+        ...(guarded ? { 'cache-control': 'no-store' } : {}),
+      });
       res.end(data);
     });
   })

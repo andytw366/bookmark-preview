@@ -136,6 +136,7 @@ cat > "$PROFILE/bookmarks.html" <<'HTML'
         <DT><A HREF="http://127.0.0.1:8899/embed-spa">嵌入式播放器測試 前端渲染（本地）</A>
         <DT><A HREF="http://127.0.0.1:8899/text-only">純文字頁 沒有任何圖（本地）</A>
         <DT><A HREF="http://127.0.0.1:8899/deep-thumbs">背景封面 vs 推薦縮圖（本地）</A>
+        <DT><A HREF="http://127.0.0.1:8899/hotlink">防盜連封面測試（本地）</A>
         <DT><A HREF="place:type=6&sort=14&maxResults=10">最近的書籤</A>
     </DL><p>
     <DT><H3>其他書籤</H3>

@@ -118,7 +118,7 @@ function collectCoverCandidates(): { url: string; score: number }[] {
   // 站台 logo 當成影片的 poster。所以排在宣告層之上。
   //
   // 只看參數名稱與值的形狀，不看網域。猜錯的成本也很低：
-  // 取不下來或解不出圖片，fetchCoverThumbnail 會直接換下一個候選。
+  // 取不下來或解不出圖片，grabCoverThumbnail 會直接換下一個候選。
   const POSTER_KEYS = ['poster', 'thumbnail', 'thumb', 'image', 'img', 'preview', 'cover'];
   for (const frame of document.querySelectorAll('iframe[src], embed[src]')) {
     const source = frame.getAttribute('src');

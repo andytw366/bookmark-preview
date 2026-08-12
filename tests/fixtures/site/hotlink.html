@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>防盜連的封面</title>
+    <!--
+      這一頁驗「選對了封面，但取不下來」。
+
+      封面 `/guarded.png` 的伺服器端規則（見 scripts/serve-fixture.sh）：
+      **沒有本站 Referer 的請求一律 403**，而且回應帶 `no-store`
+      （否則背景頁的 fetch 會命中頁面剛才載入時留下的快取而測不到失敗）。
+
+      這正是實務上會遇到的形狀：擴充套件無法自行設定跨來源的 Referer
+      （`fetch` 的 `referrer` 選項會被瀏覽器丟掉），所以背景頁怎麼試都是 403。
+      唯一的出路是在頁面的脈絡裡抓 —— 那個請求的 Referer 與 cookie 都是對的。
+
+      刻意不放 og:image：判定要靠視覺層挑中這張直式圖，才會真的去下載它。
+      判準看伺服器記錄：**一個沒有 Referer 的 403，接著一個帶 Referer 的 200。**
+      只有 403 就停，表示自動路徑又退回只做一次背景頁 fetch 了。
+    -->
+  </head>
+  <body style="font-family: sans-serif; margin: 0">
+    <nav style="background: #222; color: #fff; padding: 10px">首頁 | 分類 | 排行</nav>
+
+    <div style="padding: 16px">
+      <h1>防盜連的封面</h1>
+      <!-- 正解：直式封面，面積與比例都應該讓它勝出 -->
+      <img src="/guarded.png" width="400" height="600" alt="封面" />
+      <p>上面那張圖的 CDN 會擋掉沒有本站 Referer 的請求。</p>
+    </div>
+
+    <!-- 干擾項：橫幅廣告（應被排除） -->
+    <img src="/banner.png" width="900" height="90" alt="廣告" />
+  </body>
+</html>

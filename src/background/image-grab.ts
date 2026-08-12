@@ -26,6 +26,19 @@ export interface GrabResult {
   strategy: GrabStrategy;
 }
 
+export interface GrabOptions {
+  /**
+   * 允許第三段（畫面裁切）。預設允許。
+   *
+   * **自動判定那條路要關掉它**：裁切前得先 `scrollIntoView` 把那張圖捲進可見範圍，
+   * 而自動擷取是使用者只是造訪了一個已加入書籤的頁面就會跑的 —— 頁面自己跳動一下
+   * 完全沒道理，那是右鍵手動指定（使用者主動要這張圖）才付得起的代價。
+   *
+   * 對自動那條路也沒什麼損失：封面全部失敗時，管線本來就會退回整頁截圖。
+   */
+  allowScreenshot?: boolean;
+}
+
 const TIMEOUT_MS = 12_000;
 const MAX_IMAGE_BYTES = 12_000_000;
 
@@ -50,6 +63,7 @@ async function injectWithArgs<T>(
 export async function grabImage(
   tabId: number | undefined,
   imageUrl: string,
+  { allowScreenshot = true }: GrabOptions = {},
 ): Promise<GrabResult | null> {
   const direct = await tryDirectFetch(imageUrl);
   if (direct !== null) {
@@ -61,6 +75,9 @@ export async function grabImage(
   const viaPage = await tryPageFetch(tabId, imageUrl);
   if (viaPage !== null) {
     return { thumbnail: viaPage, strategy: 'page-fetch' };
+  }
+  if (!allowScreenshot) {
+    return null;
   }
   const viaScreen = await tryScreenshotCrop(tabId, imageUrl);
   if (viaScreen !== null) {
@@ -105,39 +122,53 @@ async function tryDirectFetch(imageUrl: string): Promise<Thumbnail | null> {
   }
 }
 
-/** 在頁面裡抓，回傳 base64。頁面的請求會自動帶對的 Referer 與 cookie。 */
+/**
+ * 在頁面裡抓，回傳 `data:` URL。頁面的請求會自動帶對的 Referer 與 cookie。
+ *
+ * **不要在這裡自己把位元組轉成 base64。** 這段程式是被注入到頁面裡跑的，而
+ * `String.fromCharCode(...bytes.subarray(...))` 這種展開跨不過 Xray 邊界 ——
+ * 展開需要取得迭代器，Firefox 的安全包裝會丟
+ * `Permission denied to access property "constructor"`。
+ *
+ * 原本就是這樣寫的，於是第二段策略**從來沒有真正成功過**：請求送出去了、伺服器
+ * 也回 200，位元組卻在轉換那一步死掉，而 `catch` 把它變成安靜的 null。從外面看
+ * 只知道「手動指定會拿到畫面裁切的結果」，看不出中間那段根本沒運作 ——
+ * 當初驗證階段 2 時只看伺服器的請求記錄，那還不足以證明位元組回到了背景頁。
+ *
+ * 交給 `FileReader` 讓瀏覽器自己編碼：完全不必碰位元組，也就沒有邊界問題。
+ */
 function fetchInPage(url: string): Promise<string | null> {
   return fetch(url, { credentials: 'include' })
     .then(async (response) => {
       if (!response.ok) {
         return null;
       }
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength === 0 || buffer.byteLength > 12_000_000) {
+      const blob = await response.blob();
+      if (blob.size === 0 || blob.size > 12_000_000) {
         return null;
       }
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let index = 0; index < bytes.length; index += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-      }
-      return btoa(binary);
+      return await new Promise<string | null>((done) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          done(typeof reader.result === 'string' ? reader.result : null);
+        };
+        reader.onerror = () => {
+          done(null);
+        };
+        reader.readAsDataURL(blob);
+      });
     })
     .catch(() => null);
 }
 
 async function tryPageFetch(tabId: number, imageUrl: string): Promise<Thumbnail | null> {
   try {
-    const base64 = await injectWithArgs<string>(tabId, fetchInPage as never, [imageUrl]);
-    if (typeof base64 !== 'string' || base64 === '') {
+    const dataUrl = await injectWithArgs<string>(tabId, fetchInPage as never, [imageUrl]);
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
       return null;
     }
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    return await decode(new Blob([bytes]));
+    // data: URL 不走網路，這個 fetch 只是把它變回位元組（截圖那一段也是這樣做的）
+    return await decode(await (await fetch(dataUrl)).blob());
   } catch {
     return null;
   }
