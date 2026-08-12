@@ -1,5 +1,5 @@
 import { broadcast } from '@/shared/messages';
-import { isSamePage, urlKey } from '@/shared/url';
+import { urlKey } from '@/shared/url';
 import { getSettings } from '@/storage/settings';
 import { deleteThumb, putThumb } from '@/storage/thumbs-db';
 import {
@@ -9,31 +9,13 @@ import {
   screenshotThumbnailFor,
 } from './capture';
 import { fetchOgThumbnail } from './og-fetcher';
+import { findOpenTabResolving } from './open-tab';
 import { findVaultBookmarkById, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
 
 export interface RefreshReport {
   ok: boolean;
   detail: string;
-}
-
-/**
- * 找出這個網址現在有沒有開著的分頁。
- *
- * **刻意不用 `tabs.query({ url })`。** match pattern 的兩個硬性限制會讓它對很常見
- * 的網址直接丟 `Invalid url pattern`：主機不能帶連接埠、而且一定要有路徑。
- * 實測踩到的兩個都是日常網址 —— `https://news.ycombinator.com/`（去掉尾端斜線
- * 就沒有路徑了）與 `http://127.0.0.1:8899/`（帶連接埠）。改成把分頁全部拿回來
- * 自己比對，判準與縮圖鍵一致（`isSamePage`），沒有語法上的地雷。
- *
- * 這也與 `capture.ts` 找分頁的做法一致 —— 兩邊對「同一頁」的定義本來就該一樣。
- */
-async function findOpenTab(url: string): Promise<number | undefined> {
-  const tabs = await browser.tabs.query({});
-  const target = tabs.find(
-    (tab) => tab.id !== undefined && tab.url !== undefined && isSamePage(tab.url, url),
-  );
-  return target?.id;
 }
 
 /**
@@ -58,10 +40,13 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
   // 已經不存在的圖，重抓失敗時更會讓人以為「還在，只是沒更新」。
   broadcast('thumbs/updated', { key });
 
-  const openTabId = await findOpenTab(url);
-  if (openTabId !== undefined) {
+  // 使用者是明確按下去的，所以找不到時值得多花一個請求解析轉址：書籤存 http、
+  // 分頁停在 https（或首頁被轉到語系路徑）時，頁面明明開著，而失敗訊息卻會叫他
+  // 「先開啟那個頁面」—— 那句話會讓人反覆試同一件事
+  const open = await findOpenTabResolving(url, true);
+  if (open !== undefined) {
     const settings = await getSettings();
-    const produced = await produceThumbnailNow(openTabId, url, key, settings.previewSource);
+    const produced = await produceThumbnailNow(open.tabId, open.pageUrl, key, settings.previewSource);
     return produced
       ? { ok: true, detail: t('refresh_done') }
       : { ok: false, detail: t('refresh_no_cover_on_page') };
@@ -127,16 +112,21 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
    *
    * 兩者都只回傳位元組，由 `store` 加密寫入，明文不落地。
    */
-  const openTabId = await findOpenTab(url);
-  if (openTabId !== undefined) {
+  /*
+   * `remember: false` —— 隱私書籤的網址不准寫進 `storage.local`。解析轉址的結果
+   * 只留在記憶體裡、用完就丟（`storage/redirect-map.ts` 開頭寫了同一條規則）。
+   * 一般書籤那條路記，隱私空間這條不記，與診斷（`recordCapture`）完全一樣的取捨。
+   */
+  const open = await findOpenTabResolving(url, false);
+  if (open !== undefined) {
     const { previewSource } = await getSettings();
     const order: ('cover' | 'capture')[] =
       previewSource === 'cover-first' ? ['cover', 'capture'] : ['capture', 'cover'];
     for (const attempt of order) {
       const thumbnail =
         attempt === 'cover'
-          ? await coverThumbnailFor(openTabId, url)
-          : await screenshotThumbnailFor(openTabId, url);
+          ? await coverThumbnailFor(open.tabId, open.pageUrl)
+          : await screenshotThumbnailFor(open.tabId, open.pageUrl);
       if (thumbnail !== null) {
         await store(thumbnail);
         return { ok: true, detail: t('refresh_done') };
@@ -152,7 +142,7 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
     return {
       ok: false,
       detail:
-        openTabId !== undefined
+        open !== undefined
           ? t('refresh_no_cover_no_server')
           : t('refresh_no_tab_no_server'),
     };

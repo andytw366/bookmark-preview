@@ -2,7 +2,7 @@ import { broadcast } from '@/shared/messages';
 import { urlKey } from '@/shared/url';
 import { recordCapture } from '@/storage/diagnostics';
 import { putThumb } from '@/storage/thumbs-db';
-import { isBookmarked } from './bookmark-index';
+import { matchBookmark, resolveBookmarkForPage } from './bookmark-index';
 import { grabImage } from './image-grab';
 import { findVaultBookmarkByUrl, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
@@ -73,12 +73,21 @@ async function applyManualCover(
       return;
     }
 
-    if (!(await isBookmarked(pageUrl))) {
+    /*
+     * 用書籤自己的網址算鍵，不是這一頁的網址。
+     *
+     * 這條路一樣會被轉址擋掉：書籤存 `http://`、頁面停在 `https://` 時，
+     * 原本會記成 `manual:not-bookmarked` —— 使用者對著自己的書籤右鍵指定圖片，
+     * 卻被告知「這一頁沒有加入書籤」。連手動這條救命路都沒了。
+     */
+    const match =
+      tabId === undefined ? await matchBookmark(pageUrl) : await resolveBookmarkForPage(pageUrl, tabId);
+    if (match === null) {
       await recordCapture({ ...stamp, stage: 'manual:not-bookmarked' });
       return;
     }
 
-    const key = await urlKey(pageUrl);
+    const key = await urlKey(match.bookmarkUrl);
     await putThumb({
       key,
       ...thumbnail,

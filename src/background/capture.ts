@@ -4,7 +4,8 @@ import { hostnameOf, isPreviewableUrl, normalizeUrl, urlKey } from '@/shared/url
 import { recordCapture, type CaptureStage } from '@/storage/diagnostics';
 import { getSettings, isBlocked } from '@/storage/settings';
 import { getThumb, putThumb } from '@/storage/thumbs-db';
-import { isBookmarked } from './bookmark-index';
+import { resolveBookmarkForPage } from './bookmark-index';
+import { findOpenTabResolving } from './open-tab';
 import { noteDeclaredImages } from '@/storage/site-image-stats';
 import { coverCandidatesFromTab, DECLARED_THRESHOLD, SITE_WIDE_PENALTY } from './cover';
 import { grabCoverThumbnail } from './cover-grab';
@@ -24,7 +25,7 @@ const pending = new Map<number, ReturnType<typeof setTimeout>>();
 
 export function startCapturePipeline(): void {
   browser.tabs.onUpdated.addListener(handleUpdate);
-  browser.tabs.onRemoved.addListener(cancel);
+  browser.tabs.onRemoved.addListener(forget);
   browser.bookmarks.onCreated.addListener(handleBookmarkCreated);
 }
 
@@ -83,20 +84,16 @@ async function captureForNewBookmark(node: browser.bookmarks.BookmarkTreeNode): 
     return;
   }
 
-  const tabs = await browser.tabs.query({});
-  const target = tabs.find(
-    (tab) =>
-      tab.id !== undefined &&
-      tab.incognito !== true &&
-      tab.url !== undefined &&
-      normalizeUrl(tab.url) === normalizeUrl(url),
-  );
-  if (target?.id === undefined) {
+  // 與右鍵重抓共用同一套「這一頁開著沒」的判斷（含協定差異與已知的轉址目標）——
+  // 兩邊各寫一份的話，放寬了一邊、另一邊還是抓不到，症狀完全看不出來
+  const target = await findOpenTabResolving(url, true);
+  if (target === undefined) {
     await skip('skipped:not-open', url, t('capture_detail_not_open'));
     return;
   }
 
-  await produceThumbnailNow(target.id, url, key, settings.previewSource);
+  // 往下傳分頁停在的那個網址（`target.pageUrl`），鍵用書籤的 —— 理由見 `OpenTab`
+  await produceThumbnailNow(target.tabId, target.pageUrl, key, settings.previewSource);
 }
 
 function cancel(tabId: number): void {
@@ -163,22 +160,31 @@ async function schedule(tabId: number, tab: browser.tabs.Tab): Promise<void> {
     await skip('skipped:blocklisted', url);
     return;
   }
-  if (!(await isBookmarked(url))) {
+  /*
+   * 用**書籤自己的網址**算鍵，不是分頁這個網址。
+   *
+   * 書籤存 `http://x/`、分頁停在 `https://x/`（或首頁被轉到語系路徑）是很常見的，
+   * 而縮圖要能被那個書籤讀到，就必須寫在它的鍵上。配不上時借這個分頁解析一次轉址
+   * —— 頁面就在眼前，那是唯一能拿到「帶 cookie 與語系的轉址結果」的地方。
+   */
+  const match = await resolveBookmarkForPage(url, tabId);
+  if (match === null) {
     await skip('skipped:not-bookmarked', url);
     return;
   }
 
-  const key = await urlKey(url);
+  const key = await urlKey(match.bookmarkUrl);
   const existing = await getThumb(key);
   const maxAge = settings.thumbMaxAgeDays * DAY_MS;
   // 只有「自動產生的」縮圖才會因為過期而重抓。手動補抓的 og 圖不主動覆蓋。
   const autoSource = existing?.source === 'capture' || existing?.source === 'cover';
-  if (autoSource && Date.now() - existing.capturedAt < maxAge) {
+  if (autoSource && !justCaptured(tabId, key) && Date.now() - existing.capturedAt < maxAge) {
     await skip('skipped:fresh', url);
     return;
   }
 
   cancel(tabId);
+  remember(tabId, key);
   pending.set(
     tabId,
     setTimeout(() => {
@@ -186,6 +192,43 @@ async function schedule(tabId: number, tab: browser.tabs.Tab): Promise<void> {
       void produceThumbnailNow(tabId, url, key, settings.previewSource);
     }, SETTLE_MS),
   );
+}
+
+/**
+ * 剛才才為這個分頁抓過同一個鍵。
+ *
+ * 為什麼需要這個例外：**不少站台會先給一頁 JS 檢查或閃屏，再自己導向真正的內容。**
+ * 那一頁載入完成得比誰都快，於是抓到的是「瀏覽器安全檢查中…」而不是內容；等真正的
+ * 頁面載入完成時，剛才那張截圖已經是「很新的縮圖」，於是 `skipped:fresh` 把它釘住
+ * 整整 `thumbMaxAgeDays` 天。實測 eyny 論壇就是這樣（它的檢查頁還會導向同一個網址，
+ * 所以連換頁都看不出來）。
+ *
+ * 判準刻意不去猜「這一頁是不是檢查頁」（那要看內容，而且怎麼猜都會有例外）：
+ * 只要「同一個分頁、同一個鍵、剛才才抓過」就允許再抓一次，後到的那張蓋掉先前的。
+ * 一次瀏覽最多多抓幾張，而且每一張都覆蓋同一個鍵，不會累積。
+ */
+const RECAPTURE_WINDOW_MS = 60_000;
+
+const recent = new Map<number, { key: string; at: number }>();
+
+function remember(tabId: number, key: string): void {
+  recent.set(tabId, { key, at: Date.now() });
+}
+
+function justCaptured(tabId: number, key: string): boolean {
+  const last = recent.get(tabId);
+  return last !== undefined && last.key === key && Date.now() - last.at < RECAPTURE_WINDOW_MS;
+}
+
+/**
+ * 分頁關掉了。
+ *
+ * 與 `cancel` 分開：`cancel` 也用在「又開始載入」那條路上，而**那正是檢查頁導向真正
+ * 內容的時候** —— 在那裡把記錄清掉，上面那個例外就永遠不會生效。
+ */
+function forget(tabId: number): void {
+  cancel(tabId);
+  recent.delete(tabId);
 }
 
 /**

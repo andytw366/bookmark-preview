@@ -12,6 +12,13 @@ import { describe, expect, it } from 'vitest';
  * 用靜態檢查而不是單元測試，是因為這幾個模組都要 `browser.*` 才跑得起來
  * （與 `vault-locking.test.ts`、`vault-autolock.test.ts` 同一個理由）。
  */
+/**
+ * 取出函式體，**並把註解消掉**。
+ *
+ * 註解一定會提到 `recordCapture`、`putThumb` 這些名字 —— 那正是在說明為什麼不准用
+ * 它們。不消掉的話，寫下規則的那句話自己就會讓檢查失敗（改一個字就變綠也一樣糟：
+ * 那時檢查等於沒有在看程式碼）。
+ */
 function bodyOf(source: string, signature: string): string {
   const start = source.indexOf(signature);
   expect(start, `找不到 ${signature}`).toBeGreaterThan(-1);
@@ -22,11 +29,15 @@ function bodyOf(source: string, signature: string): string {
     } else if (source[index] === '}') {
       depth -= 1;
       if (depth === 0) {
-        return source.slice(start, index + 1);
+        return withoutComments(source.slice(start, index + 1));
       }
     }
   }
   throw new Error(`${signature} 的函式體沒有結束`);
+}
+
+function withoutComments(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
 describe('隱私書籤的縮圖', () => {
@@ -70,5 +81,19 @@ describe('隱私書籤的縮圖', () => {
     const body = bodyOf(refresh, 'export async function refreshVaultThumbnail');
     expect(body).not.toContain('recordCapture');
     expect(body).not.toContain('skip(');
+  });
+
+  /**
+   * 轉址表（`storage/redirect-map.ts`）是同一個問題的新入口：它把
+   * 「書籤網址 → 最終網址」寫進 `storage.local`，對隱私書籤來說那等於把藏起來的
+   * 網址留在磁碟上。解析本身可以做（頁面就在眼前），但結果只能留在記憶體裡，
+   * 所以那條路必須傳 `remember: false`。
+   *
+   * 傳成 true 不會有任何錯誤 —— 功能完全正常，只有去翻 storage 才會發現。
+   */
+  it('隱私空間的重抓不把轉址結果寫進磁碟', () => {
+    const body = bodyOf(refresh, 'export async function refreshVaultThumbnail');
+    expect(body).not.toContain('rememberRedirect');
+    expect(body).toContain('findOpenTabResolving(url, false)');
   });
 });

@@ -24,7 +24,8 @@ import type {
   WrappedKey,
 } from '@/shared/types';
 import { createSerialQueue } from '@/shared/serial-queue';
-import { normalizeUrl, urlKey, VAULT_THUMB_PREFIX, vaultThumbKey } from '@/shared/url';
+import { urlKey, VAULT_THUMB_PREFIX, vaultThumbKey } from '@/shared/url';
+import { isSamePageIgnoringScheme } from '@/shared/url-match';
 import { backupFilename, buildBackup, parseBackup } from '@/shared/vault-backup';
 import { planFolderExport, planFolderImport } from '@/shared/vault-subtree';
 import {
@@ -1020,10 +1021,11 @@ export function findVaultBookmarkByUrl(url: string): PrivateBookmark | null {
   if (payload === null) {
     return null;
   }
-  const target = normalizeUrl(url);
+  // 容許 http/https 的差異（`shared/url-match.ts`）：隱私書籤存的網址一樣可能是
+  // 多年前的 http，而頁面早就轉到 https —— 嚴格比對會讓右鍵手動指定對它完全失效
   return (
     payload.bookmarks.find(
-      (record) => record.deleted !== true && normalizeUrl(record.url) === target,
+      (record) => record.deleted !== true && isSamePageIgnoringScheme(record.url, url),
     ) ?? null
   );
 }

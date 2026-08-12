@@ -76,6 +76,21 @@ switches to the `thumbs/get` message when `browser.extension.inIncognitoContext`
 and keeps the fast path everywhere else. (Vault thumbnails were always fine, because that
 path already asks the background page for bytes.)
 
+**Matching a page to a bookmark is wide; the thumbnail key stays narrow.** A bookmark's URL
+is often not where the browser ends up — an `http://` bookmark from years ago, a site root
+that redirects to a locale path. `shared/url-match.ts` therefore matches across the
+http/https difference and across redirects it has resolved, while `normalizeUrl` — which
+doubles as the thumbnail key via `urlKey` — is left exactly as it was: widening it would
+strand every thumbnail already on disk. Once a page matches, the key must come from **the
+bookmark's** URL, not the tab's, or the thumbnail lands somewhere that bookmark will never
+read. `open-tab.ts` returns both URLs in one object (`OpenTab`) so the two cannot be
+confused: the tab's URL is what tells `coverThumbnailFor` whether the user has navigated
+away, and passing the bookmark's URL there makes it decide they have, every time, silently.
+
+Resolving a redirect has to happen **inside the page**, never from the background page:
+`https://poedb.tw/` lands on `/tw/` with the user's cookies and on `/us/` without them, so
+a cookieless background request answers a different question than the one being asked.
+
 **Cache invalidation is subscribed at the cache's own layer, not in a component.** Every
 path that writes or deletes a thumbnail broadcasts `thumbs/updated` (or `thumbs/cleared`),
 but a broadcast is only worth as much as its listener: `sidebar/lib/thumb-cache.ts` holds
