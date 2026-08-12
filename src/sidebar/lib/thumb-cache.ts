@@ -1,3 +1,4 @@
+import { subscribe } from '@/shared/messages';
 import type { ThumbSource } from '@/shared/types';
 
 /** 已經解好、可以直接掛到 `<img src>` 的縮圖。 */
@@ -122,6 +123,36 @@ export function invalidateAllThumbs(): void {
     entry.stale = true;
   }
 }
+
+/*
+ * 作廢的來源就在這一層，不在元件裡。
+ *
+ * 這兩則廣播原本是 `useThumb` / `VaultThumb` 在 `useEffect` 裡訂閱的，於是**只有
+ * 掛載中的那幾列聽得到**。但這份快取活得比元件久（模組層狀態，而虛擬滾動一直在
+ * 掛載／卸載同一批列），那個差別會變成一個不會有任何錯誤的缺陷：
+ *
+ *   1. 看過那一列 → 快取記下「這個 key 沒有縮圖」（`image: null`，與「還沒查過」不同）
+ *   2. 捲走或換搜尋 → 元件卸載，訂閱跟著消失，但那筆答案留著
+ *      （`releaseThumb` 只減佔用數，不刪內容 —— 那正是它存在的理由）
+ *   3. 補抓成功 → 寫進 IndexedDB → 廣播 → **沒有人在聽**
+ *   4. 再看那一列 → `holdThumb` 回傳 null（不是 undefined）→ 呼叫端判定「快取有答案」
+ *      就不去讀資料庫了 → 圖明明在 IndexedDB 裡，畫面永遠是色卡，
+ *      要關掉側邊欄重開（清空模組層快取）才會出現
+ *
+ * 手動右鍵重抓之所以看起來正常，是因為那時那一列剛好掛載中。
+ *
+ * 訂閱一次、不解除：這是模組層的狀態，生命週期就是這個頁面的生命週期。掛載中的
+ * 元件仍然各自訂閱同一則廣播去重讀 —— 那是「重繪」，這裡管的是「作廢」。順序也是
+ * 對的：這兩行在 import 時就跑完，早於任何元件掛載，所以廣播落在某一列的初次讀取
+ * 途中時，那一列的 `holdThumb` 也已經看得到過時標記。
+ */
+subscribe('thumbs/updated', ({ key }) => {
+  invalidateThumb(key);
+});
+
+subscribe('thumbs/cleared', () => {
+  invalidateAllThumbs();
+});
 
 function revoke(image: CachedImage | null): void {
   if (image !== null) {

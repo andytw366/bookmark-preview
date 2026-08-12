@@ -76,6 +76,17 @@ switches to the `thumbs/get` message when `browser.extension.inIncognitoContext`
 and keeps the fast path everywhere else. (Vault thumbnails were always fine, because that
 path already asks the background page for bytes.)
 
+**Cache invalidation is subscribed at the cache's own layer, not in a component.** Every
+path that writes or deletes a thumbnail broadcasts `thumbs/updated` (or `thumbs/cleared`),
+but a broadcast is only worth as much as its listener: `sidebar/lib/thumb-cache.ts` holds
+module-level state that outlives the rows, which virtual scrolling mounts and unmounts
+constantly, so it subscribes once at import time and never unsubscribes. When that
+subscription lived in `useThumb`'s effect instead, a "this bookmark has no thumbnail" entry
+recorded for a row that later scrolled away was never invalidated — a successful backfill
+wrote the image to IndexedDB, nobody was listening, and the row kept painting a colour card
+until the sidebar was closed and reopened. Components still subscribe to the same broadcast,
+but only to re-read and repaint themselves.
+
 **Lock state cannot be determined from broadcasts alone.** When the MV3 event page is
 unloaded the in-memory key simply disappears — effectively locking — but no code runs on
 that path, so **no `vault/changed` broadcast is sent**. The UI would keep showing

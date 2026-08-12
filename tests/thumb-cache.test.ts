@@ -10,18 +10,48 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * 模組狀態是全域的（就是重點：跨元件共用），每個案例前重新載入一次。
  */
 type Cache = typeof import('@/sidebar/lib/thumb-cache');
+type Messages = typeof import('@/shared/messages');
 
 let cache: Cache;
+let messages: Messages;
 let revoked: string[];
+let listeners: ((message: unknown) => unknown)[];
 
 beforeEach(async () => {
   revoked = [];
+  listeners = [];
   // 只換掉這一個方法：整個 URL 換成物件字面量會讓它不再是建構子
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation((src: string) => {
     revoked.push(src);
   });
+  /*
+   * 假的 `browser.runtime`：`sendMessage` 直接把訊息交給註冊的監聽器。
+   *
+   * 這樣就能走**真的**協定（`broadcast` → 信封 → `subscribe`）而不是在測試裡
+   * 手抄一份信封格式 —— 抄的那份漂走時，測試會繼續全綠。
+   */
+  vi.stubGlobal('browser', {
+    runtime: {
+      onMessage: {
+        addListener: (fn: (message: unknown) => unknown) => {
+          listeners.push(fn);
+        },
+        removeListener: (fn: (message: unknown) => unknown) => {
+          listeners = listeners.filter((each) => each !== fn);
+        },
+      },
+      sendMessage: (message: unknown) => {
+        for (const fn of [...listeners]) {
+          fn(message);
+        }
+        return Promise.resolve(undefined);
+      },
+    },
+  });
   vi.resetModules();
+  // 順序有意義：thumb-cache 在 import 時就掛上它的監聽器，要先有上面那個 stub
   cache = await import('@/sidebar/lib/thumb-cache');
+  messages = await import('@/shared/messages');
 });
 
 const image = (src: string) => ({ src, width: 320, height: 180, source: 'capture' as const });
@@ -138,6 +168,71 @@ describe('縮圖快取', () => {
       cache.storeThumb('a', null);
       expect(revoked).toContain('blob:a');
       expect(cache.peekThumb('a')).toBeNull();
+    });
+  });
+
+  /**
+   * 作廢要和快取同一層。
+   *
+   * 這幾條釘的是一個**不會有任何錯誤**的缺陷：作廢原本靠元件在 `useEffect` 裡訂閱，
+   * 只有掛載中的那幾列聽得到。於是「看過那一列 → 捲走 → 補抓成功 → 再看那一列」
+   * 會停在色卡上，因為快取裡那筆「這個書籤沒有縮圖」沒有人去作廢，而呼叫端一命中
+   * 快取就不讀 IndexedDB 了。圖在資料庫裡，畫面上沒有，關掉側邊欄重開才會出現。
+   *
+   * 所以這裡刻意**不掛任何元件**，只發廣播。
+   */
+  describe('廣播來的作廢（不依賴任何元件掛載中）', () => {
+    it('沒有人在用那個 key 時，補抓的廣播照樣讓它過時', () => {
+      // 「查過了、這個書籤沒有縮圖」—— 缺陷卡住的就是這一筆
+      cache.storeThumb('a', null);
+      expect(cache.peekThumb('a')).toBeNull();
+
+      messages.broadcast('thumbs/updated', { key: 'a' });
+
+      // undefined 是「要重讀一次」。留成 null 的話呼叫端會判定「快取有答案」
+      expect(cache.peekThumb('a')).toBeUndefined();
+    });
+
+    it('已經有圖的那筆也一樣會過時 —— 補抓可能換成另一張', () => {
+      cache.storeThumb('a', image('blob:old'));
+      messages.broadcast('thumbs/updated', { key: 'a' });
+      expect(cache.peekThumb('a')).toBeUndefined();
+    });
+
+    it('只動廣播指名的那個 key —— 一則通知不該讓整份快取重讀', () => {
+      cache.storeThumb('a', image('blob:a'));
+      cache.storeThumb('b', image('blob:b'));
+
+      messages.broadcast('thumbs/updated', { key: 'a' });
+
+      expect(cache.peekThumb('a')).toBeUndefined();
+      expect(cache.peekThumb('b')).toEqual(image('blob:b'));
+    });
+
+    it('「清除所有預覽圖」的廣播讓全部過時', () => {
+      cache.storeThumb('a', image('blob:a'));
+      cache.storeThumb('b', null);
+
+      messages.broadcast('thumbs/cleared', undefined);
+
+      expect(cache.peekThumb('a')).toBeUndefined();
+      expect(cache.peekThumb('b')).toBeUndefined();
+    });
+
+    it('不撤銷正在顯示的 object URL —— 那一列還沒重繪，撤銷就是破圖', () => {
+      cache.storeThumb('a', image('blob:a'));
+      cache.holdThumb('a');
+
+      messages.broadcast('thumbs/updated', { key: 'a' });
+
+      expect(revoked).not.toContain('blob:a');
+    });
+
+    it('不是自己的訊息一概不理 —— 兩個 channel 都掛在同一個 onMessage 上', () => {
+      cache.storeThumb('a', image('blob:a'));
+      // 請求（不是事件）與別的事件都不該碰到快取
+      messages.broadcast('bookmarks/invalidated', undefined);
+      expect(cache.peekThumb('a')).toEqual(image('blob:a'));
     });
   });
 

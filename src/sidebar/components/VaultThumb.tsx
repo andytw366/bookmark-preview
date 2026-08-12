@@ -3,8 +3,6 @@ import { request, subscribe } from '@/shared/messages';
 import { hueFromString, initialOf, vaultThumbKey } from '@/shared/url';
 import {
   holdThumb,
-  invalidateAllThumbs,
-  invalidateThumb,
   peekThumb,
   releaseThumb,
   storeThumb,
@@ -69,17 +67,18 @@ export function VaultThumb({ id, hostname }: VaultThumbProps) {
      * 寫進去了，也廣播了，但這個元件只在掛載時取過一次 —— 畫面永遠停在舊圖
      * （或色卡），看起來像抓取失敗。一般書籤那邊由 `useThumb` 訂閱，
      * 隱私書籤這條路當初漏掉了。
+     *
+     * 作廢快取不在這裡做，由 `thumb-cache` 自己訂閱同一則廣播 —— 這裡的訂閱只在
+     * 掛載中有效，而快取活得比元件久（見那邊的說明）。這一段管的是「重繪」。
      */
     const unsubscribe = subscribe('thumbs/updated', (payload) => {
       if (payload.key === key) {
-        invalidateThumb(key);
         load();
       }
     });
 
     // 「清除所有預覽圖」是一次清空，不會逐一廣播 thumbs/updated
     const unsubscribeCleared = subscribe('thumbs/cleared', () => {
-      invalidateAllThumbs();
       load();
     });
 

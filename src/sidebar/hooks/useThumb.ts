@@ -4,8 +4,6 @@ import { urlKey } from '@/shared/url';
 import { getThumb } from '@/storage/thumbs-db';
 import {
   holdThumb,
-  invalidateAllThumbs,
-  invalidateThumb,
   knownDigest,
   peekThumb,
   rememberDigest,
@@ -117,6 +115,8 @@ export function useThumb(url: string): LoadedThumb | null {
 
     void load();
 
+    // 作廢快取是 `thumb-cache` 自己訂閱同一則廣播做的（它的狀態活得比元件久）；
+    // 這裡只負責讓**掛載中**的這一列重讀並重繪。
     const unsubscribe = subscribe('thumbs/updated', (payload) => {
       // key 還沒算出來時無法比對，那就一律重讀 —— 這個視窗很短（一個
       // microtask 加一次 IndexedDB 讀取），但重抓速度快時廣播真的可能落在裡面，
@@ -125,14 +125,10 @@ export function useThumb(url: string): LoadedThumb | null {
       if (key !== undefined && payload.key !== key) {
         return;
       }
-      if (key !== undefined) {
-        invalidateThumb(key);
-      }
       void load();
     });
 
     const unsubscribeCleared = subscribe('thumbs/cleared', () => {
-      invalidateAllThumbs();
       void load();
     });
 
