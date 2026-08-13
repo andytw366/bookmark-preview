@@ -6,7 +6,7 @@ limited to 3000 characters**, so this is deliberately terse — run
 
 > 這份刻意用英文寫：它唯一的讀者是 Mozilla 的審查員。
 >
-> **目前只剩 4 個字元的餘裕（2996 / 3000）。要加東西就得先砍掉等量的東西。**
+> **目前只剩 2 個字元的餘裕（2998 / 3000）。要加東西就得先砍掉等量的東西。**
 >
 > 1.1.0 加了三段之後爆掉 1498 字元，削了七輪才進去 —— 一句一句削效率極差，
 > 直接砍掉一整段才有用。最後砍的是「Encryption」那一節：它描述的是 1.0.0 已經審過、
@@ -16,18 +16,23 @@ limited to 3000 characters**, so this is deliberately terse — run
 > **不要為了塞新內容去砍這三段**：三個 lint 警告的解釋、`runtime.reload()` 的理由、
 > 建置指令。它們各自替審查員省下一次來回提問，砍掉換來的是審查變慢。
 >
+> 1.1.1 要加「頁面內下載」與「HEAD 解析轉址」兩件事，額度是這樣挪出來的：
+> **「New in」那一節整個換掉**，1.1.0 的三條全部刪除。那三條描述的是**已經審過**的版本，
+> 對這次更新審查毫無用處 —— 每次改版都該這樣做，那一節寫的是「這次改了什麼」。
+>
 > 每次改版要更新的是「New in」那一節 —— 更新審查最先看的就是那裡。
 
 ---
 
-## New in 1.1.0
+## New in 1.1.1
 
-No new permissions, APIs or deps.
+Fixes only. No new permissions, APIs or deps: both additions below use `scripting` and
+`<all_urls>`, already held, on a page the user has open.
 
-- English interface; strings moved to `_locales/` (`en`, `zh_TW`), `default_locale` `en`.
-- Preview lookup reads more of the page it already fetches — see below.
-- Vault bookmarks may fall back to a screenshot (`tabs.captureVisibleTab`, already used for
-  ordinary ones), encrypted on the way in — no plaintext thumbnail is stored.
+- The cover image may now be fetched **from inside that page** (`scripting.executeScript`,
+  the injected function returning a `data:` URL).
+- One `HEAD` request, also from the page, to see where a bookmark's URL redirects, so one
+  saved as `http://` still matches the tab.
 
 ## Source and build
 
@@ -60,18 +65,18 @@ and ReactDOM are the only runtime dependencies, both bundled.
 
 ## Network requests
 
-Two, both `credentials: 'omit'`, both to build a preview: the bookmark's own URL, then the
-cover image it declares — often the site's CDN, the one host contacted that the user did
-not bookmark, and always a URL taken from the bookmarked page.
+All to build a preview. Every URL is the bookmark's own or one its page declares
+(`og:image`, JSON-LD, `<video poster>`, a player's `poster=`); http(s) only.
 
-All of it is `src/background/og-fetcher.ts`. Candidates come from `og:image`,
-`twitter:image`, `link[rel=image_src]`, JSON-LD, `<video poster>`, and a player's
-`poster=`-style query parameter — that last one new in 1.1.0, found by scanning the HTML as
-text because such URLs often sit in serialised page data rather than an attribute. A
-candidate is used only if absolute http(s) and the response is `image/*`.
+- The bookmarked URL, `credentials: 'omit'`, when no tab has it open (`og-fetcher.ts`).
+- The cover image, from the background page or the page (`image-grab.ts`).
+  This one sends cookies: an extension cannot set a cross-origin `Referer`, so a CDN that
+  checks it answers 403 however the background page asks. The host is the one the page just
+  loaded that image from; only bytes are read.
+- `HEAD` on the bookmarked URL, from the page, to resolve redirects.
 
 **Nothing is uploaded; there is no developer endpoint.** Bookmarks, thumbnails and the
-vault stay on the device, except through Firefox Sync — user-enabled, and AES-256-GCM
+vault stay on the device, except through Firefox Sync — user-enabled, AES-256-GCM
 ciphertext only (`src/crypto/`; the key never touches disk).
 
 ## Optional permissions

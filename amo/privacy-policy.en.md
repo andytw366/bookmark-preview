@@ -55,7 +55,10 @@ so you can use it on your own other devices. On this path:
 "Fetch missing previews" and "Refresh preview" connect to **the bookmark's own URL** to
 read the page's cover image (`og:image` and similar). This is an ordinary web request,
 equivalent to you opening that URL yourself; it goes only to that site, with no
-intermediary server. You can exclude specific sites under "Domains to skip" in settings.
+intermediary server. When the page is open in a tab, the request for the image itself is
+made **from that page**, so it carries the same cookies the page used to load the image —
+some sites serve their images no other way. Nothing is sent anywhere else. You can exclude
+specific sites under "Domains to skip" in settings.
 
 ## Screenshots
 
