@@ -28,7 +28,13 @@ development 七份），[README.md](README.md) 只留簡介。
 **六條都處理完了，程式與送審文件都就緒。送審前的清單：**
 
 1. `npm run verify` 四項全綠（最後一次跑：266 項測試、`web-ext lint` 0 errors / 3 warnings）
-2. `npm run package` 產生 `bookmark-preview-vault-1.1.1.zip`
+2. `npm run package` 產生 `bookmark-preview-vault-1.1.1.zip`。
+   **一定要在正常的工作目錄打包，不要在 git worktree 裡打包** —— worktree 沒有自己的
+   `node_modules`，它解析到上層去，於是 source map 的 `sources` 會變成
+   `../../../../../node_modules/react/…` 而不是 `../../node_modules/react/…`。
+   程式碼本身一模一樣（24 個檔案只有那一個 `.map` 不同），但送審備註承諾的是
+   **逐檔相同**，審查員照著重建會對不上那一個檔案。2026-08-12 實測過：
+   把原始碼壓縮檔解開、`npm ci && npm run build`，差異就只有這一項。
 3. `npm run package:source` 產生原始碼壓縮檔（`git archive`，所以**要先 commit**）
 4. `python3 scripts/amo-paste.py` 產生四份可直接貼上的純文字，確認 reviewer notes ✓ 未超過 3000
 5. **截圖不必重拍** —— 1.1.1 全是修正，介面沒有任何變化
