@@ -135,6 +135,34 @@ bookmarks, thumbnails, preview, privacy, encryption
 
 ---
 
+## 版本說明（1.1.1）
+
+送審表單的「版本說明」欄，中英各一份。全部是修正，沒有新功能、沒有新權限。
+
+```
+・書籤網址被轉址時（多年前存的 http://、或會轉到語系路徑的首頁），現在仍然抓得到
+　預覽圖 —— 之前這種書籤怎麼按都不會有圖。
+・防盜連的封面現在抓得到：改在你正開著的那個頁面裡下載，帶得到該網站需要的資訊。
+・不再挑到版面裝飾、資訊流裡的第一張圖或輪播沒輪到的那幾張；這種頁面本來就沒有封面，
+　改用網站自己的 logo。
+・補抓成功後畫面沒更新、以及先跳出「安全檢查中」的網站被抓成檢查頁，都修好了。
+```
+
+```
+・Bookmarks whose URL redirects — one saved years ago as http://, or a site root
+  that redirects to a locale path — now get a preview at all. Previously nothing
+  you did would give them one.
+・Covers behind hotlink protection now work: the image is downloaded from inside
+  the page you already have open, which carries what the site expects.
+・Page decorations, the first image in a feed, and the carousel slides that are not
+  showing no longer win. Pages like these have no cover of their own, so the site's
+  own logo is used instead.
+・Fixed: previews not appearing after a successful backfill, and sites that show a
+  "checking your browser" page first being captured as that page.
+```
+
+---
+
 ## 版本說明（1.1.0）
 
 送審表單的「版本說明」欄，中英各一份。

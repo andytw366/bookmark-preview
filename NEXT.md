@@ -4,8 +4,8 @@
 （負向快取沒有作廢／自動路徑抓不到防盜連的圖／**書籤網址被轉址時三條路全斷** ——
 後兩條途中各挖出一個新缺陷：頁面內下載那段從來沒真正成功過、檢查頁被當成內容抓走），
 第 2 條結案為**不是缺陷**、第 6 條實際翻過 IndexedDB 驗完，全部實機複驗過。
-**送 1.1.1 之前唯一還要做的是更新 AMO 的 reviewer notes**，見下面「1.1.1 的待辦」。
-上架頁那句安全性警語不是缺陷，見「上架狀態」）
+AMO 的送審文件也更新完了，版本已經是 1.1.1 —— **剩下的就是實際送審**，
+清單見下面「1.1.1 的待辦」開頭。上架頁那句安全性警語不是缺陷，見「上架狀態」）
 
 給下一個 session 的交接文件。設計背景讀 [PLAN.md](PLAN.md)；操作與架構已拆成英文的
 [`docs/`](docs/)（architecture、vault、previews、interface、sync-and-backup、permissions、
@@ -25,8 +25,16 @@ development 七份），[README.md](README.md) 只留簡介。
 
 ## 1.1.1 的待辦（1.1.0 送審後整理，照這個順序做）
 
-**六條都處理完了，可以準備 1.1.1** —— 送審前唯一還要做的是更新 AMO reviewer notes
-（見缺陷 3 最後一段）。紀錄全部留著，修法的依據與「為什麼那不是缺陷」都在裡面，不要刪。
+**六條都處理完了，程式與送審文件都就緒。送審前的清單：**
+
+1. `npm run verify` 四項全綠（最後一次跑：266 項測試、`web-ext lint` 0 errors / 3 warnings）
+2. `npm run package` 產生 `bookmark-preview-vault-1.1.1.zip`
+3. `npm run package:source` 產生原始碼壓縮檔（`git archive`，所以**要先 commit**）
+4. `python3 scripts/amo-paste.py` 產生四份可直接貼上的純文字，確認 reviewer notes ✓ 未超過 3000
+5. **截圖不必重拍** —— 1.1.1 全是修正，介面沒有任何變化
+6. 送出後把「上架狀態」那一節的 `current_version` 更新
+
+紀錄全部留著，修法的依據與「為什麼那不是缺陷」都在裡面，不要刪。
 
 **三節特別值得讀**：缺陷 3 途中挖出「頁面內下載那段從來沒真正成功過」；缺陷 4 是使用者
 回報那四個站台的真正根因（與封面判定無關）；缺陷 5 回答了「什麼時候該用 logo、什麼時候
@@ -168,10 +176,10 @@ binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
 `grabImage(tabId, …)` 換成 `grabImage(undefined, …)`（＝舊行為，只有第一段）重新打包，
 同一個流程只剩 403 那一行，畫面退回整頁截圖 —— 正是缺陷原本的樣子。
 
-⬜ **還沒做**：`amo/reviewer-notes.md` 的「Network requests」那一節要更新才能送 1.1.1。
-現在自動路徑第一段帶 cookie（`credentials: 'include'`，與手動路徑一致，對象是頁面自己
-剛才就用同樣 cookie 載入過的圖），而那一節目前寫的是「兩個請求，都 `credentials: 'omit'`，
-全部在 `og-fetcher.ts`」。那個檔案只剩 4 個字元的額度（見檔案開頭），要換掉別的東西。
+✅ **AMO 的送審文件已經跟上**（2026-08-12）：`reviewer-notes.md` 的「New in」整段換成
+1.1.1、「Network requests」重寫成三種請求並說明為什麼帶 cookie；兩份隱私政策各補一句；
+`permissions.md` 的 `scripting` 不再只寫「讀已渲染的 DOM」。額度是把 1.1.0 那一節
+整個刪掉挪出來的 —— **那一節寫的是「這次改了什麼」，每次改版都該清空重寫，不是往下加。**
 
 ### 4. ✅ **書籤網址會被轉址時，三條路全部失效**（已修並實機複驗，2026-08-12）
 
