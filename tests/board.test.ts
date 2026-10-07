@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { applyOp, buildBoard, insertItems, labels, membersInOrder, type Board, type GridOp } from '@/shared/board';
+import {
+  applyOp,
+  buildBoard,
+  insertItems,
+  labels,
+  layoutGrid,
+  membersInOrder,
+  orderIndexAt,
+  type Board,
+  type GridOp,
+} from '@/shared/board';
 
 /**
  * 版面操作。順序用字串表示：一個字元一張卡片，大寫是資料夾（不能進群組）。
@@ -158,7 +168,7 @@ describe('其他', () => {
 
   it('沒有成員的群組消失；標籤在第一個成員那格', () => {
     const b = board('xab', { a: 'G', b: 'G' });
-    expect(labels(b).get(1)?.id).toBe('G');
+    expect(labels(b, layoutGrid(b)).get(1)?.id).toBe('G');
     expect(run(b, { kind: 'dissolve', groupId: 'G' }).groups).toEqual([]);
   });
 
@@ -174,5 +184,63 @@ describe('其他', () => {
     const flat = insertItems(b, ['a', 'b'], { id: 'G', name: '', color: 0 }, 1);
     expect(order(flat)).toBe('pabq');
     expect(groupOf(flat, 'a')).toBe('G');
+  });
+});
+
+/** 畫面的擺法畫成一列一行的字串，`.` 是空格 */
+const shown = (b: Board): string[] => {
+  const grid = layoutGrid(b);
+  const rows: string[] = [];
+  for (let i = 0; i < grid.cells.length; i += grid.columns) {
+    rows.push(Array.from({ length: grid.columns }, (_, c) => grid.cells[i + c] || '.').join(''));
+  }
+  return rows.map((row, index) => (index === rows.length - 1 ? row.replace(/\.+$/, '') : row));
+};
+
+describe('畫面的擺法：群組永遠是上下接著的一整塊', () => {
+  it('沒有群組就是照順序排滿', () => {
+    expect(shown(board('abcdef', {}, 4))).toEqual(['abcd', 'ef']);
+  });
+
+  it('放得下就在同一列', () => {
+    expect(shown(board('abGHcd', { G: 'g', H: 'g' }, 4))).toEqual(['abGH', 'cd']);
+  });
+
+  it('列尾放不下：剩下的接在正下方，後面的卡片填進左邊空出來的格子', () => {
+    // 順序 a b c G H I d e，4 欄：G 在第 3 欄，H I 接在下一列、從第 3 欄往左延伸到對齊列尾
+    expect(shown(board('abcGHIde', { G: 'g', H: 'g', I: 'g' }, 4))).toEqual(['abcG', 'deHI']);
+  });
+
+  it('下一截盡量從同一欄開始', () => {
+    expect(shown(board('abGHIJcdef', { G: 'g', H: 'g', I: 'g', J: 'g' }, 4))).toEqual(['abGH', 'cdIJ', 'ef']);
+  });
+
+  it('比一整列還長：一列一列往下疊', () => {
+    expect(shown(board('aGHIJKL', { G: 'g', H: 'g', I: 'g', J: 'g', K: 'g', L: 'g' }, 3))).toEqual([
+      'aGH',
+      'IJK',
+      'L',
+    ]);
+  });
+
+  it('框線：擺出來的群組是一整塊', async () => {
+    const { components } = await import('./helpers/components');
+    const b = board('abcGHIde', { G: 'g', H: 'g', I: 'g' }, 4);
+    expect(components(layoutGrid(b), new Set(['G', 'H', 'I']))).toBe(1);
+  });
+
+  it('畫面上的落點換成順序上的位置', () => {
+    const b = board('abcGHIde', { G: 'g', H: 'g', I: 'g' }, 4);
+    const grid = layoutGrid(b);
+    // 對準 d（畫面第 4 格）插在前面 = 順序上 d 的位置
+    expect(orderIndexAt(b, grid, 4, 'd', false)).toBe(6);
+    expect(orderIndexAt(b, grid, 4, 'd', true)).toBe(7);
+    // 最後面的空位
+    expect(orderIndexAt(b, grid, grid.cells.length, null, false)).toBe(8);
+  });
+
+  it('鍵盤往下：插到畫面上正下方那張的後面', () => {
+    const b = board('abcdef', {}, 4);
+    expect(order(run(b, { kind: 'nudge', id: 'b', direction: 'down' }))).toBe('acdefb');
   });
 });

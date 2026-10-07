@@ -192,8 +192,8 @@ open it in a normal window and write it to history. Only an internal type is set
 
 ### Groups (tags)
 
-A group is a **consecutive run** of bookmarks in one folder (in reading order), drawn as a
-coloured outline — a staircase shape where it wraps — with a small tag on the first member:
+A group is a **consecutive run** of bookmarks in one folder's order, drawn as **one
+connected block** with a coloured outline and a small tag on the first member:
 the name, or just a colour chip for an untitled group. **A named group is a tag**: names are
 unique per folder (trimmed, case-insensitive). A bookmark belongs to at most one group;
 folders never do.
@@ -209,6 +209,14 @@ folders never do.
 
 Nothing that is not a member can be inserted into the middle of a group: the drop point is
 pushed to the group's start or end, whichever is nearer, so a group always stays one run.
+
+**Placement on screen** (`layoutGrid` in `board.ts`) is computed from the order and the
+column count every time: cards go into the next free cell; a group fills what is left of
+its row and the remaining members continue on the next row **directly underneath**
+(starting in the same column where possible, extending left otherwise, always overlapping
+the part above), so the group never splits at a row end. Later cards flow into the free
+cells around it. Order and screen position therefore differ; drops are converted back
+(`orderIndexAt`), and arrow keys / `Ctrl+Shift+arrow` follow what is on screen.
 Each cell draws its own part of the outline (`outlineEdges`: a side is drawn when the
 neighbour is not in the same group), extending 8px into the gap so neighbours join.
 

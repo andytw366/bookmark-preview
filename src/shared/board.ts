@@ -21,7 +21,10 @@ import { t } from './i18n';
  * 使用者拍板的規則（2026-10-07，看過「固定格子＋不規則形狀」之後改的）：
  *
  * - 卡片緊密排列、不留空格；拖進來後面的讓位，拿走後面的往前補。
- * - **群組是閱讀順序上連續的一段**，框起來是階梯形。移動群組時整段搬、其他卡片自動讓位。
+ * - **群組是順序上連續的一段**，移動群組時整段搬、其他卡片自動讓位。
+ * - **畫面上群組永遠是上下接著的一整塊**：列尾放不下時，剩下的成員擺在下一列、接在上一截正下方，
+ *   後面的卡片繞著它填進空著的格子（`layoutGrid`）。所以「順序」與「畫面上第幾格」是兩回事：
+ *   資料只存順序，擺法每次照欄數算出來。
  * - **放進框線範圍內才加入**：放下時對準的是某個群組的成員（插在它前後、或疊在它中央）就加入那個群組；
  *   放在群組旁邊、框外都不加入。成員被拖到框外 = 離開。
  * - 不是成員的東西（散卡片、資料夾、別的群組）不能插進一個群組中間：落點會被推到那個群組的頭或尾
@@ -102,7 +105,7 @@ export function buildBoard(input: BoardInput): Board {
 export type GridOp =
   /** 拖拽放開：插在第 `at` 個位置（拿掉被拖的之前的索引）。`aimed` 是放下時對準的那張卡片（最後的空位是 null） */
   | { kind: 'place'; ids: string[]; at: number; aimed: string | null }
-  /** 鍵盤一次挪一格（與那一格的卡片換位，照「放進框線範圍內才加入」改成員資格） */
+  /** 鍵盤一次挪一格：插到畫面上那個方向的卡片前／後，照「放進框線範圍內才加入」改成員資格 */
   | { kind: 'nudge'; id: string; direction: Direction }
   /** 拖群組的標籤：整段搬到第 `at` 個位置（拿掉成員之前的索引），其他卡片讓位 */
   | { kind: 'move-group'; groupId: string; at: number }
@@ -249,10 +252,14 @@ export function applyOp(input: Board, op: GridOp, ctx: OpContext): Board {
       break;
     }
     case 'nudge': {
-      const from = indexOfId(board.grid, op.id);
-      const to = from === -1 ? null : stepCell(board.grid, from, op.direction);
-      if (to !== null) {
-        place(board, [op.id], to > from ? to + 1 : to, cells[to] ?? null, ctx);
+      const shown = layoutGrid(board);
+      const from = indexOfId(shown, op.id);
+      const to = from === -1 ? null : stepCell(shown, from, op.direction);
+      const target = to === null ? '' : (shown.cells[to] ?? '');
+      if (target !== '') {
+        const at = cells.indexOf(target);
+        // 往右、往下 = 插到那張的後面；往左、往上 = 前面
+        place(board, [op.id], op.direction === 'right' || op.direction === 'down' ? at + 1 : at, target, ctx);
       }
       break;
     }
@@ -400,11 +407,12 @@ function settle(board: Board): Board {
   return board;
 }
 
-/** 標籤所在的格子 → 群組。畫面用來把標籤貼在那一格的左上角 */
-export function labels(board: Board): Map<number, GroupInfo> {
+/** 標籤所在的格子（畫面上，`shown` = `layoutGrid`）→ 群組。標籤貼在第一個成員那一格的左上角 */
+export function labels(board: Board, shown: Grid): Map<number, GroupInfo> {
   const out = new Map<number, GroupInfo>();
   for (const group of board.groups) {
-    const cell = labelCell(board, group.id);
+    const first = board.grid.cells.find((id) => board.memberOf.get(id) === group.id);
+    const cell = first === undefined ? -1 : shown.cells.indexOf(first);
     if (cell !== -1) {
       out.set(cell, group);
     }
@@ -452,4 +460,122 @@ export function insertItems(input: Board, ids: readonly string[], group: GroupIn
     }
   }
   return settle(board);
+}
+
+/**
+ * 畫面上的擺法：照順序一張一張放進下一個空格；遇到群組就整塊放 ——
+ * 這一列從游標開始的空格放得下就放在這一列，放不下的成員擺到下一列、**接在上一截正下方**
+ * （盡量從同一欄開始，放不下就往左延伸，但一定和上一截有重疊），一列一列往下，直到放完。
+ * 之後的卡片從群組第一截後面繼續找空格，所以會填進群組左邊空出來的位置。
+ *
+ * 回傳的格子裡 `''` 是空格（群組被前一個群組卡住、找不到接得上的位置時才會出現，退回照順序放）。
+ * 純函式：同樣的順序與欄數，任何地方算出來都一樣 —— 拖拽的落點、鍵盤、框線都照它。
+ */
+export function layoutGrid(board: Board): Grid {
+  const columns = board.grid.columns;
+  const out: string[] = [];
+  const taken = (index: number): boolean => (out[index] ?? '') !== '';
+  const put = (index: number, id: string): void => {
+    while (out.length <= index) {
+      out.push('');
+    }
+    out[index] = id;
+  };
+  const nextFree = (from: number): number => {
+    let index = from;
+    while (taken(index)) {
+      index += 1;
+    }
+    return index;
+  };
+  const cells = board.grid.cells;
+  let cursor = 0;
+  for (let i = 0; i < cells.length; ) {
+    const id = cells[i] ?? '';
+    const group = board.memberOf.get(id);
+    if (group === undefined) {
+      cursor = nextFree(cursor);
+      put(cursor, id);
+      cursor += 1;
+      i += 1;
+      continue;
+    }
+    let j = i;
+    while (j < cells.length && board.memberOf.get(cells[j] ?? '') === group) {
+      j += 1;
+    }
+    const members = cells.slice(i, j);
+    i = j;
+
+    cursor = nextFree(cursor);
+    let row = Math.floor(cursor / columns);
+    const col = cursor % columns;
+    let width = 0;
+    while (col + width < columns && !taken(row * columns + col + width)) {
+      width += 1;
+    }
+    let placed = Math.min(members.length, width);
+    members.slice(0, placed).forEach((member, offset) => {
+      put(row * columns + col + offset, member);
+    });
+    cursor = row * columns + col + placed;
+    let previous: [number, number] = [col, col + placed - 1];
+    while (placed < members.length) {
+      row += 1;
+      // 這一列的空格段，挑和上一截重疊最多的那一段
+      let best: [number, number] | null = null;
+      let bestOverlap = 0;
+      for (let c = 0; c < columns; ) {
+        if (taken(row * columns + c)) {
+          c += 1;
+          continue;
+        }
+        let e = c;
+        while (e + 1 < columns && !taken(row * columns + e + 1)) {
+          e += 1;
+        }
+        const overlap = Math.min(e, previous[1]) - Math.max(c, previous[0]) + 1;
+        if (overlap > bestOverlap) {
+          best = [c, e];
+          bestOverlap = overlap;
+        }
+        c = e + 1;
+      }
+      if (best === null) {
+        // 接不上（下面被別的群組佔了）：剩下的照順序放進空格
+        for (const member of members.slice(placed)) {
+          const at = nextFree(row * columns);
+          put(at, member);
+        }
+        break;
+      }
+      const length = Math.min(members.length - placed, best[1] - best[0] + 1);
+      const start = Math.min(Math.max(previous[0], best[0]), best[1] - length + 1);
+      members.slice(placed, placed + length).forEach((member, offset) => {
+        put(row * columns + start + offset, member);
+      });
+      previous = [start, start + length - 1];
+      placed += length;
+    }
+  }
+  let end = out.length;
+  while (end > 0 && out[end - 1] === '') {
+    end -= 1;
+  }
+  return { columns, cells: out.slice(0, end) };
+}
+
+/**
+ * 畫面上的落點換成順序上的插入位置。
+ *
+ * - 對準一張卡片：`after` 為 false 插在它前面，true 插在它後面（順序上，不是畫面上的下一格）
+ * - 空格或最後面的空位：插在「畫面上在它之後的第一張卡片」前面；後面沒有卡片就是最後
+ */
+export function orderIndexAt(board: Board, shown: Grid, cell: number, aimed: string | null, after: boolean): number {
+  const cells = board.grid.cells;
+  if (aimed !== null && cells.includes(aimed)) {
+    return cells.indexOf(aimed) + (after ? 1 : 0);
+  }
+  const next = shown.cells.slice(cell).find((id) => id !== '');
+  return next === undefined ? cells.length : cells.indexOf(next);
 }

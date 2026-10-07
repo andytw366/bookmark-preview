@@ -17,8 +17,17 @@ import {
   vaultGroups,
   type VaultChild,
 } from '@/shared/vault-layout';
-import { buildBoard, labelCell, labels, membersInOrder, type Board, type GridOp } from '@/shared/board';
-import { MAX_COLUMNS, MIN_COLUMNS, navCell, outlineEdges, stepCell, type Direction } from '@/shared/grid';
+import {
+  buildBoard,
+  labelCell,
+  labels,
+  layoutGrid,
+  membersInOrder,
+  orderIndexAt,
+  type Board,
+  type GridOp,
+} from '@/shared/board';
+import { MAX_COLUMNS, MIN_COLUMNS, navCell, outlineEdges, stepCell, type Direction, type Grid } from '@/shared/grid';
 import type { GroupInfo } from '@/shared/groups';
 import { hostnameOf } from '@/shared/url';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
@@ -488,7 +497,9 @@ export function Gallery() {
   // 版面還在讀：先不畫，免得先畫一次沒有群組、欄數不對的再跳一下
   const bookmarkGridLoading = inFolderView && view.grid === undefined;
   const bookmarkCols = bookmarkBoard.grid.columns;
-  const bookmarkCellCount = bookmarkBoard.grid.cells.length + (inFolderView ? 1 : 0);
+  // 畫面的擺法（群組繞著擺成一整塊）：格子、拖拽落點、方向鍵、框線都照它
+  const bookmarkShown: Grid = layoutGrid(bookmarkBoard);
+  const bookmarkCellCount = bookmarkShown.cells.length + (inFolderView ? 1 : 0);
   const gridRows = useVirtualRows({
     count: bookmarkCellCount,
     columns: bookmarkCols,
@@ -505,7 +516,7 @@ export function Gallery() {
         count: bookmarkCellCount,
         columns: bookmarkCols,
         scrollToIndex: gridRows.scrollToIndex,
-        cells: { nav: (key, at) => navCell(bookmarkBoard.grid, at, key) },
+        cells: { nav: (key, at) => navCell(bookmarkShown, at, key) },
       },
     },
     gridRef,
@@ -524,7 +535,8 @@ export function Gallery() {
     groupOf: vaultGroupOf(view.layout),
   });
   const vaultCols = vaultBoard.grid.columns;
-  const vaultCellCount = vaultBoard.grid.cells.length + 1;
+  const vaultShown: Grid = layoutGrid(vaultBoard);
+  const vaultCellCount = vaultShown.cells.length + 1;
   const vaultGrid = useVirtualRows({
     count: vaultCellCount,
     columns: vaultCols,
@@ -541,7 +553,7 @@ export function Gallery() {
         count: vaultCellCount,
         columns: vaultCols,
         scrollToIndex: vaultGrid.scrollToIndex,
-        cells: { nav: (key, at) => navCell(vaultBoard.grid, at, key) },
+        cells: { nav: (key, at) => navCell(vaultShown, at, key) },
       },
     },
     vaultGridRef,
@@ -597,6 +609,7 @@ export function Gallery() {
   };
 
   const boardOf = (space: Mode): Board => (space === 'vault' ? vaultBoard : bookmarkBoard);
+  const shownOf = (space: Mode): Grid => (space === 'vault' ? vaultShown : bookmarkShown);
 
   /** 一個版面操作。`columns` 是畫面現在的欄數：還沒定下來的資料夾就用它定下來 */
   const gridOp = (space: Mode, op: GridOp): void => {
@@ -615,12 +628,13 @@ export function Gallery() {
 
   /** 兩個網格共用的那一半拖拽回呼 */
   const dragSpace = (space: Mode) => ({
-    cells: boardOf(space).grid.cells,
+    cells: shownOf(space).cells,
     onDragChange: setDragging,
-    onPlace: (ids: string[], at: number, aimed: string | null) => {
+    onPlace: (ids: string[], cell: number, aimed: string | null, after: boolean) => {
       if (ids.length > 1) {
         exitSelection();
       }
+      const at = orderIndexAt(boardOf(space), shownOf(space), cell, aimed, after);
       gridOp(space, { kind: 'place', ids, at, aimed });
     },
     onMerge: (targetId: string, ids: string[], x: number, y: number) => {
@@ -638,7 +652,8 @@ export function Gallery() {
       }
       setMerge({ space, targetId, ids, x, y });
     },
-    onMoveGroup: (groupId: string, at: number) => {
+    onMoveGroup: (groupId: string, cell: number, aimed: string | null, after: boolean) => {
+      const at = orderIndexAt(boardOf(space), shownOf(space), cell, aimed, after);
       gridOp(space, { kind: 'move-group', groupId, at });
     },
   });
@@ -725,9 +740,11 @@ export function Gallery() {
     if (space === 'bookmarks' && !canDragBookmarks) {
       return null;
     }
-    const board = boardOf(space);
-    const at = board.grid.cells.indexOf(id);
-    if (at === -1 || stepCell(board.grid, at, direction) === null) {
+    // 方向是畫面上的方向：群組繞著擺時，上下左右的鄰居不等於順序上的前後
+    const shown = shownOf(space);
+    const at = shown.cells.indexOf(id);
+    const to = at === -1 ? null : stepCell(shown, at, direction);
+    if (to === null || (shown.cells[to] ?? '') === '') {
       return null;
     }
     return () => {
@@ -750,7 +767,7 @@ export function Gallery() {
     return () => {
       refocusRef.current = {
         selector: `[data-group-label="${CSS.escape(groupId)}"]`,
-        from: at,
+        from: shownOf(space).cells.indexOf(members[0] ?? ''),
         until: Date.now() + 3000,
       };
       gridOp(space, { kind: 'nudge-group', groupId, direction });
@@ -1126,13 +1143,14 @@ export function Gallery() {
     render: (id: string) => ReactNode,
   ): ReactNode[] => {
     const drag = space === 'vault' ? vaultDrag : bookmarkDrag;
-    const edges = outlineEdges(board.grid, (id) => board.memberOf.get(id) ?? null);
+    const shown = shownOf(space);
+    const edges = outlineEdges(shown, (id) => board.memberOf.get(id) ?? null);
     const groupById = new Map(board.groups.map((group) => [group.id, group]));
-    const tags = labels(board);
+    const tags = labels(board, shown);
     const out: ReactNode[] = [];
     for (let at = win.start; at < win.end; at += 1) {
-      const id = board.grid.cells[at];
-      if (id === undefined) {
+      const id = shown.cells[at];
+      if (id === undefined || id === '') {
         out.push(<div key={`slot:${String(at)}`} className={`cell cell--empty${drag.dropClass(at)}`} data-cell={at} />);
         continue;
       }

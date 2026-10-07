@@ -158,20 +158,30 @@ export function setColumns(grid: Grid, columns: number): Grid {
 }
 
 /**
- * 方向鍵：左右照順序前一張／後一張，上下是上一列／下一列的同一欄（下一列比較短就落在最後一張）。
- * 到底了原地不動（不要讓焦點自己往旁邊挪）。
+ * 方向鍵：在**有卡片的格子**之間移動，跳過空格（畫面的擺法可能有空格，見 `board.ts` 的 `layoutGrid`）。
+ *
+ * - 左右：照畫面閱讀順序的前一張／後一張（跨得過列尾）
+ * - 上下：往那個方向一列一列找，第一個有卡片的列裡挑欄位最近的（同距離取左邊）
+ * - 到底了原地不動（不要讓焦點自己往旁邊挪）
  *
  * `from` 為 -1（焦點不在格子裡）時，下／右／Home 到第一張、上／左／End 到最後一張。
  * 回傳 null = 這個鍵不歸格子管，或格子是空的。
  */
 export function navCell(grid: Grid, from: number, key: string): number | null {
-  const last = grid.cells.length - 1;
-  if (last < 0) {
+  const filled: number[] = [];
+  grid.cells.forEach((id, index) => {
+    if (id !== '') {
+      filled.push(index);
+    }
+  });
+  const first = filled[0];
+  const last = filled[filled.length - 1];
+  if (first === undefined || last === undefined) {
     return null;
   }
   if (from < 0) {
     if (key === 'ArrowDown' || key === 'Home' || key === 'ArrowRight') {
-      return 0;
+      return first;
     }
     if (key === 'ArrowUp' || key === 'End' || key === 'ArrowLeft') {
       return last;
@@ -180,17 +190,38 @@ export function navCell(grid: Grid, from: number, key: string): number | null {
   }
   switch (key) {
     case 'Home':
-      return 0;
+      return first;
     case 'End':
       return last;
     case 'ArrowRight':
-      return Math.min(from + 1, last);
+      return filled.find((index) => index > from) ?? from;
     case 'ArrowLeft':
-      return Math.max(from - 1, 0);
+      return [...filled].reverse().find((index) => index < from) ?? from;
     case 'ArrowUp':
-      return from - grid.columns >= 0 ? from - grid.columns : from;
-    case 'ArrowDown':
-      return rowOf(grid, from) < rowOf(grid, last) ? Math.min(from + grid.columns, last) : from;
+    case 'ArrowDown': {
+      const step = key === 'ArrowDown' ? 1 : -1;
+      const col = colOf(grid, from);
+      const lastRow = rowOf(grid, last);
+      for (let row = rowOf(grid, from) + step; row >= 0 && row <= lastRow; row += step) {
+        let best: number | null = null;
+        let bestDistance = Infinity;
+        for (let c = 0; c < grid.columns; c += 1) {
+          const index = row * grid.columns + c;
+          if ((grid.cells[index] ?? '') === '') {
+            continue;
+          }
+          const distance = Math.abs(c - col);
+          if (distance < bestDistance) {
+            best = index;
+            bestDistance = distance;
+          }
+        }
+        if (best !== null) {
+          return best;
+        }
+      }
+      return from;
+    }
     default:
       return null;
   }

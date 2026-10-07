@@ -56,13 +56,16 @@ export interface DragSpace {
   selected: ReadonlySet<string>;
   /** 書籤卡片拖到分頁列要能打開；隱私空間永遠回 null */
   linkOf: (id: string) => { url: string; title: string } | null;
-  /** 插在第 `at` 個位置（後面的讓位）。`aimed` 是對準的那張卡片，最後面的空位是 null */
-  onPlace: (ids: string[], at: number, aimed: string | null) => void;
+  /**
+   * 放在畫面第 `cell` 格：對準那張卡片（`aimed`）的前面或後面（`after`）；空格與最後面的空位 `aimed` 是 null。
+   * 畫面上第幾格與順序上第幾個不一樣（群組會繞著擺），換算交給呼叫端（`orderIndexAt`）。
+   */
+  onPlace: (ids: string[], cell: number, aimed: string | null, after: boolean) => void;
   /** 移進資料夾或麵包屑的某一層（null = 最上層） */
   onInto: (ids: string[], folderId: string | null) => void;
   onMerge: (targetId: string, ids: string[], x: number, y: number) => void;
-  /** 拖標籤：整組插在第 `at` 個位置 */
-  onMoveGroup: (groupId: string, at: number) => void;
+  /** 拖標籤：整組放在畫面第 `cell` 格那張卡片的前面或後面（語意同 `onPlace`） */
+  onMoveGroup: (groupId: string, cell: number, aimed: string | null, after: boolean) => void;
   onGroupInto: (groupId: string, folderId: string | null) => void;
   /** 開始／結束拖拽。呼叫端要在拖拽期間凍結資料（理由見 Gallery 的 `frozen`） */
   onDragChange: (dragging: boolean) => void;
@@ -263,19 +266,17 @@ export function useGridDrag(space: DragSpace) {
         if (shown.kind === 'into' && id !== '') {
           current.onGroupInto(drag.groupId, id);
         } else if (shown.kind !== 'merge') {
-          current.onMoveGroup(drag.groupId, shown.kind === 'after' ? shown.cell + 1 : shown.cell);
+          current.onMoveGroup(drag.groupId, shown.cell, id === '' ? null : id, shown.kind === 'after');
         }
         return;
       }
       switch (shown.kind) {
         case 'slot':
-          current.onPlace(drag.ids, shown.cell, null);
+          current.onPlace(drag.ids, shown.cell, null, false);
           return;
         case 'before':
-          current.onPlace(drag.ids, shown.cell, id);
-          return;
         case 'after':
-          current.onPlace(drag.ids, shown.cell + 1, id);
+          current.onPlace(drag.ids, shown.cell, id, shown.kind === 'after');
           return;
         case 'into':
           current.onInto(drag.ids, id);
