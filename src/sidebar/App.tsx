@@ -343,6 +343,7 @@ export function App() {
               state={vault.state}
               bookmarks={vault.bookmarks}
               folders={vault.folders}
+              layout={vault.layout}
               density={settings.density}
               onOpenLink={openLink}
               onLock={() => {

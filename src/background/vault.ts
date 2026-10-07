@@ -27,6 +27,17 @@ import { createSerialQueue } from '@/shared/serial-queue';
 import { urlKey, VAULT_THUMB_PREFIX, vaultThumbKey } from '@/shared/url';
 import { isSamePageIgnoringScheme } from '@/shared/url-match';
 import { backupFilename, buildBackup, parseBackup } from '@/shared/vault-backup';
+import {
+  emptyLayout,
+  layoutTag,
+  mergeLayouts,
+  moveIds,
+  sanitizeLayout,
+  vaultChildId,
+  vaultChildren,
+  withFolderOrder,
+  type VaultLayout,
+} from '@/shared/vault-layout';
 import { planFolderExport, planFolderImport } from '@/shared/vault-subtree';
 import {
   contentTag,
@@ -36,6 +47,7 @@ import {
   sanitizeVaultPayload,
   type MergeReport,
 } from '@/shared/vault-merge';
+import { clearLayoutEnvelope } from '@/storage/layout-sync';
 import { getSettings } from '@/storage/settings';
 import { deleteThumb, getThumb, listKeys as listThumbKeys, putThumb } from '@/storage/thumbs-db';
 import {
@@ -52,7 +64,9 @@ import {
   readBlob,
   readMeta,
   readStoredBlob,
+  readStoredLayout,
   writeBlob,
+  writeLayout,
   writeMeta,
 } from '@/storage/vault-store';
 import { t } from '@/shared/i18n';
@@ -68,6 +82,8 @@ import { t } from '@/shared/i18n';
  */
 let key: CryptoKey | null = null;
 let payload: VaultPayload | null = null;
+/** 版面（排列順序）。與 payload 同生同死：解鎖時一起讀進來、上鎖時一起丟掉 */
+let layout: VaultLayout | null = null;
 
 const EMPTY: VaultPayload = { version: 1, bookmarks: [], folders: [] };
 
@@ -304,6 +320,7 @@ export async function createVault(password: string): Promise<string> {
       await writeMeta(meta);
       key = dataKey;
       payload = { ...EMPTY };
+      layout = emptyLayout();
       await persist();
     } finally {
       // 原始位元組只需要活到包裹完成為止
@@ -449,8 +466,27 @@ async function unlockWith(opener: Opener): Promise<void> {
 
     payload = opened;
     key = dataKey;
+    layout = await openLayout(dataKey);
     prune();
   });
+}
+
+/**
+ * 讀出本機的版面。
+ *
+ * 解不開時給一份空的而不是讓解鎖失敗：版面只是排列順序，為了它把使用者關在門外
+ * 不划算。空的那份不會自己寫回去，要等使用者下一次排序才會蓋掉那份解不開的。
+ */
+async function openLayout(dataKey: CryptoKey): Promise<VaultLayout> {
+  const stored = await readStoredLayout();
+  if (stored === null) {
+    return emptyLayout();
+  }
+  try {
+    return sanitizeLayout(await decodePayload<unknown>(dataKey, [stored.blob]));
+  } catch {
+    return emptyLayout();
+  }
 }
 
 /**
@@ -530,6 +566,7 @@ export async function revealRecoveryKey(): Promise<string> {
 export function lockVault(): void {
   key = null;
   payload = null;
+  layout = null;
 }
 
 export function isUnlocked(): boolean {
@@ -558,6 +595,7 @@ export async function deleteEverything(): Promise<void> {
     const remote = (await syncEnabled()) ? await readSyncMeta() : null;
     if (remote !== null && local !== null && remote.vault.salt === local.salt) {
       await clearSyncEnvelope();
+      await clearLayoutEnvelope();
       /*
        * 留下刪除標記。
        *
@@ -759,6 +797,14 @@ async function persist(): Promise<void> {
   persistHook();
 }
 
+async function persistLayout(): Promise<void> {
+  const { key: k } = requireUnlocked();
+  const current = layout ?? emptyLayout();
+  const encoded = fromChunks(await encodePayload(k, current));
+  await writeLayout(encoded, await layoutTag(current));
+  persistHook();
+}
+
 /** 清掉過期的墓碑。在解鎖時做一次就夠。 */
 function prune(): void {
   if (payload === null) {
@@ -876,7 +922,11 @@ export async function exportBackup(): Promise<{ filename: string; json: string }
   if (blob === null) {
     throw new Error(t('vault_nothing_to_export'));
   }
-  return { filename: backupFilename(), json: buildBackup(meta, blob) };
+  const storedLayout = await readStoredLayout();
+  return {
+    filename: backupFilename(),
+    json: buildBackup(meta, blob, Date.now(), storedLayout?.blob),
+  };
 }
 
 export interface BackupImportResult {
@@ -923,19 +973,32 @@ export async function importBackup(
       zero(dek);
     }
     const incoming = sanitizeVaultPayload(await decodePayload<unknown>(backupKey, [backup.blob]));
+    // 版面是選用的（舊版的備份檔沒有），解不開也不該讓整份還原失敗
+    let incomingLayout = emptyLayout();
+    if (backup.layout !== undefined) {
+      try {
+        incomingLayout = sanitizeLayout(await decodePayload<unknown>(backupKey, [backup.layout]));
+      } catch {
+        // 維持空的
+      }
+    }
 
     if ((await readMeta()) === null) {
       await writeMeta(backup.vault);
       key = backupKey;
       payload = incoming;
+      layout = incomingLayout;
       await persist();
+      await persistLayout();
       return { adopted: true, report: countAlive(incoming) };
     }
 
     const { payload: current } = requireUnlocked();
     const merged = mergeVaults(current, incoming);
     payload = merged.payload;
+    layout = mergeLayouts(layout ?? emptyLayout(), incomingLayout);
     await persist();
+    await persistLayout();
     return { adopted: false, report: merged.report };
   });
 }
@@ -1467,6 +1530,152 @@ export async function removeBookmark(id: string): Promise<void> {
     record.updatedAt = Date.now();
     await deleteThumb(vaultThumbKey(record.id));
     await persist();
+  });
+}
+
+// ── 排列（版面）───────────────────────────────────────────────────────
+
+export function readLayout(): VaultLayout {
+  requireUnlocked();
+  return layout ?? emptyLayout();
+}
+
+/** 把一筆（書籤或資料夾）搬到 `folderId` 底下。已經在那裡就不動。回傳有沒有搬 */
+function placeUnder(current: VaultPayload, id: string, folderId: string | null, now: number): boolean {
+  const record = current.bookmarks.find((item) => item.id === id && item.deleted !== true);
+  if (record !== undefined) {
+    if (record.folderId === folderId) {
+      return false;
+    }
+    record.folderId = folderId;
+    record.updatedAt = now;
+    return true;
+  }
+  const folder = requireFolder(current, id);
+  if (folder.parentId === folderId) {
+    return false;
+  }
+  if (folderId !== null && isWithin(current, folderId, id)) {
+    throw new Error(t('vault_folder_into_itself'));
+  }
+  folder.parentId = folderId;
+  folder.updatedAt = now;
+  return true;
+}
+
+function childIdsOf(folderId: string | null): string[] {
+  return vaultChildren(listFolders(), listBookmarks(), folderId, layout ?? emptyLayout()).map(
+    vaultChildId,
+  );
+}
+
+/**
+ * 拖拽排序：把 `ids` 放到 `folderId` 裡 `beforeId` 那一筆的前面（null = 最後）。
+ *
+ * 也涵蓋「拖進資料夾」—— 那就是 `beforeId: null`。不在這個資料夾的先搬過來，
+ * 搬動與排序在同一個佇列項目裡做完，不會有「搬了但排序還沒寫」被同步撞見的空檔。
+ */
+export async function reorder(
+  ids: readonly string[],
+  folderId: string | null,
+  beforeId: string | null,
+): Promise<void> {
+  return exclusive(async () => {
+    const { payload: current } = requireUnlocked();
+    if (folderId !== null) {
+      requireFolder(current, folderId);
+    }
+    const now = Date.now();
+    let moved = false;
+    for (const id of ids) {
+      moved = placeUnder(current, id, folderId, now) || moved;
+    }
+    if (moved) {
+      await persist();
+    }
+    const children = childIdsOf(folderId);
+    layout = withFolderOrder(
+      layout ?? emptyLayout(),
+      folderId,
+      moveIds(children, ids, beforeId),
+      new Set(children),
+      now,
+    );
+    await persistLayout();
+  });
+}
+
+/**
+ * 兩張卡片疊在一起 →「建立資料夾」：在 `targetId` 的位置建一個資料夾，把它與 `ids`
+ * 依序搬進去。回傳新資料夾的 id。
+ *
+ * 建資料夾與搬移必須在同一個佇列項目裡（「多選移動讓佇列永久卡死」那次的前車之鑑是
+ * 巢狀取鎖；這裡反過來，分兩次送的話中間可能插進一次同步合併）。
+ */
+export async function mergeIntoNewFolder(
+  targetId: string,
+  ids: readonly string[],
+  name: string,
+): Promise<string> {
+  return exclusive(async () => {
+    const { payload: current } = requireUnlocked();
+    const target =
+      current.bookmarks.find((item) => item.id === targetId && item.deleted !== true) ??
+      requireFolder(current, targetId);
+    const parentId = 'folderId' in target ? target.folderId : target.parentId;
+    const now = Date.now();
+    const siblings = childIdsOf(parentId);
+
+    const id = crypto.randomUUID();
+    current.folders.push({ id, name, parentId, updatedAt: now });
+    const members = [targetId, ...ids.filter((member) => member !== targetId)];
+    for (const member of members) {
+      placeUnder(current, member, id, now);
+    }
+    await persist();
+
+    // 新資料夾放在被疊上去的那張卡片原本的位置
+    const parentOrder = moveIds([...siblings, id], [id], targetId).filter(
+      (member) => !members.includes(member),
+    );
+    let next = withFolderOrder(
+      layout ?? emptyLayout(),
+      parentId,
+      parentOrder,
+      new Set(childIdsOf(parentId)),
+      now,
+    );
+    next = withFolderOrder(next, id, members, new Set(members), now);
+    layout = next;
+    await persistLayout();
+    return id;
+  });
+}
+
+/**
+ * 把另一份加密的版面合併進來（同步用）。回傳內容有沒有變。
+ */
+export async function mergeEncryptedLayout(blob: string): Promise<boolean> {
+  return exclusive(async () => {
+    const { key: k } = requireUnlocked();
+    let incoming: VaultLayout;
+    try {
+      incoming = sanitizeLayout(await decodePayload<unknown>(k, [blob]));
+    } catch (cause) {
+      throw new RemoteBlobUnreadable(cause instanceof Error ? cause.message : String(cause));
+    }
+    if (key !== k) {
+      throw new Error(t('vault_locked_during_merge'));
+    }
+    const current = layout ?? emptyLayout();
+    const merged = mergeLayouts(current, incoming);
+    // 與書籤那份同理：內容沒變就不要重新加密，否則兩台裝置會無止盡地互相上傳
+    if ((await layoutTag(current)) === (await layoutTag(merged))) {
+      return false;
+    }
+    layout = merged;
+    await persistLayout();
+    return true;
   });
 }
 

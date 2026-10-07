@@ -752,6 +752,27 @@
   "permission_dismiss": {
     "message": "Not now — keep the colour cards"
   },
+  "merge_heading": {
+    "message": "Combine"
+  },
+  "merge_create_folder": {
+    "message": "Create folder"
+  },
+  "merge_folder_default_name": {
+    "message": "New folder"
+  },
+  "row_move_earlier": {
+    "message": "Move earlier"
+  },
+  "row_move_earlier_hint": {
+    "message": "Move one place earlier in this folder (Ctrl+Shift+←)"
+  },
+  "row_move_later": {
+    "message": "Move later"
+  },
+  "row_move_later_hint": {
+    "message": "Move one place later in this folder (Ctrl+Shift+→)"
+  },
   "row_open_in_gallery": {
     "message": "Open in full page"
   },

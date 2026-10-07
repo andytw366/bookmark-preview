@@ -31,6 +31,12 @@ Import takes one of two paths:
   password may differ from the local one: it is opened with the backup's key and written
   back with the local key.
 
+The file also carries the **layout** (the order you arranged things in, see
+[vault.md](vault.md#order)) as an optional, separately encrypted `layout` field — same key.
+It is an extra field rather than a version bump on purpose: an older `parseBackup` rejects
+files with a newer `version` but ignores fields it does not know, so a backup made by this
+version still restores in an older one, just without the order.
+
 ## Cross-device sync
 
 Off by default, and it must be turned on deliberately: enabling it means handing your
@@ -69,6 +75,29 @@ The merged result is then normalised: records whose parent no longer exists are 
 at the top level, and cyclic `parentId` chains are broken. Two devices each moving a folder
 is enough to produce both states, and their symptom is "the bookmark is still in the data
 but can never be seen on screen" — indistinguishable from having lost it.
+
+### The layout syncs separately
+
+The order of items in vault folders is a second encrypted document with its own keys
+(`vaultLayoutMeta` + `vaultLayoutC0…`), synced right after the bookmark copy with the same
+four rules: nothing while in transit, merge only while unlocked, content fingerprint
+decides uploads. It carries the salt to prove it belongs to the same vault.
+
+It is **not** inside the bookmark copy, and its keys deliberately do not start with
+`vaultSyncC`: an older version's stale-chunk cleanup deletes every key with that prefix,
+and an older version rebuilding records field by field would strip anything it does not
+know — after which the two devices' fingerprints never agree and they overwrite each other
+every two seconds. Old versions simply never touch the layout keys.
+
+Both documents share the 100 KB quota, so each upload checks that it fits **together with
+what the other one currently occupies**, and stops with the usual over-quota warning if not.
+An older version does not know the layout exists and checks only its own size; near the
+limit it can fail its upload with a quota error. "Remove the cloud copy", deleting the
+vault and "overwrite the cloud" all clear the layout keys too.
+
+Merging is per entry, newer `updatedAt` wins, regardless of what the entry contains — so
+sections a version does not understand (groups, from phase 3 on) are kept and merged
+rather than dropped.
 
 ### Deletion
 

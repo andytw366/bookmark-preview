@@ -7,6 +7,7 @@ import type {
   VaultState,
 } from '@/shared/types';
 import { hostnameOf } from '@/shared/url';
+import { vaultChildren, type VaultLayout } from '@/shared/vault-layout';
 import { useListNav } from '../hooks/useListNav';
 import { useVirtualRows } from '../hooks/useVirtualRows';
 import { contextMenuHandlers } from '../lib/keys';
@@ -29,6 +30,8 @@ interface VaultViewProps {
   state: Extract<VaultState, { status: 'unlocked' }>;
   bookmarks: PrivateBookmark[];
   folders: PrivateFolder[];
+  /** 全頁瀏覽排過的順序。側邊欄還不能拖（第 4 期），但要照同一個順序顯示 */
+  layout: VaultLayout;
   density: Density;
   onOpenLink: (url: string, where: OpenTarget) => void;
   onLock: () => void;
@@ -48,6 +51,7 @@ export function VaultView({
   state,
   bookmarks,
   folders,
+  layout,
   density,
   onOpenLink,
   onLock,
@@ -82,10 +86,7 @@ export function VaultView({
    * 虛擬滾動的單位是「第幾列」，兩段各自 map 的話就沒有一個共同的索引可以切 ——
    * 而且「先資料夾後書籤」本來就是同一份清單的順序，只是原本分兩段畫。
    */
-  const rows: VaultRow[] = [
-    ...childFolders.map((folder): VaultRow => ({ kind: 'folder', folder })),
-    ...childBookmarks.map((record): VaultRow => ({ kind: 'bookmark', record })),
-  ];
+  const rows: VaultRow[] = vaultChildren(folders, bookmarks, folderId, layout);
 
   /*
    * 每個資料夾直接裝了幾個書籤，一次算完。

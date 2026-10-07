@@ -10,6 +10,7 @@ The sidebar and the full-page view are both fully operable without a mouse.
 | `↑` `↓` | Previous / next row (in the grid: the same **column**, one row up or down) |
 | `←` `→` | Sidebar: go up a level / enter a folder. Grid: the adjacent card |
 | `Backspace` | Go up a level (both views) |
+| `Ctrl+Shift+←` / `Ctrl+Shift+→` | Full-page view: move the focused card one place earlier / later |
 | `Home` / `End` | First / last item |
 | `Enter` | Open the bookmark, or enter the folder |
 | `Menu` key or `Shift+F10` | Open that row's or card's context menu |
@@ -145,6 +146,37 @@ The sidebar has no history to go back through. It listens for the mouse back but
 (`mouseup` with `button === 3`) as "up a level" in both spaces, but **on Linux Firefox never
 delivers that button to page content** — GTK turns buttons 8/9 into a browser Back command,
 which navigates the active tab instead. Whether other platforms deliver it is unverified.
+
+### Drag and drop
+
+Both grids (bookmarks and vault) accept drags. Where you let go decides what happens:
+
+| Drop on | Result |
+|---|---|
+| The left or right ~30% of a card | Insert before / after it (an insertion line shows where) |
+| The middle of a folder card | Move into that folder, at the end |
+| The middle of a bookmark card, held ~400 ms (dashed frame) | A small menu: *Create folder* — Enter accepts the default, Esc cancels |
+| A breadcrumb segment | Move up to that level |
+| Empty space in the grid | Move to the end |
+
+Dragging a checked card while selecting moves the whole selection, keeping its order.
+Search results and the top level of the bookmarks (Firefox's permanent folders) cannot be
+dragged. Data updates arriving mid-drag are held until you let go — a re-render could
+otherwise remove the card being dragged. Dragging close to the top or bottom edge of the
+window scrolls.
+
+Everything a drag can do the keyboard can too: *Move earlier / Move later* in the context
+menu, or `Ctrl+Shift+←` / `Ctrl+Shift+→` on a focused card (`Alt+←/→` are Firefox's
+back/forward).
+
+**Bookmarks** reorder Firefox's own bookmarks (`bookmarks.move`), so the order shows up in
+the bookmarks menu and library too. A bookmark card dragged onto the tab strip opens it.
+Firefox's `index` for `move` is the **final** position after removal (Chrome uses the
+position before removal); `src/background/bookmark-order.ts` computes for that and re-checks.
+
+**Vault cards carry no URL in the drag data at all** — dropping one on the tab strip would
+open it in a normal window and write it to history. Only an internal type is set; the
+order itself is stored as described in [vault.md](vault.md#order).
 
 ### The top toolbar
 

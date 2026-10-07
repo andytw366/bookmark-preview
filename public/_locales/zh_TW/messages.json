@@ -752,6 +752,27 @@
   "permission_dismiss": {
     "message": "先不要，繼續使用色卡"
   },
+  "merge_heading": {
+    "message": "疊在一起"
+  },
+  "merge_create_folder": {
+    "message": "建立資料夾"
+  },
+  "merge_folder_default_name": {
+    "message": "新資料夾"
+  },
+  "row_move_earlier": {
+    "message": "往前移"
+  },
+  "row_move_earlier_hint": {
+    "message": "在這個資料夾裡往前挪一格（Ctrl+Shift+←）"
+  },
+  "row_move_later": {
+    "message": "往後移"
+  },
+  "row_move_later_hint": {
+    "message": "在這個資料夾裡往後挪一格（Ctrl+Shift+→）"
+  },
   "row_open_in_gallery": {
     "message": "在全頁瀏覽開啟"
   },

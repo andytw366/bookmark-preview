@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { request, subscribe } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder, VaultState } from '@/shared/types';
+import { emptyLayout, type VaultLayout } from '@/shared/vault-layout';
 import { t, tn } from '@/shared/i18n';
 
 const KEEPALIVE_PORT = 'vault-keepalive';
@@ -37,6 +38,8 @@ interface VaultApi {
   state: VaultState | null;
   bookmarks: PrivateBookmark[];
   folders: PrivateFolder[];
+  /** 排列順序。畫面要照它排，拖拽送出去的錨點才對得上背景頁算的順序 */
+  layout: VaultLayout;
   error: string | null;
   clearError: () => void;
   /**
@@ -63,6 +66,10 @@ interface VaultApi {
   moveToFolder: (id: string, folderId: string | null) => Promise<void>;
   /** 搬移資料夾本身。與 `moveToFolder` 分開：資料夾多一條「不能搬進自己的子樹」的規則 */
   moveFolder: (id: string, parentId: string | null) => Promise<void>;
+  /** 拖拽排序（含拖進資料夾：`beforeId: null`） */
+  reorder: (ids: string[], folderId: string | null, beforeId: string | null) => Promise<void>;
+  /** 兩張疊在一起 → 建立資料夾 */
+  mergeIntoFolder: (targetId: string, ids: string[], name: string) => Promise<void>;
   /** 重讀清單。重新命名之類的操作直接走 request，改完要讓 UI 跟上 */
   reload: () => Promise<void>;
   /**
@@ -79,6 +86,7 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
   const [state, setState] = useState<VaultState | null>(null);
   const [bookmarks, setBookmarks] = useState<PrivateBookmark[]>([]);
   const [folders, setFolders] = useState<PrivateFolder[]>([]);
+  const [layout, setLayout] = useState<VaultLayout>(emptyLayout);
   const [error, setError] = useState<string | null>(null);
   /*
    * 活動訊息要送到目前那條 port 上，而 port 由下面的 effect 持有。
@@ -107,6 +115,7 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
       }
       void request('vault/list', undefined).then(setBookmarks, () => undefined);
       void request('vault/folders', undefined).then(setFolders, () => undefined);
+      void request('vault/layout', undefined).then(setLayout, () => undefined);
     });
   }, []);
 
@@ -122,6 +131,7 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
     if (status !== 'unlocked') {
       setBookmarks([]);
       setFolders([]);
+      setLayout(emptyLayout());
       return;
     }
     let closing = false;
@@ -146,6 +156,7 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
     }, KEEPALIVE_PING_MS);
     void request('vault/list', undefined).then(setBookmarks, () => undefined);
     void request('vault/folders', undefined).then(setFolders, () => undefined);
+    void request('vault/layout', undefined).then(setLayout, () => undefined);
 
     /*
      * 連線斷掉就重新問一次狀態。
@@ -260,12 +271,14 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
   const refreshAll = useCallback(async () => {
     setFolders(await request('vault/folders', undefined));
     setBookmarks(await request('vault/list', undefined));
+    setLayout(await request('vault/layout', undefined));
   }, []);
 
   return {
     state,
     bookmarks,
     folders,
+    layout,
     error,
     clearError: () => {
       setError(null);
@@ -394,6 +407,18 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
       await run(async () => {
         await request('vault/folder-move', { id, parentId });
         // 這裡要 refreshAll 不是 refreshList：動到的是資料夾，清單與資料夾都得重讀
+        await refreshAll();
+      });
+    },
+    reorder: async (ids, folderId, beforeId) => {
+      await run(async () => {
+        setState(await request('vault/reorder', { ids, folderId, beforeId }));
+        await refreshAll();
+      });
+    },
+    mergeIntoFolder: async (targetId, ids, name) => {
+      await run(async () => {
+        await request('vault/merge-folder', { targetId, ids, name });
         await refreshAll();
       });
     },

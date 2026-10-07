@@ -13,6 +13,7 @@ import {
 } from '@/crypto/keyring';
 import { decodePayload, encodePayload } from '@/crypto/vault-codec';
 import { BACKUP_FORMAT, backupFilename, buildBackup, parseBackup } from '@/shared/vault-backup';
+import { sanitizeLayout, type VaultLayout } from '@/shared/vault-layout';
 import { sanitizeVaultPayload } from '@/shared/vault-merge';
 import type { VaultMeta, VaultPayload } from '@/shared/types';
 
@@ -103,6 +104,33 @@ describe('備份檔往返', () => {
     const parsed = JSON.parse(buildBackup(meta, fromChunks(await encodePayload(key, SAMPLE)), NOW));
 
     expect(parsed.vault).toEqual(meta);
+  });
+  it('版面（排列）跟著備份走，加密、與書籤同一把金鑰', async () => {
+    const { meta, key } = await makeMeta('pw');
+    const layout: VaultLayout = {
+      version: 1,
+      sections: { order: { '~root': { ids: ['2a1c1f4e-0000-4000-8000-000000000001'], updatedAt: NOW } } },
+    };
+    const json = buildBackup(
+      meta,
+      fromChunks(await encodePayload(key, SAMPLE)),
+      NOW,
+      fromChunks(await encodePayload(key, layout)),
+    );
+    expect(json).not.toContain('~root');
+    const file = parseBackup(json);
+    expect(file.layout).toBeDefined();
+    expect(sanitizeLayout(await decodePayload(key, [file.layout ?? '']))).toEqual(layout);
+  });
+
+  it('舊版的備份檔沒有版面，照樣讀得進來', async () => {
+    const { meta, key } = await makeMeta('pw');
+    const file = parseBackup(buildBackup(meta, fromChunks(await encodePayload(key, SAMPLE)), NOW));
+    expect(file.layout).toBeUndefined();
+  });
+
+  it('加了版面欄位但沒有升版本號 —— 舊版的 parseBackup 會拒絕版本較新的檔案', () => {
+    expect(JSON.parse(buildBackup({} as VaultMeta, 'x', NOW, 'y')).version).toBe(1);
   });
 });
 

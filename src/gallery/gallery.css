@@ -285,3 +285,52 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/*
+ * 拖拽的落點提示。
+ *
+ * 插入線畫在卡片外側、網格間距（16px）的正中間，看起來是「插在兩張之間」而不是
+ * 「貼在這一張上」。移入資料夾與合併用外框：前者是實線（放開就搬進去），後者要停留
+ * 一下才出現（`MERGE_DWELL_MS`），一路滑過去的卡片不會每張都亮。
+ */
+.drop--before,
+.drop--after {
+  position: relative;
+}
+
+.drop--before::before,
+.drop--after::after {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  content: '';
+  pointer-events: none;
+}
+
+.drop--before::before {
+  left: -10px;
+}
+
+.drop--after::after {
+  right: -10px;
+}
+
+.drop--into,
+.drop--merge {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.drop--merge {
+  outline-style: dashed;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.crumbs__item--drop {
+  outline: 2px solid var(--accent);
+  background: var(--bg-hover);
+}

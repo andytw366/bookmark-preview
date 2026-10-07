@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { request } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder } from '@/shared/types';
 import { Popover } from './Popover';
+import { ReorderItems, type ReorderActions } from './ReorderItems';
 import { t } from '@/shared/i18n';
 
 export type VaultMenuTarget =
@@ -25,6 +26,8 @@ interface VaultRowMenuProps {
   /** 重新命名書籤成功後要重讀清單 */
   onChanged: () => void;
   onNotice: (message: string) => void;
+  /** 全頁瀏覽的「往前移／往後移」。省略就不顯示（側邊欄、搜尋結果、最上層） */
+  reorder?: ReorderActions | undefined;
 }
 
 interface FolderChoice {
@@ -82,6 +85,7 @@ export function VaultRowMenu({
   onDeleteFolder,
   onChanged,
   onNotice,
+  reorder,
 }: VaultRowMenuProps) {
   const initialName = target.kind === 'bookmark' ? target.record.title : target.folder.name;
   const [renaming, setRenaming] = useState(false);
@@ -286,6 +290,8 @@ export function VaultRowMenu({
       >
         {t('action_move_to')}
       </button>
+
+      {reorder !== undefined ? <ReorderItems reorder={reorder} onClose={onClose} /> : null}
 
       {/* 資料夾與書籤都能移出：資料夾會連同子樹在原生書籤裡重建，與移入對稱 */}
       <button

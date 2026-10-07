@@ -3,6 +3,7 @@ import { getSettings, patchSettings } from '@/storage/settings';
 import { clearSiteImageStats } from '@/storage/site-image-stats';
 import { getThumb, pruneOlderThan, usage } from '@/storage/thumbs-db';
 import { backfillThumbnails, backfillVaultThumbnails } from './backfill';
+import { mergeIntoNewFolder as mergeBookmarksIntoFolder, reorderBookmarks } from './bookmark-order';
 import { collectFolderChoices, collectRoots } from './bookmark-tree';
 import { startBookmarkWatcher } from './bookmark-watcher';
 import { startCapturePipeline, startPermissionWatcher } from './capture';
@@ -25,6 +26,9 @@ import {
   listBookmarks,
   listFolders,
   lockVault,
+  mergeIntoNewFolder,
+  readLayout,
+  reorder,
   moveBookmarkToFolder,
   moveFolderToParent,
   moveManyToFolder,
@@ -117,6 +121,10 @@ serve({
     }
     return { moved, failed };
   },
+  'bookmarks/reorder': async ({ ids, parentId, beforeId }) => reorderBookmarks(ids, parentId, beforeId),
+  'bookmarks/merge-folder': async ({ targetId, ids, title }) => ({
+    id: await mergeBookmarksIntoFolder(targetId, ids, title),
+  }),
   'bookmarks/folders': async () => collectFolderChoices(),
   'bookmarks/folder-create': async ({ parentId, title }) => {
     // 沒有 url 就是資料夾
@@ -213,6 +221,17 @@ serve({
   'vault/folder-delete': async ({ id }) => acted(deleteFolder(id)),
   'vault/folder-move': async ({ id, parentId }) => acted(moveFolderToParent(id, parentId)),
   'vault/move': async ({ id, folderId }) => acted(moveBookmarkToFolder(id, folderId)),
+  'vault/layout': async () => readLayout(),
+  // 排列要讓其他開著的頁面（側邊欄、另一個全頁瀏覽）跟上，所以走廣播
+  'vault/reorder': async ({ ids, folderId, beforeId }) => {
+    await reorder(ids, folderId, beforeId);
+    return announceVault();
+  },
+  'vault/merge-folder': async ({ targetId, ids, name }) => {
+    const id = await mergeIntoNewFolder(targetId, ids, name);
+    await announceVault();
+    return { id };
+  },
   'vault/backfill': async () => acted(backfillVaultThumbnails()),
   'vault/export': async ({ id, parentId }) => {
     await exportToNative(id, parentId);

@@ -145,6 +145,26 @@ own descendant is blocked — that produces a cyclic `parentId`, after which nav
 breadcrumbs can never get back out. The UI blocks it first (the picker omits your own
 subtree) and the background page's `isWithin` check is the second line.
 
+## Order
+
+Vault folders can be rearranged in the full-page view (drag, or *Move earlier / later*).
+The order lives in a separate encrypted **layout** document (`src/shared/vault-layout.ts`),
+not on the bookmark records: an older version rebuilding records field by field would drop
+an unknown `order` field during sync, and the two devices would then disagree forever about
+the content fingerprint.
+
+The layout is a set of sections of `id → entry`, each entry carrying its own `updatedAt`;
+the `order` section has one entry per folder holding the complete list of that folder's
+children. Items not in the list (never arranged, added by an older version, moved in from
+elsewhere) follow it in the default order — folders by name, then bookmarks newest first —
+so a folder nobody has rearranged looks exactly as before. The UI and the background page
+compute the order with the same function (`vaultChildren`), because a drop is sent as
+"before this card" and both sides must agree which card that is.
+
+Stored locally as `vaultLayout` (+ its fingerprint), encrypted with the data key; removed
+together with the vault. Decryption failure on unlock yields an empty layout rather than a
+failed unlock — the order is not worth locking anyone out over.
+
 ## Whole folders move in and out, structure intact
 
 Pressing the lock icon on a bookmark folder (or "Move the whole folder into the vault")

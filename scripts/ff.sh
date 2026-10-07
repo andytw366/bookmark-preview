@@ -20,6 +20,10 @@
 #   click X Y          左鍵
 #   rclick X Y         右鍵
 #   move X Y           只移動游標
+#   drag X1 Y1 X2 Y2   HTML5 拖拽：按住 → 分段移過去 → 停 0.6 秒 → 放開
+#   press X Y          只按住（拖拽的前半；之後用 glide 移動、release 放開，中間可以截圖）
+#   glide X Y          按住狀態下分段移到 X Y
+#   release            放開滑鼠左鍵
 #   scroll N           往下滾 N 格（負數往上）
 #   type TEXT          輸入文字
 #   key KEY            送按鍵（例如 Return、ctrl+a、F5）
@@ -93,6 +97,22 @@ cmd_start() {
   echo "Firefox 已啟動（DISPLAY=$DISPLAY）"
 }
 
+# HTML5 拖拽要「按住 → 好幾段 mousemove（中間有停頓）」Firefox 才會開始拖拽並持續送
+# dragover；一次跳到終點只會得到一個點擊。最後多晃一個像素，讓落點的 dragover 一定送到。
+glide_to() {
+  local to_x="$1" to_y="$2" from_x from_y
+  eval "$(xdotool getmouselocation --shell | grep -E '^(X|Y)=')"
+  from_x="$X"
+  from_y="$Y"
+  for step in 1 2 3 4 5 6 7 8 9 10; do
+    xdotool mousemove $(( from_x + (to_x - from_x) * step / 10 )) $(( from_y + (to_y - from_y) * step / 10 ))
+    sleep 0.08
+  done
+  sleep 0.2
+  xdotool mousemove $(( to_x + 1 )) "$to_y"
+  sleep 0.1
+}
+
 cmd_stop() {
   # 進程名是 firefox-bin 不是 firefox；-f 會誤殺路徑含 firefox 的腳本自己
   pkill -x firefox-bin 2> /dev/null || true
@@ -128,6 +148,33 @@ while (($#)); do
       require_display
       xdotool mousemove "$2" "$3"
       shift 3
+      ;;
+    press)
+      require_display
+      xdotool mousemove "$2" "$3" mousedown 1
+      sleep 0.3
+      shift 3
+      ;;
+    glide)
+      require_display
+      glide_to "$2" "$3"
+      shift 3
+      ;;
+    release)
+      require_display
+      xdotool mouseup 1
+      sleep "$WAIT"
+      shift
+      ;;
+    drag)
+      require_display
+      xdotool mousemove "$2" "$3" mousedown 1
+      sleep 0.3
+      glide_to "$4" "$5"
+      sleep 0.6
+      xdotool mouseup 1
+      sleep "$WAIT"
+      shift 5
       ;;
     scroll)
       require_display

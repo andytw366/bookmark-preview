@@ -12,6 +12,12 @@ import type { VaultMeta } from '@/shared/types';
 const META_KEY = 'vaultMeta';
 const BLOB_KEY = 'vaultBlob';
 const TAG_KEY = 'vaultBlobTag';
+/**
+ * 版面文件（排列順序，第 3 期再加群組）。與書籤資料分開存，理由見 `shared/vault-layout`。
+ * 一樣是加密的 base64 —— 群組名稱與「哪幾筆放在一起」都是隱私資訊。
+ */
+const LAYOUT_KEY = 'vaultLayout';
+const LAYOUT_TAG_KEY = 'vaultLayoutTag';
 
 export async function readMeta(): Promise<VaultMeta | null> {
   const stored = await browser.storage.local.get(META_KEY);
@@ -57,6 +63,21 @@ export async function writeBlob(blob: string, tag: string): Promise<void> {
   await browser.storage.local.set({ [BLOB_KEY]: blob, [TAG_KEY]: tag });
 }
 
+export async function readStoredLayout(): Promise<StoredBlob | null> {
+  const stored = await browser.storage.local.get([LAYOUT_KEY, LAYOUT_TAG_KEY]);
+  const blob = stored[LAYOUT_KEY] as string | undefined;
+  if (blob === undefined) {
+    return null;
+  }
+  const tag = stored[LAYOUT_TAG_KEY] as string | undefined;
+  return { blob, tag: tag ?? null };
+}
+
+export async function writeLayout(blob: string, tag: string): Promise<void> {
+  await browser.storage.local.set({ [LAYOUT_KEY]: blob, [LAYOUT_TAG_KEY]: tag });
+}
+
 export async function destroyVault(): Promise<void> {
-  await browser.storage.local.remove([META_KEY, BLOB_KEY, TAG_KEY]);
+  // 版面要一起刪：留著的話是一份永遠解不開、卻透露「這裡曾經有隱私空間」的密文
+  await browser.storage.local.remove([META_KEY, BLOB_KEY, TAG_KEY, LAYOUT_KEY, LAYOUT_TAG_KEY]);
 }

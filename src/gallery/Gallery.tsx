@@ -1,10 +1,19 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { request } from '@/shared/messages';
 import type { BookmarkNode, PrivateBookmark, PrivateFolder } from '@/shared/types';
+import { vaultChildId, vaultChildren, type VaultChild } from '@/shared/vault-layout';
 import { hostnameOf } from '@/shared/url';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
 import { Breadcrumb } from '../sidebar/components/Breadcrumb';
 import { FolderPicker } from '../sidebar/components/FolderPicker';
+import { MergeMenu } from '../sidebar/components/MergeMenu';
 import { MoveInPrompt } from '../sidebar/components/MoveInPrompt';
 import { NewFolderForm } from '../sidebar/components/NewFolderForm';
 import { RowMenu, type MenuTarget } from '../sidebar/components/RowMenu';
@@ -34,6 +43,7 @@ import { contextMenuHandlers } from '../sidebar/lib/keys';
 import { buildIndex, countLinks, pathTo, searchLinks } from '../sidebar/lib/tree';
 import { vaultPathTo } from '../sidebar/lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
+import { useGridDrag } from './useGridDrag';
 
 /**
  * 獨立分頁的全頁書籤瀏覽。
@@ -71,10 +81,19 @@ const GRID_GAP = 16;
  */
 const cardEstimate = (size: ColumnSize): number => size * 0.72 + 82;
 
-/** 隱私空間的資料夾與書籤在畫面上是同一份清單 */
-type VaultGridRow =
-  | { kind: 'folder'; folder: PrivateFolder }
-  | { kind: 'bookmark'; record: PrivateBookmark };
+/** 隱私空間的資料夾與書籤在畫面上是同一份清單（順序由版面決定，見 `vaultChildren`） */
+type VaultGridRow = VaultChild<PrivateFolder, PrivateBookmark>;
+
+const NO_SELECTION: ReadonlySet<string> = new Set();
+
+/** 合併選單：兩張卡片疊在一起之後要問的事 */
+interface PendingMerge {
+  space: Mode;
+  targetId: string;
+  ids: string[];
+  x: number;
+  y: number;
+}
 
 export function Gallery() {
   const { roots, error, reload } = useBookmarks();
@@ -111,6 +130,9 @@ export function Gallery() {
   const [vaultFolderPicker, setVaultFolderPicker] = useState<{ x: number; y: number } | null>(null);
   const [optionsMenu, setOptionsMenu] = useState<{ x: number; y: number } | null>(null);
   const backfill = useBackfill();
+  const [merge, setMerge] = useState<PendingMerge | null>(null);
+  /** 拖拽中。拖拽期間資料凍結（見下面的 `frozen`） */
+  const [dragging, setDragging] = useState(false);
   const [pendingMove, setPendingMove] = useState<{
     nodes: BookmarkNode[];
     x: number;
@@ -122,7 +144,21 @@ export function Gallery() {
   const gridRef = useRef<HTMLDivElement>(null);
   const vaultGridRef = useRef<HTMLDivElement>(null);
 
-  const index = useMemo(() => buildIndex(roots ?? []), [roots]);
+  /*
+   * 拖拽期間畫面用的是**開始拖之前**的資料。
+   *
+   * 書籤或隱私空間在拖拽中途變動（另一個分頁、同步合併）會讓網格重繪，被拖的那張卡片
+   * 可能因此被拆掉 —— 那之後 drop／dragend 都送不到，拖拽卡在半空。放開之後才換成
+   * 最新的資料，中間錯過的變動一次補上。
+   */
+  const frozen = useRef({ roots, bookmarks: vault.bookmarks, folders: vault.folders, layout: vault.layout });
+  if (!dragging) {
+    frozen.current = { roots, bookmarks: vault.bookmarks, folders: vault.folders, layout: vault.layout };
+  }
+  const view = frozen.current;
+  const viewRoots = view.roots;
+
+  const index = useMemo(() => buildIndex(viewRoots ?? []), [viewRoots]);
   const vaultStatus = vault.state?.status;
   const vaultUnlocked = vaultStatus === 'unlocked';
 
@@ -302,9 +338,9 @@ export function Gallery() {
   const trimmed = query.trim();
   const currentNode = folderId === null ? undefined : index.byId.get(folderId);
   const currentFolder = currentNode?.kind === 'folder' ? currentNode : undefined;
-  const search = trimmed === '' ? null : searchLinks(roots ?? [], trimmed);
+  const search = trimmed === '' ? null : searchLinks(viewRoots ?? [], trimmed);
   const nodes: BookmarkNode[] =
-    search !== null ? search.links : (currentFolder?.children ?? roots ?? []);
+    search !== null ? search.links : (currentFolder?.children ?? viewRoots ?? []);
 
   // 勾選跨資料夾保留，所以要從整棵樹的索引還原成節點，並濾掉已不存在的 id
   const selectedNodes: BookmarkNode[] = [...selectedIds]
@@ -314,10 +350,10 @@ export function Gallery() {
   // 資料夾整棵一起移入，所以送的是 selectedNodes；這個數字只用來判斷有沒有東西可移
   const selectedLinkCount = countLinks(selectedNodes);
 
-  const vaultFolders: PrivateFolder[] = vault.folders.filter(
+  const vaultFolders: PrivateFolder[] = view.folders.filter(
     (folder) => folder.parentId === vaultFolderId,
   );
-  const vaultBookmarks: PrivateBookmark[] = vault.bookmarks.filter(
+  const vaultBookmarks: PrivateBookmark[] = view.bookmarks.filter(
     (record) => record.folderId === vaultFolderId,
   );
 
@@ -327,16 +363,13 @@ export function Gallery() {
   /* 每個隱私資料夾直接裝了幾個書籤，掃一次建表 —— 原本是每張卡片各自
      filter 整份清單，也就是「資料夾數 × 書籤數」次比對，而且每次重繪都重算 */
   const vaultCountIn = new Map<string, number>();
-  for (const record of vault.bookmarks) {
+  for (const record of view.bookmarks) {
     if (record.folderId !== null) {
       vaultCountIn.set(record.folderId, (vaultCountIn.get(record.folderId) ?? 0) + 1);
     }
   }
 
-  const vaultRows: VaultGridRow[] = [
-    ...vaultFolders.map((folder): VaultGridRow => ({ kind: 'folder', folder })),
-    ...vaultBookmarks.map((record): VaultGridRow => ({ kind: 'bookmark', record })),
-  ];
+  const vaultRows: VaultGridRow[] = vaultChildren(view.folders, view.bookmarks, vaultFolderId, view.layout);
 
   /*
    * 兩個網格各有一組虛擬滾動與鍵盤巡覽。
@@ -411,6 +444,141 @@ export function Gallery() {
   const showModes = settings?.vaultEntry === 'tab' || vaultUnlocked;
   // 根層列的是 Firefox 內建的永久資料夾，移入對它們一定失敗（理由同側邊欄）
   const showingRoots = search === null && currentFolder === undefined;
+
+  /*
+   * 拖拽（兩個網格各一份）。
+   *
+   * 書籤這邊：搜尋結果的順序沒有意義、最上層是 Firefox 的永久資料夾，兩者都不能拖。
+   */
+  const canDragBookmarks = search === null && currentFolder !== undefined;
+  const bookmarkOrder = nodes.map((node) => node.id);
+  const vaultOrder = vaultRows.map(vaultChildId);
+  const vaultRowById = new Map(vaultRows.map((row) => [vaultChildId(row), row]));
+
+  const reportFailure = (cause: unknown): void => {
+    setNotice(cause instanceof Error ? cause.message : String(cause));
+  };
+
+  /** 拖拽、右鍵「往前／往後移」、快捷鍵共用。整批搬完就退出多選（與「移動到…」一致） */
+  const moveBookmarks = (ids: string[], parentId: string, beforeId: string | null): void => {
+    if (ids.length > 1) {
+      exitSelection();
+    }
+    void request('bookmarks/reorder', { ids, parentId, beforeId }).then((report) => {
+      if (report.failed > 0) {
+        setNotice(
+          t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
+        );
+      }
+      reload();
+    }, reportFailure);
+  };
+
+  const moveVault = (ids: string[], target: string | null, beforeId: string | null): void => {
+    if (ids.length > 1) {
+      exitSelection();
+    }
+    void vault.reorder(ids, target, beforeId);
+  };
+
+  const bookmarkDrag = useGridDrag({
+    enabled: canDragBookmarks,
+    order: bookmarkOrder,
+    kindOf: (id) => {
+      const node = index.byId.get(id);
+      return node === undefined ? undefined : node.kind === 'folder' ? 'folder' : 'bookmark';
+    },
+    selected: selecting ? selectedIds : NO_SELECTION,
+    linkOf: (id) => {
+      const node = index.byId.get(id);
+      return node?.kind === 'link' ? { url: node.url, title: node.title } : null;
+    },
+    onDragChange: setDragging,
+    onReorder: (ids, beforeId) => {
+      if (currentFolder !== undefined) {
+        moveBookmarks(ids, currentFolder.id, beforeId);
+      }
+    },
+    onInto: (ids, target) => {
+      // 原生書籤的最上層只能放 Firefox 的永久資料夾，麵包屑的「全部」不接受拖放
+      if (target !== null) {
+        moveBookmarks(ids, target, null);
+      }
+    },
+    onMerge: (targetId, ids, x, y) => {
+      setMerge({ space: 'bookmarks', targetId, ids, x, y });
+    },
+  });
+
+  const vaultDrag = useGridDrag({
+    enabled: mode === 'vault',
+    order: vaultOrder,
+    kindOf: (id) => vaultRowById.get(id)?.kind,
+    selected: vaultSelecting ? vaultSelectedIds : NO_SELECTION,
+    // 隱私書籤永遠不帶網址：拖到分頁列會在一般視窗打開、寫進瀏覽記錄
+    linkOf: () => null,
+    onDragChange: setDragging,
+    onReorder: (ids, beforeId) => {
+      moveVault(ids, vaultFolderId, beforeId);
+    },
+    onInto: (ids, target) => {
+      moveVault(ids, target, null);
+    },
+    onMerge: (targetId, ids, x, y) => {
+      setMerge({ space: 'vault', targetId, ids, x, y });
+    },
+  });
+
+  /**
+   * 往前／往後挪一格（鍵盤與右鍵選單用，拖拽做得到的事鍵盤也要做得到）。
+   * 回傳 null 代表這個方向已經到底、或這個畫面不能排序 —— 選單據此停用那一項。
+   */
+  const stepper = (space: Mode, id: string, delta: -1 | 1): (() => void) | null => {
+    const order = space === 'vault' ? vaultOrder : bookmarkOrder;
+    const at = order.indexOf(id);
+    if (at === -1 || (space === 'bookmarks' && (!canDragBookmarks || currentFolder === undefined))) {
+      return null;
+    }
+    if (delta < 0 ? at === 0 : at === order.length - 1) {
+      return null;
+    }
+    const beforeId = delta < 0 ? (order[at - 1] ?? null) : (order[at + 2] ?? null);
+    return () => {
+      if (space === 'vault') {
+        moveVault([id], vaultFolderId, beforeId);
+      } else if (currentFolder !== undefined) {
+        moveBookmarks([id], currentFolder.id, beforeId);
+      }
+    };
+  };
+
+  /** Ctrl+Shift+←／→ 挪動焦點所在的卡片；其餘的鍵交給方向鍵巡覽 */
+  const gridKeys =
+    (space: Mode, fallback: (event: ReactKeyboardEvent<HTMLDivElement>) => void) =>
+    (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+      if (event.ctrlKey && event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        const id = (event.target as HTMLElement).closest<HTMLElement>('[data-drag-id]')?.dataset.dragId;
+        const step = id === undefined ? null : stepper(space, id, event.key === 'ArrowLeft' ? -1 : 1);
+        event.preventDefault();
+        step?.();
+        return;
+      }
+      fallback(event);
+    };
+
+  // 合併選單貼著卡片；捲動之後那張卡片已經不在原處（甚至被虛擬滾動卸載了），就關掉
+  useEffect(() => {
+    if (merge === null) {
+      return;
+    }
+    const close = (): void => {
+      setMerge(null);
+    };
+    window.addEventListener('scroll', close, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', close);
+    };
+  }, [merge]);
 
   /*
    * 兩個模式各有自己的多選狀態（id 空間不同），但工具列只有一組。
@@ -511,7 +679,8 @@ export function Gallery() {
     // 多選中點卡片是勾選，巡覽移到角落的箭頭（與側邊欄同一套規則）
     <div
       key={folder.id}
-      className={`card-wrap${vaultSelectedIds.has(folder.id) ? ' card-wrap--selected' : ''}`}
+      className={`card-wrap${vaultSelectedIds.has(folder.id) ? ' card-wrap--selected' : ''}${vaultDrag.dropClass(folder.id)}`}
+      {...vaultDrag.cardProps(folder.id)}
     >
       <button
         type="button"
@@ -565,7 +734,8 @@ export function Gallery() {
       <button
         key={record.id}
         type="button"
-        className={`card card--select${vaultSelectedIds.has(record.id) ? ' card--selected' : ''}`}
+        className={`card card--select${vaultSelectedIds.has(record.id) ? ' card--selected' : ''}${vaultDrag.dropClass(record.id)}`}
+        {...vaultDrag.cardProps(record.id)}
         data-nav=""
         role="checkbox"
         aria-checked={vaultSelectedIds.has(record.id)}
@@ -592,7 +762,8 @@ export function Gallery() {
     ) : (
       <a
         key={record.id}
-        className="card"
+        className={`card${vaultDrag.dropClass(record.id)}`}
+        {...vaultDrag.cardProps(record.id)}
         data-nav=""
         href={record.url}
         title={record.url}
@@ -848,6 +1019,7 @@ export function Gallery() {
               go({ mode: 'vault', folderId: id });
             }}
             onUp={upVault}
+            drop={{ props: (id) => vaultDrag.crumbProps(id, true), className: vaultDrag.crumbClass }}
           />
         ) : search === null ? (
           <Breadcrumb
@@ -863,6 +1035,15 @@ export function Gallery() {
               go({ mode: 'bookmarks', folderId: id });
             }}
             onUp={upBookmarks}
+            drop={
+              canDragBookmarks
+                ? {
+                    // 「全部」那一層只能放 Firefox 的永久資料夾，不接受拖放
+                    props: (id) => bookmarkDrag.crumbProps(id, id !== null),
+                    className: bookmarkDrag.crumbClass,
+                  }
+                : undefined
+            }
           />
         ) : (
           <p className="gallery__hint">
@@ -882,7 +1063,8 @@ export function Gallery() {
         ) : (
           <div
             ref={vaultGridRef}
-            onKeyDown={vaultNav.onKeyDown}
+            onKeyDown={gridKeys('vault', vaultNav.onKeyDown)}
+            {...vaultDrag.gridProps}
             className="grid"
             style={{ ...gridStyle, paddingTop: vaultGrid.padTop, paddingBottom: vaultGrid.padBottom }}
           >
@@ -900,7 +1082,8 @@ export function Gallery() {
       ) : (
         <div
           ref={gridRef}
-          onKeyDown={nav.onKeyDown}
+          onKeyDown={gridKeys('bookmarks', nav.onKeyDown)}
+          {...bookmarkDrag.gridProps}
           className="grid"
           // 墊高用 padding：網格用空 div 佔位還得跨滿整列，padding 沒有這個問題
           style={{ ...gridStyle, paddingTop: gridRows.padTop, paddingBottom: gridRows.padBottom }}
@@ -912,7 +1095,8 @@ export function Gallery() {
               // 但「點資料夾卻只是進去、選不到它」也同樣不合直覺。
               <div
                 key={node.id}
-                className={`card-wrap${selecting && selectedIds.has(node.id) ? ' card-wrap--selected' : ''}`}
+                className={`card-wrap${selecting && selectedIds.has(node.id) ? ' card-wrap--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
+                {...bookmarkDrag.cardProps(node.id)}
               >
                 <button
                   type="button"
@@ -970,7 +1154,8 @@ export function Gallery() {
               <button
                 key={node.id}
                 type="button"
-                className={`card card--select${selectedIds.has(node.id) ? ' card--selected' : ''}`}
+                className={`card card--select${selectedIds.has(node.id) ? ' card--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
+                {...bookmarkDrag.cardProps(node.id)}
                 data-nav=""
                 role="checkbox"
                 aria-checked={selectedIds.has(node.id)}
@@ -999,7 +1184,8 @@ export function Gallery() {
             ) : (
               <a
                 key={node.id}
-                className="card"
+                className={`card${bookmarkDrag.dropClass(node.id)}`}
+                {...bookmarkDrag.cardProps(node.id)}
                 data-nav=""
                 href={node.url}
                 title={node.url}
@@ -1038,6 +1224,11 @@ export function Gallery() {
           }}
           onChanged={reload}
           onNotice={setNotice}
+          reorder={
+            canDragBookmarks
+              ? { earlier: stepper('bookmarks', menu.node.id, -1), later: stepper('bookmarks', menu.node.id, 1) }
+              : undefined
+          }
         />
       ) : null}
 
@@ -1207,6 +1398,30 @@ export function Gallery() {
         />
       ) : null}
 
+      {merge !== null ? (
+        <MergeMenu
+          x={merge.x}
+          y={merge.y}
+          onClose={() => {
+            setMerge(null);
+          }}
+          onCreateFolder={(name) => {
+            const { space, targetId, ids } = merge;
+            if (ids.length > 1) {
+              exitSelection();
+            }
+            if (space === 'vault') {
+              void vault.mergeIntoFolder(targetId, ids, name);
+              return;
+            }
+            void request('bookmarks/merge-folder', { targetId, ids, title: name }).then(
+              reload,
+              reportFailure,
+            );
+          }}
+        />
+      ) : null}
+
       {vaultMenu !== null ? (
         <VaultRowMenu
           target={vaultMenu}
@@ -1242,6 +1457,10 @@ export function Gallery() {
             void vault.reload();
           }}
           onNotice={setNotice}
+          reorder={(() => {
+            const id = vaultMenu.kind === 'bookmark' ? vaultMenu.record.id : vaultMenu.folder.id;
+            return { earlier: stepper('vault', id, -1), later: stepper('vault', id, 1) };
+          })()}
         />
       ) : null}
 

@@ -19,6 +19,7 @@ import type {
   ThumbSource,
   VaultState,
 } from './types';
+import type { VaultLayout } from './vault-layout';
 import type { MergeReport } from './vault-merge';
 
 export interface OpenBookmarkRequest {
@@ -159,6 +160,19 @@ export type Protocol = {
     request: { ids: string[]; parentId: string };
     response: { moved: number; failed: number };
   };
+  /**
+   * 拖拽排序：把 `ids` 依序放到 `parentId` 裡 `beforeId` 那一筆的前面（null = 最後）。
+   * 不在 `parentId` 裡的會先搬過來，所以「拖進資料夾」也是這一則。
+   */
+  'bookmarks/reorder': {
+    request: { ids: string[]; parentId: string; beforeId: string | null };
+    response: { moved: number; failed: number };
+  };
+  /** 兩張卡片疊在一起 →「建立資料夾」：建在 `targetId` 的位置，兩者（與其餘 `ids`）搬進去 */
+  'bookmarks/merge-folder': {
+    request: { targetId: string; ids: string[]; title: string };
+    response: { id: string };
+  };
   'bookmarks/folders': { request: void; response: FolderChoice[] };
   /**
    * 新增資料夾。
@@ -215,6 +229,17 @@ export type Protocol = {
    */
   'vault/folder-move': { request: { id: string; parentId: string | null }; response: void };
   'vault/move': { request: { id: string; folderId: string | null }; response: void };
+  /** 版面（排列順序）。畫面與背景頁要用同一份才算得出同一個順序 */
+  'vault/layout': { request: void; response: VaultLayout };
+  /** 拖拽排序，語意同 `bookmarks/reorder`；`folderId: null` 是隱私空間最上層 */
+  'vault/reorder': {
+    request: { ids: string[]; folderId: string | null; beforeId: string | null };
+    response: VaultState;
+  };
+  'vault/merge-folder': {
+    request: { targetId: string; ids: string[]; name: string };
+    response: { id: string };
+  };
   'vault/refresh-thumb': { request: { id: string }; response: RefreshReport };
   'vault/backfill': { request: void; response: BackfillReport };
   'vault/export': { request: { id: string; parentId?: string }; response: VaultState };

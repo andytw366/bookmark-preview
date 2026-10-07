@@ -32,15 +32,28 @@ export interface BackupFile {
   vault: VaultMeta;
   /** base64 的加密信封（`vault-codec` 的輸出接回單一字串） */
   blob: string;
+  /**
+   * 版面（排列順序）的加密信封，同一把金鑰。選用：舊版的備份檔沒有。
+   *
+   * 加欄位而**不升 `BACKUP_VERSION`**：舊版 `parseBackup` 會拒絕版本較新的檔案，
+   * 但會忽略多出來的欄位 —— 新版做的備份在舊版裡照樣還原得了，只是沒有排序。
+   */
+  layout?: string;
 }
 
-export function buildBackup(meta: VaultMeta, blob: string, now: number = Date.now()): string {
+export function buildBackup(
+  meta: VaultMeta,
+  blob: string,
+  now: number = Date.now(),
+  layout?: string,
+): string {
   const file: BackupFile = {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     createdAt: now,
     vault: meta,
     blob,
+    ...(layout === undefined ? {} : { layout }),
   };
   // 縮排兩格：檔案大小差別可以忽略，但人工檢查與 diff 差很多
   return JSON.stringify(file, null, 2);
@@ -97,6 +110,7 @@ export function parseBackup(text: string): BackupFile {
     createdAt: typeof file.createdAt === 'number' && Number.isFinite(file.createdAt) ? file.createdAt : 0,
     vault: vault as VaultMeta,
     blob: file.blob,
+    ...(typeof file.layout === 'string' && file.layout !== '' ? { layout: file.layout } : {}),
   };
 }
 

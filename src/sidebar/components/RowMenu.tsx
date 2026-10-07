@@ -4,6 +4,7 @@ import type { BookmarkNode } from '@/shared/types';
 import { folderHash } from '../lib/gallery-history';
 import { FolderPicker } from './FolderPicker';
 import { Popover } from './Popover';
+import { ReorderItems, type ReorderActions } from './ReorderItems';
 import { t } from '@/shared/i18n';
 
 export interface MenuTarget {
@@ -21,6 +22,8 @@ interface RowMenuProps {
   onMoveToVault: (node: BookmarkNode) => void;
   onChanged: () => void;
   onNotice: (message: string) => void;
+  /** 全頁瀏覽的「往前移／往後移」。省略就不顯示（側邊欄、搜尋結果、最上層） */
+  reorder?: ReorderActions | undefined;
 }
 
 /**
@@ -38,6 +41,7 @@ export function RowMenu({
   onMoveToVault,
   onChanged,
   onNotice,
+  reorder,
 }: RowMenuProps) {
   const { node } = target;
   const [renaming, setRenaming] = useState(false);
@@ -217,6 +221,8 @@ export function RowMenu({
       >
         {t('action_move_to')}
       </button>
+
+      {reorder !== undefined ? <ReorderItems reorder={reorder} onClose={onClose} /> : null}
 
       {canMoveToVault ? (
         <button

@@ -50,6 +50,14 @@ npm run build && ./scripts/ff.sh start
 - **數字輸入框連續打字會掉字**（受控 input + 非同步 settings），每個字之間停 1 秒以上。
 - 進程名是 `firefox-bin`，`pkill -x firefox` 殺不掉；也**不要**用 `pkill -f firefox`（會殺到腳本自己）。用 `./scripts/ff.sh stop`。
 
+## 拖拽
+
+`./scripts/ff.sh drag X1 Y1 X2 Y2` 一次做完。要在拖到一半時截圖（看插入線、合併的虛線框、停留時間）就拆開：
+`press X Y glide X Y wait 0.6 glide X+2 Y+2 crop … release`。HTML5 拖拽要「按住 → 分好幾段移動」
+才會開始，一次跳到終點只會得到一個點擊；腳本的 `glide` 已經處理好。拖到分頁列開出的新分頁會搶焦點，拖完要切回來。
+
+**動到 `src/background/` 之後要 `stop` 再 `start`**：`web-ext run` 重建後背景頁可能還是舊的（NEXT.md 有記）。
+
 ## 驗「有沒有寫到磁碟」
 
 隱私空間的東西不能出現在網址、`history.state` 這類會被 session restore 存下來的地方。

@@ -1,3 +1,4 @@
+import type { HTMLAttributes } from 'react';
 import { t } from '@/shared/i18n';
 
 /**
@@ -14,13 +15,23 @@ interface BreadcrumbProps {
   onNavigate: (folderId: string | null) => void;
   /** 有給就在最前面放一顆「↑」回上一層（全頁瀏覽用；側邊欄窄，靠 Backspace 與滑鼠側鍵） */
   onUp?: (() => void) | undefined;
+  /**
+   * 全頁瀏覽的拖拽：把一段麵包屑當成落點（拖到那一層）。回傳要掛在那一段上的處理器，
+   * 與它現在要不要亮起來的 class。
+   */
+  drop?:
+    | {
+        props: (folderId: string | null) => HTMLAttributes<HTMLElement>;
+        className: (folderId: string | null) => string;
+      }
+    | undefined;
 }
 
 /**
  * 窄欄用麵包屑，而非縮排樹狀清單 —— 側邊欄典型寬度只有 320–420px，
  * 放不下多層縮排。路徑過長時只保留最後兩層並以「…」代表被折疊的中間層。
  */
-export function Breadcrumb({ path, onNavigate, onUp }: BreadcrumbProps) {
+export function Breadcrumb({ path, onNavigate, onUp, drop }: BreadcrumbProps) {
   if (path.length === 0) {
     return null;
   }
@@ -43,7 +54,8 @@ export function Breadcrumb({ path, onNavigate, onUp }: BreadcrumbProps) {
       ) : null}
       <button
         type="button"
-        className="crumbs__item"
+        className={`crumbs__item${drop?.className(null) ?? ''}`}
+        {...drop?.props(null)}
         onClick={() => {
           onNavigate(null);
         }}
@@ -65,7 +77,8 @@ export function Breadcrumb({ path, onNavigate, onUp }: BreadcrumbProps) {
             ) : (
               <button
                 type="button"
-                className="crumbs__item"
+                className={`crumbs__item${drop?.className(folder.id) ?? ''}`}
+                {...drop?.props(folder.id)}
                 onClick={() => {
                   onNavigate(folder.id);
                 }}
