@@ -9,7 +9,7 @@ import {
   type Direction,
   type Grid,
 } from './grid';
-import { nextColor, sameName, type GroupInfo } from './groups';
+import { nextColor, sameName, type GroupInfo, type TagHit } from './groups';
 import { t } from './i18n';
 
 /**
@@ -653,4 +653,20 @@ export function listNudge(board: Board, id: string, step: -1 | 1): GridOp | null
     return null;
   }
   return { kind: 'place', ids: [id], at: step < 0 ? at + step : at + step + 1, aimed: target };
+}
+
+/**
+ * `#名稱` 搜尋結果的版面：照結果的順序排，找到的群組照樣是一段（`gather`），只為了畫出來 ——
+ * 搜尋結果跨資料夾，不能排、不能改群組。
+ */
+export function searchBoard(ids: readonly string[], hits: readonly TagHit[], columns: number): Board {
+  const groupOf = new Map(hits.flatMap((hit) => hit.members.map((id) => [id, hit.group.id] as const)));
+  return buildBoard({
+    stored: null,
+    fixed: false,
+    children: ids,
+    autoColumns: columns,
+    groups: hits.map((hit) => hit.group),
+    groupOf: (id) => groupOf.get(id) ?? null,
+  });
 }

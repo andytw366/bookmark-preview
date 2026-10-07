@@ -1931,5 +1931,8 @@
   },
   "search_tag_hint": {
     "message": "打 #名稱 可以找出所有資料夾裡這個 tag 的書籤"
+  },
+  "group_tag_search_hint": {
+    "message": "點一下開啟這個群組所在的資料夾"
   }
 }

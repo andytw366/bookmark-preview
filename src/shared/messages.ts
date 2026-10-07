@@ -214,8 +214,8 @@ export type Protocol = {
     request: { fromFolderId: string; groupId: string; toFolderId: string; columns: number };
     response: void;
   };
-  /** 搜尋的 `#名稱`：所有資料夾裡名稱相符的群組成員（`folderId` 是群組所在的資料夾） */
-  'groups/find': { request: { name: string }; response: { folderId: string; id: string }[] };
+  /** 搜尋的 `#名稱`：所有資料夾裡名稱相符的群組（連同成員；`folderId` 是群組所在的資料夾） */
+  'groups/find': { request: { name: string }; response: { folderId: string; group: StoredGroup }[] };
   'bookmarks/folders': { request: void; response: FolderChoice[] };
   /**
    * 新增資料夾。

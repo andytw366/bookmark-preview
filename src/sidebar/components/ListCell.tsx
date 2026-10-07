@@ -35,6 +35,7 @@ export function ListCell({
         <GroupTag
           group={row.group}
           drag={grouping.drag.labelProps(row.group.id)}
+          hint={grouping.board.tagHint}
           onMenu={(x, y) => {
             grouping.board.openGroupMenu(row.group, x, y);
           }}

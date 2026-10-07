@@ -268,8 +268,10 @@ Both views and both spaces search the same way:
 Bookmark groups live in the background page, so `#name` asks it (`groups/find`) and keeps
 only members still in that group's folder. The vault is searched entirely in the page
 from the already-decrypted data (`searchVault`); the query is never sent anywhere and is
-cleared on lock and when switching between bookmarks and the vault. Results have no groups
-and cannot be rearranged.
+cleared on lock and when switching between bookmarks and the vault. Results cannot be
+rearranged. `#name` results still show their groups (bar or outline plus tag, each group kept
+together, `searchBoard`); since they span folders, clicking a tag opens that group's folder
+instead of the group menu. Plain-text results show no groups.
 
 ### The top toolbar
 

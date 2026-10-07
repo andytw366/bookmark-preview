@@ -1,4 +1,4 @@
-import { tagMatches, tagQuery } from '@/shared/groups';
+import { tagMatches, tagQuery, type TagHit } from '@/shared/groups';
 import type { PrivateBookmark, PrivateFolder } from '@/shared/types';
 import {
   vaultChildren,
@@ -79,4 +79,28 @@ export function searchVault<F extends PrivateFolder, B extends PrivateBookmark>(
   };
   walk(null, 0);
   return [...folderHits, ...hits];
+}
+
+/** `#名稱` 搜尋找到的群組（搜尋結果裡照樣畫出來）。不是 tag 搜尋回空陣列 */
+export function vaultTagHits(bookmarks: readonly PrivateBookmark[], layout: VaultLayout, query: string): TagHit[] {
+  const tag = tagQuery(query);
+  if (tag === null) {
+    return [];
+  }
+  const groupOf = vaultGroupOf(layout);
+  return Object.keys(layout.sections.groups ?? {}).flatMap((id) => {
+    const entry = vaultGroupEntry(layout, id);
+    if (entry === null || !tagMatches(entry.name, tag)) {
+      return [];
+    }
+    return [
+      {
+        folderId: entry.folderId,
+        group: { id, name: entry.name, color: entry.color, ...(entry.pinned === true ? { pinned: true } : {}) },
+        members: bookmarks
+          .filter((record) => record.folderId === entry.folderId && groupOf(record.id) === id)
+          .map((record) => record.id),
+      },
+    ];
+  });
 }

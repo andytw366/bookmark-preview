@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { buildBoard, type GridOp } from '@/shared/board';
+import { buildBoard, searchBoard, type GridOp } from '@/shared/board';
+import { tagQuery } from '@/shared/groups';
 import { request } from '@/shared/messages';
 import type { BookmarkNode, OpenTarget } from '@/shared/types';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
@@ -27,6 +28,7 @@ import { useSettings } from './hooks/useSettings';
 import { useTagSearch } from './hooks/useTagSearch';
 import { useVault } from './hooks/useVault';
 import { buildIndex, countLinks, pathTo, searchTree } from './lib/tree';
+import { searchVault, vaultTagHits } from './lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
 
 type Tab = 'bookmarks' | 'vault';
@@ -229,8 +231,8 @@ export function App() {
   const currentNode = folderId === null ? undefined : index.byId.get(folderId);
   const currentFolder = currentNode?.kind === 'folder' ? currentNode : undefined;
 
-  const tagged = useTagSearch(trimmed, index);
-  const search = trimmed === '' ? null : searchTree(view.roots ?? [], trimmed, tagged);
+  const tagHits = useTagSearch(trimmed, index);
+  const search = trimmed === '' ? null : searchTree(view.roots ?? [], trimmed, tagHits);
   const folderNodes: BookmarkNode[] = currentFolder?.children ?? view.roots ?? [];
 
   // 勾選是跨資料夾保留的，所以要從整棵樹的索引還原成節點，而不是只看目前這一層。
@@ -292,18 +294,27 @@ export function App() {
       group.members.map((member) => [member, group.id] as const),
     ),
   );
-  const bookmarkBoard = buildBoard({
-    stored: null,
-    fixed: false,
-    children: folderNodes.map((node) => node.id),
-    autoColumns: 1,
-    groups: inFolderView ? (view.grid?.groups ?? []).map(({ members: _members, ...group }) => group) : [],
-    groupOf: (id) => bookmarkGroupOf.get(id) ?? null,
-  });
+  // `#名稱` 的搜尋結果裡群組照樣畫出來（只是不能排；點標籤跳到那個資料夾）
+  const tagResults = search !== null && tagHits !== null;
+  const bookmarkBoard =
+    search !== null && tagHits !== null
+      ? searchBoard(
+          search.nodes.map((node) => node.id),
+          tagHits,
+          1,
+        )
+      : buildBoard({
+          stored: null,
+          fixed: false,
+          children: folderNodes.map((node) => node.id),
+          autoColumns: 1,
+          groups: inFolderView ? (view.grid?.groups ?? []).map(({ members: _members, ...group }) => group) : [],
+          groupOf: (id) => bookmarkGroupOf.get(id) ?? null,
+        });
   // 版面還在讀（undefined）時先不讓拖：落點會算在還沒有群組的順序上
   const canArrange = inFolderView && view.grid !== undefined;
   const nodes: BookmarkNode[] =
-    search !== null
+    search !== null && !tagResults
       ? search.nodes
       : bookmarkBoard.grid.cells.flatMap((id) => {
           const node = index.byId.get(id);
@@ -339,6 +350,15 @@ export function App() {
     },
     isLink: (id) => index.byId.get(id)?.kind === 'link',
     onBatch: exitSelection,
+    onTag: tagResults
+      ? (groupId) => {
+          const hit = tagHits?.find((item) => item.group.id === groupId);
+          if (hit?.folderId != null) {
+            setFolderId(hit.folderId);
+            setQuery('');
+          }
+        }
+      : undefined,
   });
   const scroller = (): HTMLElement | null => document.querySelector<HTMLElement>('.body');
   const bookmarkDrag = useGridDrag({
@@ -384,17 +404,25 @@ export function App() {
   });
 
   /** 隱私空間這邊：同一套，資料在加密的版面文件裡（`useVault` 的那幾個方法） */
-  const vaultRows = vaultChildren(view.folders, view.bookmarks, vaultFolderId, view.layout);
+  const vaultSearching = vaultQuery.trim() !== '';
+  const vaultRows = vaultSearching
+    ? searchVault(view.folders, view.bookmarks, view.layout, vaultQuery)
+    : vaultChildren(view.folders, view.bookmarks, vaultFolderId, view.layout);
   const vaultRowById = new Map(vaultRows.map((row) => [vaultChildId(row), row]));
-  const vaultBoard = buildBoard({
-    stored: null,
-    fixed: false,
-    children: vaultRows.map(vaultChildId),
-    autoColumns: 1,
-    groups: vaultGroups(view.layout, vaultFolderId),
-    groupOf: vaultGroupOf(view.layout),
-  });
-  const canArrangeVault = vaultStatus === 'unlocked' && vaultQuery.trim() === '';
+  const vaultHits = vaultTagHits(view.bookmarks, view.layout, vaultQuery);
+  // 一般的搜尋結果沒有群組；`#名稱` 的照樣畫出來
+  const vaultTagResults = vaultSearching && tagQuery(vaultQuery) !== null;
+  const vaultBoard = vaultSearching
+    ? searchBoard(vaultRows.map(vaultChildId), vaultHits, 1)
+    : buildBoard({
+        stored: null,
+        fixed: false,
+        children: vaultRows.map(vaultChildId),
+        autoColumns: 1,
+        groups: vaultGroups(view.layout, vaultFolderId),
+        groupOf: vaultGroupOf(view.layout),
+      });
+  const canArrangeVault = vaultStatus === 'unlocked' && !vaultSearching;
   const vaultList = useListBoard({
     board: vaultBoard,
     enabled: canArrangeVault,
@@ -409,6 +437,12 @@ export function App() {
     },
     isLink: (id) => vaultRowById.get(id)?.kind === 'bookmark',
     onBatch: exitVaultSelection,
+    onTag: vaultTagResults
+      ? (groupId) => {
+          setVaultFolderId(vaultHits.find((hit) => hit.group.id === groupId)?.folderId ?? null);
+          setVaultQuery('');
+        }
+      : undefined,
   });
   const vaultDrag = useGridDrag({
     ...vaultList.dragHandlers,
@@ -564,7 +598,7 @@ export function App() {
               onToggleSelect={toggleVaultSelect}
               query={vaultQuery}
               onQueryChange={setVaultQuery}
-              grouping={{ board: vaultList, drag: vaultDrag }}
+              grouping={!vaultSearching || vaultTagResults ? { board: vaultList, drag: vaultDrag } : undefined}
             />
           ) : (
             <VaultGate
@@ -761,7 +795,7 @@ export function App() {
               onToggleSelect={toggleSelect}
               // 換資料夾或換搜尋字串時，虛擬滾動要把量到的列高丟掉
               listKey={search === null ? (folderId ?? 'root') : `search:${trimmed}`}
-              grouping={inFolderView ? { board: bookmarkList, drag: bookmarkDrag } : undefined}
+              grouping={inFolderView || tagResults ? { board: bookmarkList, drag: bookmarkDrag } : undefined}
               // 搜尋結果沒有「上一層」可回，最上層也沒有 —— 兩者都不提供，
               // Backspace 於是不做事，而不是把人送到一個看起來像退格失效的地方
               onNavigateUp={

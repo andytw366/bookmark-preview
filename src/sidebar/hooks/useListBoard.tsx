@@ -5,6 +5,7 @@ import { GroupMenu } from '../../gallery/GroupMenu';
 import { MergeMenu } from '../components/MergeMenu';
 import type { ReorderActions } from '../components/ReorderItems';
 import { TagPrompt, type TagActions } from '../components/TagItems';
+import { t } from '@/shared/i18n';
 
 /**
  * 側邊欄清單的群組與排序（第 4 期）。書籤與隱私空間各掛一份，差別只在 `space` 送哪一種訊息。
@@ -27,6 +28,10 @@ export interface ListBoardSpace {
   isLink: (id: string) => boolean;
   /** 一次動了好幾張（多選整批拖）之後退出多選，與「移動到…」一致 */
   onBatch: () => void;
+  /**
+   * `#名稱` 的搜尋結果：點標籤不開選單（結果跨資料夾，選單的操作沒有對象），改成跳到那個群組所在的資料夾。
+   */
+  onTag?: ((groupId: string) => void) | undefined;
 }
 
 /** 一列在群組裡的位置：決定色條要不要接上一列／下一列 */
@@ -282,8 +287,14 @@ export function useListBoard(space: ListBoardSpace) {
     order: board.grid.cells,
     rowGroup,
     openGroupMenu: (group: GroupInfo, x: number, y: number) => {
+      if (space.onTag !== undefined) {
+        space.onTag(group.id);
+        return;
+      }
       setGroupMenu({ group, x, y });
     },
+    /** 標籤的提示：搜尋結果裡點它是跳到資料夾 */
+    tagHint: space.onTag === undefined ? undefined : t('group_tag_search_hint'),
     reorder,
     tagActions,
     onKeyDown,

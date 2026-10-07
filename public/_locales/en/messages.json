@@ -1931,5 +1931,8 @@
   },
   "search_tag_hint": {
     "message": "Type #name to find every bookmark with that tag, across all folders"
+  },
+  "group_tag_search_hint": {
+    "message": "Click to open the folder this group is in"
   }
 }

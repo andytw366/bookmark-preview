@@ -52,8 +52,11 @@ interface VaultViewProps {
   /** 搜尋字。由 App 持有：上鎖時要一起清掉 */
   query: string;
   onQueryChange: (query: string) => void;
-  /** 群組與拖拽（第 4 期）。搜尋中不用（順序沒有意義） */
-  grouping: { board: ListBoard; drag: GridDrag };
+  /**
+   * 群組與拖拽（第 4 期）。一般的搜尋結果不傳（順序沒有意義）；`#名稱` 的搜尋結果傳一份不能拖、
+   * 只畫出群組的（App 用同一份 `searchVault` 建）。
+   */
+  grouping?: { board: ListBoard; drag: GridDrag } | undefined;
 }
 
 export function VaultView({
@@ -99,17 +102,19 @@ export function VaultView({
    * 虛擬滾動的單位是「第幾列」，兩段各自 map 的話就沒有一個共同的索引可以切 ——
    * 而且「先資料夾後書籤」本來就是同一份清單的順序，只是原本分兩段畫。
    */
-  const rows: VaultRow[] = searching
+  const listed: VaultRow[] = searching
     ? searchVault(folders, bookmarks, layout, query)
-    : (() => {
-        // 照版面的順序（群組聚成連續的幾列）；`order` 與這裡用的是同一份 `vaultChildren`
-        const byId = new Map(vaultChildren(folders, bookmarks, folderId, layout).map((row) => [vaultChildId(row), row]));
-        return grouping.board.order.flatMap((id) => {
+    : vaultChildren(folders, bookmarks, folderId, layout);
+  // 有版面時照版面的順序（群組聚成連續的幾列）；App 建版面用的是同一份清單
+  const byId = new Map(listed.map((row) => [vaultChildId(row), row]));
+  const rows: VaultRow[] =
+    grouping === undefined
+      ? listed
+      : grouping.board.order.flatMap((id) => {
           const row = byId.get(id);
           return row === undefined ? [] : [row];
         });
-      })();
-  const listGrouping = searching ? undefined : grouping;
+  const listGrouping = grouping;
 
   /*
    * 每個資料夾直接裝了幾個書籤，一次算完。
@@ -300,7 +305,11 @@ export function VaultView({
         <Breadcrumb
           path={vaultPathTo(folders, folderId)}
           onNavigate={onNavigate}
-          drop={{ props: (id) => grouping.drag.crumbProps(id, true), className: grouping.drag.crumbClass }}
+          drop={
+            grouping === undefined
+              ? undefined
+              : { props: (id) => grouping.drag.crumbProps(id, true), className: grouping.drag.crumbClass }
+          }
         />
       )}
 

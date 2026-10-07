@@ -50,6 +50,16 @@ export function nextColor(existing: readonly GroupInfo[]): number {
 }
 
 /**
+ * `#名稱` 搜尋找到的一個群組：在哪個資料夾、群組本身、成員（照那個資料夾的順序，只含真的還在那裡的）。
+ * 搜尋結果裡群組照樣畫出來（色條／框線＋標籤），點標籤是跳到那個資料夾。
+ */
+export interface TagHit {
+  folderId: string | null;
+  group: GroupInfo;
+  members: string[];
+}
+
+/**
  * 搜尋框裡的 `#名稱`：找出所有名為這個 tag 的群組成員（跨資料夾）。回傳要比對的名稱，
  * 不是 tag 搜尋就回 null。只打一個 `#` 還不算（那時當成普通的字去找）。
  */

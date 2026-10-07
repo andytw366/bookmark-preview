@@ -1,4 +1,4 @@
-import { tagQuery } from '@/shared/groups';
+import { tagQuery, type TagHit } from '@/shared/groups';
 import type { BookmarkFolder, BookmarkLink, BookmarkNode } from '@/shared/types';
 
 export interface TreeIndex {
@@ -66,14 +66,15 @@ export interface SearchOutcome {
  * 全樹搜尋。忽略目前所在的資料夾。
  *
  * - 一般的字：資料夾比對名稱，書籤比對標題與網址。
- * - `#名稱`（`tagQuery`）：`tagged` 裡的書籤，也就是名稱相符的群組成員（跨資料夾）。
- *   群組資料在背景頁，由呼叫端先問好（`groups/find`）；還沒問到時傳 null，結果是空的。
+ * - `#名稱`（`tagQuery`）：`hits`（名稱相符的群組）的成員，跨資料夾。
+ *   群組資料在背景頁，由呼叫端先問好（`useTagSearch`）；還沒問到時傳 null，結果是空的。
  */
 export function searchTree(
   roots: BookmarkNode[],
   query: string,
-  tagged: ReadonlySet<string> | null = null,
+  hits: readonly TagHit[] | null = null,
 ): SearchOutcome {
+  const tagged = new Set(hits?.flatMap((hit) => hit.members));
   const tag = tagQuery(query) !== null;
   const needle = query.trim().toLowerCase();
   const folders: BookmarkNode[] = [];
@@ -94,7 +95,7 @@ export function searchTree(
         continue;
       }
       const hit = tag
-        ? tagged?.has(node.id) === true
+        ? tagged.has(node.id)
         : node.title.toLowerCase().includes(needle) || node.url.toLowerCase().includes(needle);
       if (hit) {
         links.push(node);

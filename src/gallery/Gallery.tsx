@@ -25,6 +25,7 @@ import {
   layoutGrid,
   membersInOrder,
   orderIndexAt,
+  searchBoard,
   type Board,
   type GridOp,
 } from '@/shared/board';
@@ -62,7 +63,7 @@ import {
 } from '../sidebar/lib/gallery-history';
 import { contextMenuHandlers } from '../sidebar/lib/keys';
 import { buildIndex, countLinks, pathTo, searchTree } from '../sidebar/lib/tree';
-import { searchVault, vaultPathTo } from '../sidebar/lib/vault-tree';
+import { searchVault, vaultPathTo, vaultTagHits } from '../sidebar/lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
 import { useGridDrag } from './useGridDrag';
 import { GroupOutlines } from './GroupOutlines';
@@ -418,8 +419,8 @@ export function Gallery() {
   const trimmed = query.trim();
   const currentNode = folderId === null ? undefined : index.byId.get(folderId);
   const currentFolder = currentNode?.kind === 'folder' ? currentNode : undefined;
-  const tagged = useTagSearch(mode === 'bookmarks' ? trimmed : '', index);
-  const search = trimmed === '' ? null : searchTree(viewRoots ?? [], trimmed, tagged);
+  const tagHits = useTagSearch(mode === 'bookmarks' ? trimmed : '', index);
+  const search = trimmed === '' ? null : searchTree(viewRoots ?? [], trimmed, tagHits);
   const nodes: BookmarkNode[] =
     search !== null ? search.nodes : (currentFolder?.children ?? viewRoots ?? []);
   /** 隱私空間的搜尋（全在記憶體裡做，規則與書籤那邊一樣）。null = 沒在搜尋 */
@@ -496,7 +497,11 @@ export function Gallery() {
   const bookmarkGroupOf = new Map(
     (view.grid ?? null)?.groups.flatMap((group) => group.members.map((member) => [member, group.id] as const)) ?? [],
   );
-  const bookmarkBoard: Board = buildBoard({
+  // `#名稱` 的搜尋結果裡群組照樣畫出來（只是不能排；點標籤跳到那個資料夾）
+  const bookmarkTagResults = search !== null && tagHits !== null;
+  const bookmarkBoard: Board = search !== null && tagHits !== null
+    ? searchBoard(nodes.map((node) => node.id), tagHits, columns)
+    : buildBoard({
     stored:
       inFolderView && view.grid != null && view.grid.columns > 0
         ? { columns: view.grid.columns, cells: nodes.map((node) => node.id) }
@@ -538,14 +543,18 @@ export function Gallery() {
   const vaultColumns = useGridColumns(vaultScrollRef, size, GRID_GAP);
   // 搜尋結果與書籤那邊一樣：照順序排、沒有群組、不能拖
   const vaultFixed = vaultSearch === null ? folderColumns(view.layout, vaultFolderId) : null;
-  const vaultBoard: Board = buildBoard({
-    stored: vaultFixed === null ? null : { columns: vaultFixed, cells: vaultRows.map(vaultChildId) },
-    fixed: vaultFixed !== null,
-    children: vaultRows.map(vaultChildId),
-    autoColumns: vaultColumns,
-    groups: vaultSearch === null ? vaultGroups(view.layout, vaultFolderId) : [],
-    groupOf: vaultGroupOf(view.layout),
-  });
+  const vaultHits = vaultSearch === null ? [] : vaultTagHits(view.bookmarks, view.layout, trimmed);
+  const vaultBoard: Board =
+    vaultSearch !== null
+      ? searchBoard(vaultRows.map(vaultChildId), vaultHits, vaultColumns)
+      : buildBoard({
+          stored: vaultFixed === null ? null : { columns: vaultFixed, cells: vaultRows.map(vaultChildId) },
+          fixed: vaultFixed !== null,
+          children: vaultRows.map(vaultChildId),
+          autoColumns: vaultColumns,
+          groups: vaultGroups(view.layout, vaultFolderId),
+          groupOf: vaultGroupOf(view.layout),
+        });
   const vaultCols = vaultBoard.grid.columns;
   const vaultShown: Grid = layoutGrid(vaultBoard);
   const canDragVault = mode === 'vault' && vaultSearch === null;
@@ -1066,6 +1075,9 @@ export function Gallery() {
       </a>
     );
 
+  /** 這個空間現在畫的是 `#名稱` 的搜尋結果（標籤點了是跳到資料夾） */
+  const searchTag = (space: Mode): boolean => (space === 'vault' ? vaultSearch !== null : bookmarkTagResults);
+
   /** 群組標籤選單的動作，兩個空間各接各的訊息 */
   const groupCall = (
     space: Mode,
@@ -1183,7 +1195,22 @@ export function Gallery() {
             <GroupTag
               group={tag}
               drag={drag.labelProps(tag.id)}
+              hint={searchTag(space) ? t('group_tag_search_hint') : undefined}
               onMenu={(x, y) => {
+                // 搜尋結果跨資料夾，選單的操作沒有對象：點標籤是跳到那個群組所在的資料夾
+                if (space === 'vault' && vaultSearch !== null) {
+                  go({ mode: 'vault', folderId: vaultHits.find((hit) => hit.group.id === tag.id)?.folderId ?? null });
+                  setQuery('');
+                  return;
+                }
+                if (space === 'bookmarks' && bookmarkTagResults) {
+                  const folder = tagHits?.find((hit) => hit.group.id === tag.id)?.folderId;
+                  if (folder != null) {
+                    go({ mode: 'bookmarks', folderId: folder });
+                    setQuery('');
+                  }
+                  return;
+                }
                 setGroupMenu({ space, group: tag, x, y });
               }}
             />

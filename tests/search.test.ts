@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyOp, buildBoard, listNudge, type Board } from '@/shared/board';
+import { applyOp, buildBoard, listNudge, searchBoard, type Board } from '@/shared/board';
 import { tagMatches, tagQuery } from '@/shared/groups';
 import type { BookmarkNode, PrivateBookmark, PrivateFolder } from '@/shared/types';
 import { emptyLayout, withFolderOrder, withGroup, withGroupOf } from '@/shared/vault-layout';
 import { searchTree } from '@/sidebar/lib/tree';
-import { searchVault } from '@/sidebar/lib/vault-tree';
+import { searchVault, vaultTagHits } from '@/sidebar/lib/vault-tree';
 
 /**
  * 第 4 期：搜尋找得到資料夾、`#名稱` 找群組成員，以及側邊欄（一欄）的鍵盤挪動。
@@ -60,7 +60,7 @@ describe('書籤搜尋', () => {
   });
 
   it('#名稱 只列出 tagged 裡的書籤，照樹的順序；資料夾不列', () => {
-    const outcome = searchTree(roots, '#x', new Set(['c', 'a']));
+    const outcome = searchTree(roots, '#x', [{ folderId: 'm', group: { id: 'g', name: 'x', color: 0 }, members: ['c', 'a'] }]);
     expect(outcome.nodes.map((node) => node.id)).toEqual(['a', 'c']);
   });
 
@@ -93,6 +93,28 @@ describe('隱私空間搜尋', () => {
     const hits = searchVault(folders, bookmarks, layout, '#trip');
     // r3 記著 g，但它在最上層、g 在 F：成員資格不成立
     expect(hits.map((hit) => (hit.kind === 'bookmark' ? hit.record.id : hit.folder.id))).toEqual(['r2', 'r1']);
+    // 搜尋結果裡要畫出來的群組：成員只算還在群組那個資料夾裡的
+    expect(vaultTagHits(bookmarks, layout, '#trip').map((hit) => [hit.group.id, hit.members.sort()])).toEqual([
+      ['g', ['r1', 'r2']],
+    ]);
+    expect(vaultTagHits(bookmarks, layout, 'trip')).toEqual([]);
+  });
+});
+
+describe('tag 搜尋結果的版面', () => {
+  it('每個群組是一段（被別的結果隔開也聚起來），不在群組裡的照順序', () => {
+    const board = searchBoard(
+      ['a', 'x', 'b', 'c'],
+      [
+        { folderId: 'F', group: { id: 'g', name: 'w', color: 0 }, members: ['a', 'b'] },
+        { folderId: 'H', group: { id: 'h', name: 'work', color: 1 }, members: ['c'] },
+      ],
+      1,
+    );
+    expect(board.grid.cells).toEqual(['a', 'b', 'x', 'c']);
+    expect(board.memberOf.get('b')).toBe('g');
+    expect(board.memberOf.get('c')).toBe('h');
+    expect(board.memberOf.has('x')).toBe(false);
   });
 });
 
