@@ -394,7 +394,7 @@
 .group-c5 { --group-color: #1fa3b8; }
 
 /*
- * 群組的框：每一格各畫自己的那一塊（往外擴 8px = 網格間距的一半，相鄰的同組格子剛好接上），
+ * 群組的框：每一格各畫自己的那一塊（連到同組鄰格的那幾邊往外擴 8px = 網格間距的一半，剛好接上），
  * 只在「鄰格不是同一組」的那幾邊畫線（`e-t/r/b/l`，`outlineEdges` 算的）；
  * 兩邊都有線的角是凸角，畫圓角。群組換行之後是階梯形，也一樣接得起來，不必包一層容器。
  */
@@ -402,7 +402,8 @@
   position: absolute;
   inset: -8px;
   z-index: -1;
-  background: color-mix(in srgb, var(--group-color) 8%, transparent);
+  /* 不透明：連接邊會互相重疊幾 px（見下面的轉角），半透明的話重疊處會深一條 */
+  background: color-mix(in srgb, var(--group-color) 8%, var(--bg));
   border: 0 solid var(--group-color);
   content: '';
   pointer-events: none;
@@ -413,13 +414,55 @@
 .e-b::before { border-bottom-width: 2px; }
 .e-l::before { border-left-width: 2px; }
 /*
- * 緊貼著另一個群組的那一邊往內縮（`n-t/r/b/l`）：兩邊都畫在間距正中間的話，兩條線黏成一條粗線，
- * 看不出是兩個群組。各縮 4px，中間留 8px 的空隙。
+ * 畫線的那幾邊只往外擴 4px（間距的四分之一）：兩個群組相鄰時中間留 8px 的空隙，不會黏成一條粗線。
+ * 連到同一組鄰格的那幾邊才擴滿 8px，和鄰格接起來。
  */
-.n-t::before { top: -4px; }
-.n-r::before { right: -4px; }
-.n-b::before { bottom: -4px; }
-.n-l::before { left: -4px; }
+.e-t::before { top: -4px; }
+.e-r::before { right: -4px; }
+.e-b::before { bottom: -4px; }
+.e-l::before { left: -4px; }
+
+/*
+ * 凹進去的轉角（L 形的內角）。畫線的邊只擴 4px、連接的邊擴 8px，兩條線會各短一截接不上：
+ *
+ * 1. 「旁邊有畫線」的連接邊多伸 6px（-14px = 再多一條線寬），讓兩條線在轉角正好接上；
+ *    重疊的部分在卡片之間的間距裡，底色不透明所以不會深一條。
+ * 2. 兩邊都連著、但斜對角不是同組的那一格（內角的另一側），它的底色會凸出到框外 4×4px：
+ *    `k-tl/tr/br/bl` 把那個角切掉。
+ */
+.cell--g:not(.e-t):is(.e-l, .e-r)::before { top: -14px; }
+.cell--g:not(.e-b):is(.e-l, .e-r)::before { bottom: -14px; }
+.cell--g:not(.e-l):is(.e-t, .e-b)::before { left: -14px; }
+.cell--g:not(.e-r):is(.e-t, .e-b)::before { right: -14px; }
+
+.cell--g {
+  --k-tl: 0px;
+  --k-tr: 0px;
+  --k-br: 0px;
+  --k-bl: 0px;
+}
+
+.k-tl { --k-tl: 4px; }
+.k-tr { --k-tr: 4px; }
+.k-br { --k-br: 4px; }
+.k-bl { --k-bl: 4px; }
+
+.cell--g:is(.k-tl, .k-tr, .k-br, .k-bl)::before {
+  clip-path: polygon(
+    var(--k-tl) 0,
+    calc(100% - var(--k-tr)) 0,
+    calc(100% - var(--k-tr)) var(--k-tr),
+    100% var(--k-tr),
+    100% calc(100% - var(--k-br)),
+    calc(100% - var(--k-br)) calc(100% - var(--k-br)),
+    calc(100% - var(--k-br)) 100%,
+    var(--k-bl) 100%,
+    var(--k-bl) calc(100% - var(--k-bl)),
+    0 calc(100% - var(--k-bl)),
+    0 var(--k-tl),
+    var(--k-tl) var(--k-tl)
+  );
+}
 .e-t.e-l::before { border-top-left-radius: 10px; }
 .e-t.e-r::before { border-top-right-radius: 10px; }
 .e-b.e-l::before { border-bottom-left-radius: 10px; }

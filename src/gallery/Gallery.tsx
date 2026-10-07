@@ -1153,11 +1153,6 @@ export function Gallery() {
       board.groups.map((group) => [group.id, { ...group, color: colors.get(group.id) ?? group.color }]),
     );
     const tags = labels(board, shown);
-    /** 這一邊緊貼著**另一個**群組：框線往內縮，兩個群組之間才看得出分界 */
-    const facesOther = (index: number, group: string): boolean => {
-      const other = groupOf(shown.cells[index]);
-      return other !== null && other !== group;
-    };
     const out: ReactNode[] = [];
     for (let at = win.start; at < win.end; at += 1) {
       const id = shown.cells[at];
@@ -1167,15 +1162,23 @@ export function Gallery() {
       }
       const edge = edges.get(at);
       const group = groupById.get(board.memberOf.get(id) ?? '');
+      // 內角：兩邊都連著同組、斜對角卻不是 —— 那個角的底色要切掉（見 gallery.css 的 k-*）
       const col = at % shown.columns;
-      const near =
-        group === undefined
-          ? ''
-          : `${facesOther(at - shown.columns, group.id) ? ' n-t' : ''}${col < shown.columns - 1 && facesOther(at + 1, group.id) ? ' n-r' : ''}${facesOther(at + shown.columns, group.id) ? ' n-b' : ''}${col > 0 && facesOther(at - 1, group.id) ? ' n-l' : ''}`;
+      const same = (index: number, ok: boolean): boolean =>
+        ok && group !== undefined && groupOf(shown.cells[index]) === group.id;
+      const up = same(at - shown.columns, true);
+      const down = same(at + shown.columns, true);
+      const left = same(at - 1, col > 0);
+      const right = same(at + 1, col < shown.columns - 1);
+      const corners =
+        (up && left && !same(at - shown.columns - 1, col > 0) ? ' k-tl' : '') +
+        (up && right && !same(at - shown.columns + 1, col < shown.columns - 1) ? ' k-tr' : '') +
+        (down && right && !same(at + shown.columns + 1, col < shown.columns - 1) ? ' k-br' : '') +
+        (down && left && !same(at + shown.columns - 1, col > 0) ? ' k-bl' : '');
       const outline =
         edge === undefined || group === undefined
           ? ''
-          : ` cell--g group-c${String(group.color)}${edge.top ? ' e-t' : ''}${edge.right ? ' e-r' : ''}${edge.bottom ? ' e-b' : ''}${edge.left ? ' e-l' : ''}${near}`;
+          : ` cell--g group-c${String(group.color)}${edge.top ? ' e-t' : ''}${edge.right ? ' e-r' : ''}${edge.bottom ? ' e-b' : ''}${edge.left ? ' e-l' : ''}${corners}`;
       const tagged = tags.get(at);
       const tag = tagged === undefined ? undefined : groupById.get(tagged.id);
       out.push(

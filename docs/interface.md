@@ -218,9 +218,12 @@ the part above), so the group never splits at a row end. Later cards flow into t
 cells around it. Order and screen position therefore differ; drops are converted back
 (`orderIndexAt`), and arrow keys / `Ctrl+Shift+arrow` follow what is on screen.
 Each cell draws its own part of the outline (`outlineEdges`: a side is drawn when the
-neighbour is not in the same group), extending 8px into the gap so neighbours join; a side
-that touches **another** group pulls back to 4px (`n-t/r/b/l`), leaving a visible gap
-between the two outlines.
+neighbour is not in the same group). Outlined sides extend only 4px into the 16px gap, so
+two touching groups keep an 8px space between their frames; joining sides extend 8px so
+neighbours meet. Inner (concave) corners need two extra fixes in `gallery.css`: joining
+sides next to an outlined side extend to 14px so the two lines meet, and the cell on the
+other side of the corner has that corner clipped (`k-tl/tr/br/bl`) so its tint does not
+poke out of the frame. The tint is opaque so the overlaps don't show as darker stripes.
 
 **Colours**: groups that touch never show the same colour (`displayColors`). A group whose
 colour you picked in its menu keeps it (`pinned`); the others are shown in a colour their
