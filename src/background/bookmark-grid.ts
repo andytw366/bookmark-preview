@@ -271,9 +271,11 @@ export async function flattenFolder(subfolderId: string, columns: number): Promi
     await browser.bookmarks.removeTree(subfolderId);
 
     const loaded = await load(parentId, columns);
-    const group = loaded.board.groups.find((item) => sub.title.trim() !== '' && sameName(item.name, sub.title)) ?? {
+    // 「轉成資料夾」替沒名字的群組取的資料夾名稱，攤平回來時還原成沒名字
+    const name = sub.title.trim() === t('group_untitled') ? '' : sub.title.trim();
+    const group = loaded.board.groups.find((item) => name !== '' && sameName(item.name, name)) ?? {
       id: crypto.randomUUID(),
-      name: sub.title.trim(),
+      name,
       color: nextColor(loaded.board.groups),
     };
     await save(parentId, loaded, insertItems(loaded.board, links, group, at === -1 ? undefined : at));

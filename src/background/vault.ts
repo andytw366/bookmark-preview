@@ -1827,9 +1827,11 @@ export async function flattenVaultFolder(subfolderId: string, columns: number): 
     await persist();
 
     const after = vaultBoard(sub.parentId, columns, from);
-    const group = after.board.groups.find((item) => sub.name.trim() !== '' && sameName(item.name, sub.name)) ?? {
+    // 「轉成資料夾」替沒名字的群組取的資料夾名稱，攤平回來時還原成沒名字
+    const name = sub.name.trim() === t('group_untitled') ? '' : sub.name.trim();
+    const group = after.board.groups.find((item) => name !== '' && sameName(item.name, name)) ?? {
       id: crypto.randomUUID(),
-      name: sub.name.trim(),
+      name,
       color: nextColor(after.board.groups),
     };
     const next = insertItems(after.board, inside, group, at === -1 ? undefined : at);
