@@ -1,3 +1,4 @@
+import { gridSyncReserve } from '@/storage/grid-sync';
 import { estimateSyncBytes, fitsInSync, SYNC_META_RESERVE, SYNC_TOTAL_BUDGET, toChunks } from '@/crypto/chunk';
 import { broadcast } from '@/shared/messages';
 import type { SyncOutcome, VaultSyncStatus } from '@/shared/messages';
@@ -316,7 +317,7 @@ async function push(local: VaultMeta, remote: SyncMeta | null): Promise<void> {
   }
   const chunks = toChunks(blob);
   // 版面那份與它共用同一個 100 KB，要把它佔掉的算進來
-  if (!fitsInSync(chunks, SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await layoutSyncBytes()))) {
+  if (!fitsInSync(chunks, SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await layoutSyncBytes()) + (await gridSyncReserve()))) {
     throw new Error(quotaMessage(blob));
   }
   await writeSyncEnvelope(
@@ -373,7 +374,7 @@ async function syncLayout(local: VaultMeta): Promise<void> {
     return;
   }
   const chunks = toChunks(stored.blob);
-  if (!fitsInSync(chunks, LAYOUT_CHUNK_PREFIX, SYNC_META_RESERVE + (await mainSyncBytes()))) {
+  if (!fitsInSync(chunks, LAYOUT_CHUNK_PREFIX, SYNC_META_RESERVE + (await mainSyncBytes()) + (await gridSyncReserve()))) {
     throw new Error(quotaMessage(stored.blob));
   }
   await writeLayoutEnvelope({ salt: local.salt, tag: stored.tag ?? '', deviceId: await deviceId() }, chunks);
@@ -409,7 +410,7 @@ export async function overwriteRemote(): Promise<void> {
      * 反過來的話（清空 → 上傳 → 因為超額而失敗）會變成兩邊都沒有那份副本，
      * 而使用者按這顆按鈕的處境往往正是「資料很多」。
      */
-    if (!fitsInSync(chunks, SYNC_CHUNK_PREFIX)) {
+    if (!fitsInSync(chunks, SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await gridSyncReserve()))) {
       throw new Error(quotaMessage(blob));
     }
     await clearSyncEnvelope();
@@ -516,7 +517,7 @@ export async function syncStatus(): Promise<VaultSyncStatus> {
     bytes: await syncBytesInUse(),
     wouldFit:
       blob === null ||
-      fitsInSync(toChunks(blob), SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await layoutSyncBytes())),
+      fitsInSync(toChunks(blob), SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await layoutSyncBytes()) + (await gridSyncReserve())),
     deletedElsewhere: gone !== null && gone.deviceId !== (await deviceId()),
   };
 }

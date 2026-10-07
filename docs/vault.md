@@ -147,7 +147,7 @@ subtree) and the background page's `isWithin` check is the second line.
 
 ## Order
 
-Vault folders can be rearranged in the full-page view (drag, or *Move earlier / later*).
+Vault folders can be rearranged in the full-page view (drag, or *Move left / right*; since phase 3 as a pinned grid, see [Groups](#groups)).
 The order lives in a separate encrypted **layout** document (`src/shared/vault-layout.ts`),
 not on the bookmark records: an older version rebuilding records field by field would drop
 an unknown `order` field during sync, and the two devices would then disagree forever about
@@ -167,18 +167,24 @@ failed unlock — the order is not worth locking anyone out over.
 
 ## Groups
 
-Vault groups are two sections of the encrypted layout document:
+Vault grids and groups are three sections of the encrypted layout document:
 
-- `groups` — `{ id: { folderId, name, color, collapsed, updatedAt, deleted? } }`.
-  Dissolving writes a tombstone rather than removing the entry; removing it would let an
-  older copy on another device bring it back on merge.
+- `grid` — `{ folderKey: { columns, cells, updatedAt } }`, the pinned grid of a folder
+  (see [interface.md](interface.md#fixed-grid)); `columns: 0` is the tombstone for "back to
+  automatic". The `order` section keeps being written as the grid's reading order, so a
+  phase-2 device still sees a sensible order. Cells naming records that are not (yet) here
+  are shown empty and dropped on the next write.
+- `groups` — `{ id: { folderId, name, color, updatedAt, deleted? } }` (older entries may
+  still carry `collapsed`; it is ignored). Groups that lose their last member get a
+  tombstone rather than being removed, so an older copy elsewhere cannot bring them back.
 - `groupOf` — `{ recordId: { groupId | null, updatedAt } }`. Membership only counts when
   the group's folder is the record's current folder, so moving a bookmark out of a folder
   needs no write here.
 
-Both merge with the generic per-entry rule, travel with sync and backups, and are never
-stored in plaintext — group names are as private as the bookmarks. The order written back
-for a folder always has a group's members adjacent.
+All merge with the generic per-entry rule, travel with sync and backups, and are never
+stored in plaintext — group names are as private as the bookmarks. Only entries that
+actually changed are rewritten, so an unchanged entry does not win a merge against another
+device's edit.
 
 ## Whole folders move in and out, structure intact
 

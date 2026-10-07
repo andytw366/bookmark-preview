@@ -772,15 +772,6 @@
   "merge_create_group": {
     "message": "Create group"
   },
-  "group_expand": {
-    "message": "Expand group"
-  },
-  "group_collapse": {
-    "message": "Collapse group"
-  },
-  "group_menu": {
-    "message": "Group options"
-  },
   "group_name_label": {
     "message": "Group name (the tag)"
   },
@@ -843,16 +834,16 @@
     "message": "New folder"
   },
   "row_move_earlier": {
-    "message": "Move earlier"
+    "message": "Move left"
   },
   "row_move_earlier_hint": {
-    "message": "Move one place earlier in this folder (Ctrl+Shift+←)"
+    "message": "Move one cell left, swapping with any card there (Ctrl+Shift+arrow keys move in all four directions)"
   },
   "row_move_later": {
-    "message": "Move later"
+    "message": "Move right"
   },
   "row_move_later_hint": {
-    "message": "Move one place later in this folder (Ctrl+Shift+→)"
+    "message": "Move one cell right, swapping with any card there (Ctrl+Shift+arrow keys move in all four directions)"
   },
   "row_open_in_gallery": {
     "message": "Open in full page"
@@ -1823,5 +1814,105 @@
   },
   "gallery_vault_empty_hint": {
     "message": "No vault bookmarks yet. In the sidebar, use the lock icon on the right of a bookmark, or “Select”, to move some in."
+  },
+  "group_links_only": {
+    "message": "Only bookmarks can go into a group, not folders"
+  },
+  "grid_shape_blocked": {
+    "message": "The whole group doesn't fit there: the target cells must be empty (and inside the columns)"
+  },
+  "grid_auto_has_groups": {
+    "message": "This folder has groups, so it can't go back to automatic layout — wrapping can't keep irregular shapes. Dissolve the groups first."
+  },
+  "grid_frame_disconnected": {
+    "message": "The selected bookmarks must touch each other (up, down, left or right) to be framed as one group"
+  },
+  "group_tag_hint": {
+    "message": "Click for options; drag to move the whole group (Ctrl+Shift+arrow keys move it one cell)"
+  },
+  "grid_frame": {
+    "message": "Frame as group"
+  },
+  "grid_frame_hint": {
+    "message": "Frame the selected bookmarks as one untitled group (they must touch each other)"
+  },
+  "grid_columns": {
+    "message": "Columns"
+  },
+  "grid_columns_less": {
+    "message": "One column fewer"
+  },
+  "grid_columns_more": {
+    "message": "One column more"
+  },
+  "grid_columns_n": {
+    "message": "$N$ columns",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "grid_auto": {
+    "message": "Automatic layout"
+  },
+  "grid_auto_hint": {
+    "message": "Stop pinning columns and positions; wrap with the window width again"
+  },
+  "options_grid_sync_title": {
+    "message": "Bookmark layout and groups"
+  },
+  "options_grid_sync_hint": {
+    "message": "Positions and groups (tags) you arrange in the full-page view sync to your other devices through Firefox. They always use 20 KB of the sync space; the rest is left for the private space."
+  },
+  "options_grid_sync_checkbox": {
+    "message": "Sync bookmark layout and groups"
+  },
+  "options_grid_sync_unavailable": {
+    "message": "Sync storage isn't available in this Firefox, so layout and groups stay on this device."
+  },
+  "options_grid_sync_usage": {
+    "message": "Using $USED$ of $BUDGET$",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "budget": {
+        "content": "$2"
+      }
+    }
+  },
+  "options_grid_sync_over": {
+    "message": "Layout and groups take $USED$, over the $BUDGET$ budget, so syncing them has stopped (they stay on this device). The largest are:",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "budget": {
+        "content": "$2"
+      }
+    }
+  },
+  "options_grid_sync_folder": {
+    "message": "“$TITLE$” $BYTES$",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      },
+      "bytes": {
+        "content": "$2"
+      }
+    }
+  },
+  "options_grid_sync_local_only": {
+    "message": "“$TITLE$” $BYTES$ — too large for one sync item, kept on this device only",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      },
+      "bytes": {
+        "content": "$2"
+      }
+    }
   }
 }

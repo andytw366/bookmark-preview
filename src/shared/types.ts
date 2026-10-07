@@ -194,4 +194,11 @@ export interface Settings {
    * 這台裝置」這個性質就不再成立了，那不該由預設值替使用者決定。
    */
   vaultSyncEnabled: boolean;
+  /**
+   * 書籤的排列與群組（固定格子）跟著 `storage.sync` 到其他裝置。
+   *
+   * **預設打開**：群組名稱與排列本來就是明文書籤的一部分，不像隱私空間那樣需要使用者
+   * 自己決定。固定佔 20 KB（見 `storage/grid-sync.ts`）。
+   */
+  syncGrid: boolean;
 }

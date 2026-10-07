@@ -20,6 +20,7 @@ import type {
   VaultState,
 } from './types';
 import type { GroupInfo } from './groups';
+import type { GridOp } from './board';
 import type { VaultLayout } from './vault-layout';
 import type { MergeReport } from './vault-merge';
 
@@ -150,28 +151,29 @@ export interface VaultSyncStatus {
   lastOutcome: SyncOutcome | null;
 }
 
-/** 原生書籤的群組（存在 `storage.local`，見 `background/bookmark-groups.ts`） */
+/** 原生書籤的群組。成員照閱讀順序（見 `background/bookmark-grid.ts`） */
 export interface StoredGroup extends GroupInfo {
   members: string[];
 }
 
-/**
- * 要加入哪個群組：
- * - `none`：移出群組
- * - `id`：加入這個群組（拖到群組裡、合併到已在群組裡的卡片）
- * - `name`：設定 tag —— 同一個資料夾裡有同名的就加入，沒有就建一個
- * - `new`：一律建新的（合併選單的「建立群組」，名稱通常是空的）
- */
-export type GroupTarget =
-  | { kind: 'none' }
-  | { kind: 'id'; groupId: string }
-  | { kind: 'name'; name: string }
-  | { kind: 'new'; name: string };
+/** 原生書籤一個資料夾的固定格子（`grid:<資料夾>`）。沒有這份 = 還沒定下來（自動換行） */
+export interface BookmarkGrid {
+  columns: number;
+  cells: string[];
+  groups: StoredGroup[];
+}
 
-export interface GroupPatch {
-  name?: string;
-  color?: number;
-  collapsed?: boolean;
+/** 設定頁「同步書籤的排列與群組」那一區要顯示的 */
+export interface GridSyncStatus {
+  available: boolean;
+  enabled: boolean;
+  /** 合計超過預算：整個停止同步排列 */
+  over: boolean;
+  /** 要同步的那幾份合計多大（不含只存本機的） */
+  total: number;
+  budget: number;
+  /** 大到放不進單筆上限、只存本機的資料夾；超過預算時則是佔最多的那幾個 */
+  folders: { title: string; bytes: number; localOnly: boolean }[];
 }
 
 export type Protocol = {
@@ -198,20 +200,19 @@ export type Protocol = {
     request: { targetId: string; ids: string[]; title: string };
     response: { id: string };
   };
-  'groups/list': { request: { folderId: string }; response: StoredGroup[] };
-  /** `arrange`：順便搬原生書籤讓成員相鄰。拖拽時傳 false（位置已經是使用者放的） */
-  'groups/assign': {
-    request: { folderId: string; ids: string[]; target: GroupTarget; arrange: boolean };
-    response: { groupId: string | null };
-  };
-  'groups/update': { request: { folderId: string; groupId: string; patch: GroupPatch }; response: void };
-  'groups/dissolve': { request: { folderId: string; groupId: string }; response: void };
-  'groups/to-folder': { request: { folderId: string; groupId: string }; response: { id: string } };
-  /** 子資料夾攤平成上層的一個同名群組 */
-  'groups/flatten': { request: { folderId: string }; response: void };
-  /** 拖群組標題：整組搬到 `toFolderId` 的 `beforeId` 前面 */
+  'grid/get': { request: { folderId: string }; response: BookmarkGrid | null };
+  /**
+   * 一個版面操作（見 `shared/board.ts` 的 `GridOp`）。`columns` 是畫面現在的欄數：
+   * 還沒定下來的資料夾第一次被操作時，用它把當下的排列寫成格子。
+   */
+  'grid/apply': { request: { folderId: string; columns: number; op: GridOp }; response: void };
+  'grid/sync-status': { request: void; response: GridSyncStatus };
+  'groups/to-folder': { request: { folderId: string; groupId: string; columns: number }; response: { id: string } };
+  /** 子資料夾攤平成上層的一個同名群組，放在子資料夾原本那一格 */
+  'groups/flatten': { request: { folderId: string; columns: number }; response: void };
+  /** 拖群組的標籤到資料夾：整組照原形狀搬到那邊最後一列之後 */
   'groups/move': {
-    request: { fromFolderId: string; groupId: string; toFolderId: string; beforeId: string | null };
+    request: { fromFolderId: string; groupId: string; toFolderId: string; columns: number };
     response: void;
   };
   'bookmarks/folders': { request: void; response: FolderChoice[] };
@@ -281,17 +282,12 @@ export type Protocol = {
     request: { targetId: string; ids: string[]; name: string };
     response: { id: string };
   };
-  /** 隱私空間的群組，語意與 `groups/*` 相同；資料在加密的版面文件裡 */
-  'vault/group-assign': {
-    request: { folderId: string | null; ids: string[]; target: GroupTarget; arrange: boolean };
-    response: { groupId: string | null };
-  };
-  'vault/group-update': { request: { groupId: string; patch: GroupPatch }; response: void };
-  'vault/group-dissolve': { request: { groupId: string }; response: void };
-  'vault/group-to-folder': { request: { groupId: string }; response: { id: string } };
-  'vault/group-flatten': { request: { folderId: string }; response: void };
+  /** 隱私空間的版面操作，語意與 `grid/apply` 相同；資料在加密的版面文件裡 */
+  'vault/grid-apply': { request: { folderId: string | null; columns: number; op: GridOp }; response: void };
+  'vault/group-to-folder': { request: { groupId: string; columns: number }; response: { id: string } };
+  'vault/group-flatten': { request: { folderId: string; columns: number }; response: void };
   'vault/group-move': {
-    request: { groupId: string; toFolderId: string | null; beforeId: string | null };
+    request: { groupId: string; toFolderId: string | null; columns: number };
     response: void;
   };
   'vault/refresh-thumb': { request: { id: string }; response: RefreshReport };
@@ -329,7 +325,7 @@ export type Protocol = {
 export type EventMap = {
   'bookmarks/invalidated': void;
   /** 某個資料夾的群組變了（書籤那邊；隱私空間走 `vault/changed`） */
-  'groups/changed': { folderId: string };
+  'grid/changed': { folderId: string };
   'thumbs/updated': { key: string };
   /**
    * 全部的預覽圖都被清掉了（設定頁的「清除所有預覽圖」）。

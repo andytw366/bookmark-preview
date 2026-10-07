@@ -10,14 +10,16 @@ import {
 import { request } from '@/shared/messages';
 import type { BookmarkNode, PrivateBookmark, PrivateFolder } from '@/shared/types';
 import {
+  folderGrid,
   vaultChildId,
   vaultChildren,
   vaultGroupOf,
   vaultGroups,
   type VaultChild,
 } from '@/shared/vault-layout';
-import { arrange, gridModel, type Arranged, type Cell, type GridModel, type GroupInfo } from '@/shared/groups';
-import type { GroupTarget } from '@/shared/messages';
+import { buildBoard, labelCell, labels, shapeTarget, type Board, type GridOp } from '@/shared/board';
+import { EMPTY, MAX_COLUMNS, MIN_COLUMNS, navCell, outlineEdges, rowCount, stepCell, type Direction } from '@/shared/grid';
+import type { GroupInfo } from '@/shared/groups';
 import { hostnameOf } from '@/shared/url';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
 import { Breadcrumb } from '../sidebar/components/Breadcrumb';
@@ -53,11 +55,10 @@ import { buildIndex, countLinks, pathTo, searchLinks } from '../sidebar/lib/tree
 import { vaultPathTo } from '../sidebar/lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
 import { useGridDrag } from './useGridDrag';
-import { GroupHeader } from './GroupHeader';
+import { GroupTag } from './GroupTag';
 import { GroupMenu } from './GroupMenu';
 import { TagPrompt } from '../sidebar/components/TagItems';
-import { useBookmarkGroups } from '../sidebar/hooks/useBookmarkGroups';
-import { isNoop } from '../sidebar/lib/drop-intent';
+import { useBookmarkGrid } from '../sidebar/hooks/useBookmarkGrid';
 
 /**
  * 獨立分頁的全頁書籤瀏覽。
@@ -100,53 +101,19 @@ type VaultGridRow = VaultChild<PrivateFolder, PrivateBookmark>;
 
 const NO_SELECTION: ReadonlySet<string> = new Set();
 
-/** 隱私空間的格子要帶 id，`arrange` 才分得出誰是誰 */
-interface VaultItem {
-  id: string;
-  row: VaultGridRow;
-}
+/** Ctrl+Shift+方向鍵 → 格子的方向（挪卡片、或在標籤上整組挪） */
+const DIRECTION: Partial<Record<string, Direction>> = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+};
 
-/** 群組標題在拖拽與鍵盤巡覽裡的 id。書籤 id 與隱私記錄 id 都不會以這個開頭 */
-const GROUP_PREFIX = 'group:';
-
-function groupIdOf(id: string): string | null {
-  return id.startsWith(GROUP_PREFIX) ? id.slice(GROUP_PREFIX.length) : null;
-}
-
-function cellId<T extends { id: string }>(cell: Cell<T>): string {
-  return cell.kind === 'header' ? `${GROUP_PREFIX}${cell.group.id}` : cell.item.id;
-}
-
-function partId<T extends { id: string }>(part: Arranged<T>): string {
-  return part.kind === 'group' ? `${GROUP_PREFIX}${part.group.id}` : part.item.id;
-}
-
-/** 畫面順序的項目 id（群組成員聚在一起，收合的也算） */
-function flatIds<T extends { id: string }>(parts: readonly Arranged<T>[]): string[] {
-  return parts.flatMap((part) => (part.kind === 'item' ? [part.item.id] : part.items.map((item) => item.id)));
-}
-
-/** 項目 → 它**在畫面上**屬於的群組（只算這個資料夾裡成立的成員資格） */
-function memberMap<T extends { id: string }>(parts: readonly Arranged<T>[]): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const part of parts) {
-    if (part.kind === 'group') {
-      for (const item of part.items) {
-        out.set(item.id, part.group.id);
-      }
-    }
-  }
-  return out;
-}
-
-/** 「放在群組標題前面」= 放在那個群組第一個成員的前面 */
-function resolveAnchor<T extends { id: string }>(parts: readonly Arranged<T>[], beforeId: string | null): string | null {
-  const group = beforeId === null ? null : groupIdOf(beforeId);
-  if (group === null) {
-    return beforeId;
-  }
-  const part = parts.find((candidate) => candidate.kind === 'group' && candidate.group.id === group);
-  return part?.kind === 'group' ? (part.items[0]?.id ?? null) : null;
+/** 挪動之後要把焦點放回去的那個元素（卡片或標籤），與它挪動前所在的格子 */
+interface Refocus {
+  selector: string;
+  from: number;
+  until: number;
 }
 
 interface GroupMenuState {
@@ -211,7 +178,7 @@ export function Gallery() {
   const [merge, setMerge] = useState<PendingMerge | null>(null);
   const [groupMenu, setGroupMenu] = useState<GroupMenuState | null>(null);
   const [tagPrompt, setTagPrompt] = useState<TagPromptState | null>(null);
-  const liveGroups = useBookmarkGroups(folderId);
+  const liveGrid = useBookmarkGrid(folderId);
   /** 拖拽中。拖拽期間資料凍結（見下面的 `frozen`） */
   const [dragging, setDragging] = useState(false);
   const [pendingMove, setPendingMove] = useState<{
@@ -224,6 +191,9 @@ export function Gallery() {
   // 要量同一個元素，而欄數又是虛擬滾動的輸入
   const gridRef = useRef<HTMLDivElement>(null);
   const vaultGridRef = useRef<HTMLDivElement>(null);
+  // 欄數量的是外面那層橫向捲動的容器：定下來的格子比視窗寬時，網格本身會比它寬
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const vaultScrollRef = useRef<HTMLDivElement>(null);
 
   /*
    * 拖拽期間畫面用的是**開始拖之前**的資料。
@@ -234,7 +204,7 @@ export function Gallery() {
    */
   const frozen = useRef({
     roots,
-    groups: liveGroups,
+    grid: liveGrid,
     bookmarks: vault.bookmarks,
     folders: vault.folders,
     layout: vault.layout,
@@ -242,7 +212,7 @@ export function Gallery() {
   if (!dragging) {
     frozen.current = {
       roots,
-      groups: liveGroups,
+      grid: liveGrid,
       bookmarks: vault.bookmarks,
       folders: vault.folders,
       layout: vault.layout,
@@ -252,9 +222,6 @@ export function Gallery() {
   const viewRoots = view.roots;
 
   const index = useMemo(() => buildIndex(viewRoots ?? []), [viewRoots]);
-  const bookmarkMemberOf = new Map(
-    view.groups.flatMap((group) => group.members.map((member) => [member, group.id] as const)),
-  );
   const vaultStatus = vault.state?.status;
   const vaultUnlocked = vaultStatus === 'unlocked';
 
@@ -496,65 +463,79 @@ export function Gallery() {
   const listKey = search === null ? (folderId ?? 'root') : `search:${trimmed}`;
 
   /*
-   * 群組（＝ tag）把網格切成長短不一的列：群組標題自己一列、群組的卡片不跨到下一段。
-   * 「哪一格在哪一列」由 `gridModel` 算，虛擬滾動與方向鍵都照它走（`rows`）。
-   * 搜尋結果沒有群組（順序本身就沒有意義）。
+   * 固定格子（第 3 期改版）。每個資料夾的版面是一個 `Board`（`shared/board.ts`）：
+   * 定下來的照存下來的格子，還沒定下來的照順序、用畫面的欄數自動換行。
+   * 搜尋結果與最上層（Firefox 的永久資料夾）沒有版面可言，只是照順序排。
+   *
+   * 能拖的畫面在最後一列之後多畫一整列空格，當作「放到最後」的落點。
    */
   const inFolderView = search === null && currentFolder !== undefined;
-  const columns = useGridColumns(gridRef, size, GRID_GAP);
-  const bookmarkParts = arrange(
-    nodes,
-    inFolderView ? view.groups : [],
-    (id) => bookmarkMemberOf.get(id) ?? null,
+  const columns = useGridColumns(gridScrollRef, size, GRID_GAP);
+  const bookmarkGroupOf = new Map(
+    (view.grid ?? null)?.groups.flatMap((group) => group.members.map((member) => [member, group.id] as const)) ?? [],
   );
-  const bookmarkModel = gridModel(bookmarkParts, columns);
+  const bookmarkBoard: Board = buildBoard({
+    stored: inFolderView && view.grid != null ? { columns: view.grid.columns, cells: view.grid.cells } : null,
+    children: nodes.map((node) => node.id),
+    autoColumns: columns,
+    groups: inFolderView ? (view.grid?.groups ?? []).map(({ id, name, color }) => ({ id, name, color })) : [],
+    groupOf: (id) => bookmarkGroupOf.get(id) ?? null,
+  });
+  // 格子還在讀：先不畫，免得先以自動換行畫一次再跳成固定格子
+  const bookmarkGridLoading = inFolderView && view.grid === undefined;
+  const bookmarkCols = bookmarkBoard.grid.columns;
+  const bookmarkCellCount = inFolderView
+    ? (rowCount(bookmarkBoard.grid) + 1) * bookmarkCols
+    : bookmarkBoard.grid.cells.length;
   const gridRows = useVirtualRows({
-    count: bookmarkModel.cells.length,
-    columns,
-    rows: bookmarkModel.rows,
+    count: bookmarkCellCount,
+    columns: bookmarkCols,
     estimate: cardEstimate(size),
-    resetKey: `${listKey}/${String(size)}/${String(selecting)}/${String(columns)}`,
+    resetKey: `${listKey}/${String(size)}/${String(selecting)}/${String(bookmarkCols)}`,
     ref: gridRef,
+    item: '.cell',
   });
   const nav = useListNav(
     {
       onLeave: upBookmarks,
       virtual: {
         start: gridRows.start,
-        count: bookmarkModel.cells.length,
-        columns,
-        rows: bookmarkModel.rows,
+        count: bookmarkCellCount,
+        columns: bookmarkCols,
         scrollToIndex: gridRows.scrollToIndex,
+        cells: { nav: (key, at) => navCell(bookmarkBoard.grid, at, key) },
       },
     },
     gridRef,
   );
 
-  const vaultColumns = useGridColumns(vaultGridRef, size, GRID_GAP);
-  const vaultItems: VaultItem[] = vaultRows.map((row) => ({ id: vaultChildId(row), row }));
-  const vaultParts = arrange(
-    vaultItems,
-    vaultGroups(view.layout, vaultFolderId),
-    vaultGroupOf(view.layout),
-  );
-  const vaultModel = gridModel(vaultParts, vaultColumns);
+  const vaultColumns = useGridColumns(vaultScrollRef, size, GRID_GAP);
+  const vaultBoard: Board = buildBoard({
+    stored: folderGrid(view.layout, vaultFolderId),
+    children: vaultRows.map(vaultChildId),
+    autoColumns: vaultColumns,
+    groups: vaultGroups(view.layout, vaultFolderId),
+    groupOf: vaultGroupOf(view.layout),
+  });
+  const vaultCols = vaultBoard.grid.columns;
+  const vaultCellCount = (rowCount(vaultBoard.grid) + 1) * vaultCols;
   const vaultGrid = useVirtualRows({
-    count: vaultModel.cells.length,
-    columns: vaultColumns,
-    rows: vaultModel.rows,
+    count: vaultCellCount,
+    columns: vaultCols,
     estimate: cardEstimate(size),
-    resetKey: `${vaultFolderId ?? 'root'}/${String(size)}/${String(vaultSelecting)}/${String(vaultColumns)}`,
+    resetKey: `${vaultFolderId ?? 'root'}/${String(size)}/${String(vaultSelecting)}/${String(vaultCols)}`,
     ref: vaultGridRef,
+    item: '.cell',
   });
   const vaultNav = useListNav(
     {
       onLeave: upVault,
       virtual: {
         start: vaultGrid.start,
-        count: vaultModel.cells.length,
-        columns: vaultColumns,
-        rows: vaultModel.rows,
+        count: vaultCellCount,
+        columns: vaultCols,
         scrollToIndex: vaultGrid.scrollToIndex,
+        cells: { nav: (key, at) => navCell(vaultBoard.grid, at, key) },
       },
     },
     vaultGridRef,
@@ -566,19 +547,13 @@ export function Gallery() {
   const showingRoots = search === null && currentFolder === undefined;
 
   /*
-   * 拖拽（兩個網格各一份）。
+   * 拖拽與版面操作（兩個網格各一份）。
    *
    * 書籤這邊：搜尋結果的順序沒有意義、最上層是 Firefox 的永久資料夾，兩者都不能拖。
-   *
-   * 落點清單（`order`）是畫面上的格子，含群組標題（`group:<id>`）；送給背景頁的錨點一律
-   * 換成書籤 id —— 「放在某個群組標題前面」就是放在那個群組第一個成員的前面。
+   * 落點一律是格子的索引；怎麼擠、誰加入哪個群組由背景頁照 `shared/board.ts` 算 ——
+   * 畫面送的是「做什麼」，不是算好的結果，背景頁那邊的資料才是最新的。
    */
   const canDragBookmarks = inFolderView;
-  const bookmarkOrder = bookmarkModel.cells.map(cellId);
-  const bookmarkItems = flatIds(bookmarkParts);
-  const vaultOrder = vaultModel.cells.map(cellId);
-  const vaultItemOrder = flatIds(vaultParts);
-  const vaultMemberOf = memberMap(vaultParts);
   const vaultRowById = new Map(vaultRows.map((row) => [vaultChildId(row), row]));
 
   const reportFailure = (cause: unknown): void => {
@@ -593,41 +568,80 @@ export function Gallery() {
     });
   };
 
-  const reorderReport = async (ids: string[], parentId: string, beforeId: string | null): Promise<void> => {
-    const report = await request('bookmarks/reorder', { ids, parentId, beforeId });
-    if (report.failed > 0) {
-      setNotice(
-        t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
-      );
-    }
-  };
-
-  /** 拖拽、右鍵「往前／往後移」、快捷鍵共用。整批搬完就退出多選（與「移動到…」一致） */
-  const moveBookmarks = (ids: string[], parentId: string, beforeId: string | null): void => {
+  /** 拖進資料夾或麵包屑。整批搬完就退出多選（與「移動到…」一致） */
+  const moveBookmarks = (ids: string[], parentId: string): void => {
     if (ids.length > 1) {
       exitSelection();
     }
-    applyBookmarks(async () => reorderReport(ids, parentId, beforeId));
+    applyBookmarks(async () => {
+      const report = await request('bookmarks/reorder', { ids, parentId, beforeId: null });
+      if (report.failed > 0) {
+        setNotice(
+          t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
+        );
+      }
+    });
   };
 
-  const moveVault = (ids: string[], target: string | null, beforeId: string | null): void => {
+  const moveVault = (ids: string[], target: string | null): void => {
     if (ids.length > 1) {
       exitSelection();
     }
-    void vault.reorder(ids, target, beforeId);
+    void vault.reorder(ids, target, null);
   };
 
-  /** 放到某張卡片旁邊之後，要加入的群組：那張卡片所在的群組（散卡片 = 離開群組） */
-  const groupTarget = (groupId: string | null): GroupTarget =>
-    groupId === null ? { kind: 'none' } : { kind: 'id', groupId };
+  const boardOf = (space: Mode): Board => (space === 'vault' ? vaultBoard : bookmarkBoard);
+
+  /** 一個版面操作。`columns` 是畫面現在的欄數：還沒定下來的資料夾就用它定下來 */
+  const gridOp = (space: Mode, op: GridOp): void => {
+    if (space === 'vault') {
+      void vault.gridApply(vaultFolderId, vaultColumns, op);
+      return;
+    }
+    if (currentFolder === undefined) {
+      return;
+    }
+    const parentId = currentFolder.id;
+    applyBookmarks(async () => {
+      await request('grid/apply', { folderId: parentId, columns, op });
+    });
+  };
+
+  /** 兩個網格共用的那一半拖拽回呼 */
+  const dragSpace = (space: Mode) => ({
+    cells: boardOf(space).grid.cells,
+    onDragChange: setDragging,
+    onPlace: (ids: string[], at: number, aimed: string | null) => {
+      if (ids.length > 1) {
+        exitSelection();
+      }
+      gridOp(space, { kind: 'place', ids, at, aimed });
+    },
+    onMerge: (targetId: string, ids: string[], x: number, y: number) => {
+      const board = boardOf(space);
+      const at = board.grid.cells.indexOf(targetId);
+      if (board.memberOf.has(targetId) && at !== -1) {
+        // 疊到已在群組裡的卡片 = 放到它旁邊、加入那個群組，不跳選單
+        gridOp(space, {
+          kind: 'place',
+          ids,
+          at: stepCell(board.grid, at, 'right') ?? at + board.grid.columns,
+          aimed: targetId,
+        });
+        return;
+      }
+      setMerge({ space, targetId, ids, x, y });
+    },
+    shapeAt: (groupId: string, at: number) => shapeTarget(boardOf(space), groupId, at),
+    onShape: (groupId: string, at: number) => {
+      gridOp(space, { kind: 'shift-group', groupId, at });
+    },
+  });
 
   const bookmarkDrag = useGridDrag({
-    enabled: canDragBookmarks,
-    order: bookmarkOrder,
+    ...dragSpace('bookmarks'),
+    enabled: canDragBookmarks && !bookmarkGridLoading,
     kindOf: (id) => {
-      if (id.startsWith(GROUP_PREFIX)) {
-        return 'group';
-      }
       const node = index.byId.get(id);
       return node === undefined ? undefined : node.kind === 'folder' ? 'folder' : 'bookmark';
     },
@@ -636,197 +650,121 @@ export function Gallery() {
       const node = index.byId.get(id);
       return node?.kind === 'link' ? { url: node.url, title: node.title } : null;
     },
-    onDragChange: setDragging,
-    onReorder: (ids, beforeId, targetId) => {
-      if (currentFolder === undefined) {
-        return;
-      }
-      const parentId = currentFolder.id;
-      const before = resolveAnchor(bookmarkParts, beforeId);
-      const dragged = groupIdOf(ids[0] ?? '');
-      if (dragged !== null) {
-        applyBookmarks(async () => {
-          await request('groups/move', { fromFolderId: parentId, groupId: dragged, toFolderId: parentId, beforeId: before });
-        });
-        return;
-      }
-      const joining = targetId === null ? null : (groupIdOf(targetId) ?? bookmarkMemberOf.get(targetId) ?? null);
-      const regroup = ids.some((id) => (bookmarkMemberOf.get(id) ?? null) !== joining);
-      const stay = isNoop(bookmarkItems, ids, before);
-      if (stay && !regroup) {
-        return;
-      }
-      if (ids.length > 1) {
-        exitSelection();
-      }
-      applyBookmarks(async () => {
-        if (!stay) {
-          await reorderReport(ids, parentId, before);
-        }
-        if (regroup) {
-          // 位置已經是使用者放的，不要再搬（arrange: false）
-          await request('groups/assign', { folderId: parentId, ids, target: groupTarget(joining), arrange: false });
-        }
-      });
-    },
     onInto: (ids, target) => {
       // 原生書籤的最上層只能放 Firefox 的永久資料夾，麵包屑的「全部」不接受拖放
-      if (target === null || currentFolder === undefined) {
+      if (target === null || currentFolder === undefined || target === currentFolder.id) {
         return;
       }
-      const parentId = currentFolder.id;
-      const dragged = groupIdOf(ids[0] ?? '');
-      const intoGroup = groupIdOf(target);
-      if (intoGroup !== null) {
-        if (dragged === null) {
-          applyBookmarks(async () => {
-            await request('groups/assign', { folderId: parentId, ids, target: groupTarget(intoGroup), arrange: true });
-          });
-        }
-        return;
-      }
-      if (dragged !== null) {
-        applyBookmarks(async () => {
-          await request('groups/move', { fromFolderId: parentId, groupId: dragged, toFolderId: target, beforeId: null });
-        });
-        return;
-      }
-      moveBookmarks(ids, target, null);
+      moveBookmarks(ids, target);
     },
-    onMerge: (targetId, ids, x, y) => {
-      if (groupIdOf(ids[0] ?? '') !== null || currentFolder === undefined) {
+    onGroupInto: (groupId, target) => {
+      if (target === null || currentFolder === undefined || target === currentFolder.id) {
         return;
       }
-      // 疊到已在群組裡的卡片 = 加入那個群組，不跳選單
-      const joining = bookmarkMemberOf.get(targetId);
-      if (joining !== undefined) {
-        const parentId = currentFolder.id;
-        applyBookmarks(async () => {
-          await request('groups/assign', { folderId: parentId, ids, target: groupTarget(joining), arrange: true });
-        });
-        return;
-      }
-      setMerge({ space: 'bookmarks', targetId, ids, x, y });
+      const fromFolderId = currentFolder.id;
+      applyBookmarks(async () => {
+        await request('groups/move', { fromFolderId, groupId, toFolderId: target, columns });
+      });
     },
   });
 
   const vaultDrag = useGridDrag({
+    ...dragSpace('vault'),
     enabled: mode === 'vault',
-    order: vaultOrder,
-    kindOf: (id) => (id.startsWith(GROUP_PREFIX) ? 'group' : vaultRowById.get(id)?.kind),
+    kindOf: (id) => vaultRowById.get(id)?.kind,
     selected: vaultSelecting ? vaultSelectedIds : NO_SELECTION,
     // 隱私書籤永遠不帶網址：拖到分頁列會在一般視窗打開、寫進瀏覽記錄
     linkOf: () => null,
-    onDragChange: setDragging,
-    onReorder: (ids, beforeId, targetId) => {
-      const before = resolveAnchor(vaultParts, beforeId);
-      const dragged = groupIdOf(ids[0] ?? '');
-      if (dragged !== null) {
-        void vault.groupMove(dragged, vaultFolderId, before);
-        return;
-      }
-      const joining = targetId === null ? null : (groupIdOf(targetId) ?? vaultMemberOf.get(targetId) ?? null);
-      const regroup = ids.some((id) => (vaultMemberOf.get(id) ?? null) !== joining);
-      const stay = isNoop(vaultItemOrder, ids, before);
-      if (stay && !regroup) {
-        return;
-      }
-      if (ids.length > 1) {
-        exitSelection();
-      }
-      void (async () => {
-        if (!stay) {
-          await vault.reorder(ids, vaultFolderId, before);
-        }
-        if (regroup) {
-          await vault.groupAssign(vaultFolderId, ids, groupTarget(joining), false);
-        }
-      })();
-    },
     onInto: (ids, target) => {
-      const dragged = groupIdOf(ids[0] ?? '');
-      const intoGroup = target === null ? null : groupIdOf(target);
-      if (intoGroup !== null) {
-        if (dragged === null) {
-          void vault.groupAssign(vaultFolderId, ids, groupTarget(intoGroup), true);
-        }
-        return;
+      if (target !== vaultFolderId) {
+        moveVault(ids, target);
       }
-      if (dragged !== null) {
-        void vault.groupMove(dragged, target, null);
-        return;
-      }
-      moveVault(ids, target, null);
     },
-    onMerge: (targetId, ids, x, y) => {
-      if (groupIdOf(ids[0] ?? '') !== null) {
-        return;
+    onGroupInto: (groupId, target) => {
+      if (target !== vaultFolderId) {
+        void vault.groupMove(groupId, target, vaultColumns);
       }
-      const joining = vaultMemberOf.get(targetId);
-      if (joining !== undefined) {
-        void vault.groupAssign(vaultFolderId, ids, groupTarget(joining), true);
-        return;
-      }
-      setMerge({ space: 'vault', targetId, ids, x, y });
     },
   });
 
-  /**
-   * 往前／往後挪一格（鍵盤與右鍵選單用，拖拽做得到的事鍵盤也要做得到）。
-   * 回傳 null 代表這個方向已經到底、或這個畫面不能排序 —— 選單據此停用那一項。
-   *
-   * 群組標題（`group:<id>`）挪的是整個群組，跨過的是相鄰的一整段（另一張卡片或另一個群組）；
-   * 卡片挪的是書籤本身的順序（群組裡的卡片就在群組裡前後挪）。
+  /*
+   * 鍵盤挪動（拖拽做得到的事鍵盤也要做得到）：卡片往某個方向挪一格（目標空就放、有卡片就互換），
+   * 標籤上是整組挪一格。卡片的 DOM 換了位置焦點會掉，所以記下要放回去的元素，等它真的
+   * 換到別的格子之後再聚焦（見下面的 effect）。
    */
-  const stepper = (space: Mode, id: string, delta: -1 | 1): (() => void) | null => {
-    if (space === 'bookmarks' && (!canDragBookmarks || currentFolder === undefined)) {
+  const refocusRef = useRef<Refocus | null>(null);
+  useEffect(() => {
+    const pending = refocusRef.current;
+    if (pending === null) {
+      return;
+    }
+    if (Date.now() > pending.until) {
+      refocusRef.current = null;
+      return;
+    }
+    const element = document.querySelector<HTMLElement>(pending.selector);
+    const cell = element?.closest<HTMLElement>('[data-cell]');
+    if (element !== null && cell !== null && cell !== undefined && Number(cell.dataset.cell) !== pending.from) {
+      refocusRef.current = null;
+      element.focus();
+    }
+  });
+
+  const cardSelector = (id: string): string => {
+    const key = CSS.escape(id);
+    return `[data-drag-id="${key}"][data-nav], [data-drag-id="${key}"] [data-nav]`;
+  };
+
+  /** 卡片往某個方向挪一格。null = 這個方向出界了、或這個畫面不能排 */
+  const nudger = (space: Mode, id: string, direction: Direction): (() => void) | null => {
+    if (space === 'bookmarks' && !canDragBookmarks) {
       return null;
     }
-    const resolve = (anchor: string | null): string | null =>
-      space === 'vault' ? resolveAnchor(vaultParts, anchor) : resolveAnchor(bookmarkParts, anchor);
-    const group = groupIdOf(id);
-    const order =
-      group === null
-        ? space === 'vault'
-          ? vaultItemOrder
-          : bookmarkItems
-        : space === 'vault'
-          ? vaultParts.map(partId)
-          : bookmarkParts.map(partId);
-    const at = order.indexOf(id);
-    if (at === -1 || (delta < 0 ? at === 0 : at === order.length - 1)) {
+    const board = boardOf(space);
+    const at = board.grid.cells.indexOf(id);
+    if (at === -1 || stepCell(board.grid, at, direction) === null) {
       return null;
     }
-    const beforeId = resolve(delta < 0 ? (order[at - 1] ?? null) : (order[at + 2] ?? null));
     return () => {
-      if (group !== null) {
-        if (space === 'vault') {
-          void vault.groupMove(group, vaultFolderId, beforeId);
-        } else if (currentFolder !== undefined) {
-          const parentId = currentFolder.id;
-          applyBookmarks(async () => {
-            await request('groups/move', { fromFolderId: parentId, groupId: group, toFolderId: parentId, beforeId });
-          });
-        }
-        return;
-      }
-      if (space === 'vault') {
-        moveVault([id], vaultFolderId, beforeId);
-      } else if (currentFolder !== undefined) {
-        moveBookmarks([id], currentFolder.id, beforeId);
-      }
+      refocusRef.current = { selector: cardSelector(id), from: at, until: Date.now() + 3000 };
+      gridOp(space, { kind: 'nudge', id, direction });
     };
   };
 
-  /** Ctrl+Shift+←／→ 挪動焦點所在的卡片；其餘的鍵交給方向鍵巡覽 */
+  /** 標籤上：整組挪一格（目標要全空，否則背景頁會拒絕並說明） */
+  const groupNudger = (space: Mode, groupId: string, direction: Direction): (() => void) | null => {
+    const board = boardOf(space);
+    const at = labelCell(board, groupId);
+    if (at === -1 || stepCell(board.grid, at, direction) === null) {
+      return null;
+    }
+    return () => {
+      refocusRef.current = {
+        selector: `[data-group-label="${CSS.escape(groupId)}"]`,
+        from: at,
+        until: Date.now() + 3000,
+      };
+      gridOp(space, { kind: 'nudge-group', groupId, direction });
+    };
+  };
+
+  /** Ctrl+Shift+方向鍵挪動焦點所在的卡片或群組；其餘的鍵交給方向鍵巡覽 */
   const gridKeys =
     (space: Mode, fallback: (event: ReactKeyboardEvent<HTMLDivElement>) => void) =>
     (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-      if (event.ctrlKey && event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
-        const id = (event.target as HTMLElement).closest<HTMLElement>('[data-drag-id]')?.dataset.dragId;
-        const step = id === undefined ? null : stepper(space, id, event.key === 'ArrowLeft' ? -1 : 1);
+      const direction = DIRECTION[event.key];
+      if (event.ctrlKey && event.shiftKey && direction !== undefined) {
         event.preventDefault();
-        step?.();
+        const target = event.target as HTMLElement;
+        const label = target.closest<HTMLElement>('[data-group-label]')?.dataset.groupLabel;
+        if (label !== undefined) {
+          groupNudger(space, label, direction)?.();
+          return;
+        }
+        const id = target.closest<HTMLElement>('[data-drag-id]')?.dataset.dragId;
+        if (id !== undefined) {
+          nudger(space, id, direction)?.();
+        }
         return;
       }
       fallback(event);
@@ -878,6 +816,24 @@ export function Gallery() {
     });
   };
 
+  /**
+   * 多選之後「框成群組」：勾的要是這個資料夾裡上下左右相連的書籤（不相連時背景頁拒絕並說明）。
+   * 別的資料夾勾的不算在內 —— 群組綁在資料夾上。
+   */
+  const frameAction = (space: Mode, picked: ReadonlySet<string>): SelectionAction => {
+    const board = boardOf(space);
+    const ids = board.grid.cells.filter((id) => id !== EMPTY && picked.has(id));
+    return {
+      label: t('grid_frame'),
+      title: t('grid_frame_hint'),
+      disabled: ids.length === 0 || (space === 'bookmarks' && !canDragBookmarks),
+      onPick: () => {
+        exitSelection();
+        gridOp(space, { kind: 'frame', ids });
+      },
+    };
+  };
+
   const selectionActions: SelectionAction[] =
     mode === 'vault'
       ? [
@@ -895,6 +851,7 @@ export function Gallery() {
               setExportPicker({ x, y, ids: [...vaultSelectedIds] });
             },
           },
+          frameAction('vault', vaultSelectedIds),
         ]
       : [
           {
@@ -904,6 +861,7 @@ export function Gallery() {
               setFolderPicker({ x, y });
             },
           },
+          ...(canDragBookmarks ? [frameAction('bookmarks', selectedIds)] : []),
           ...(vaultUnlocked
             ? [
                 {
@@ -921,6 +879,13 @@ export function Gallery() {
             : []),
         ];
   const gridStyle = { '--card-min': `${String(size)}px` } as CSSProperties;
+  /** 工具列的欄數控制看的是哪一份版面（搜尋結果與最上層沒有） */
+  const layoutBoard: Board | null = mode === 'vault' ? vaultBoard : canDragBookmarks ? bookmarkBoard : null;
+  // 定下來的格子：固定欄數、卡片固定寬度（放不下就橫向捲動）
+  const gridStyleFor = (board: Board): CSSProperties =>
+    board.fixed ? ({ ...gridStyle, '--grid-cols': String(board.grid.columns) } as CSSProperties) : gridStyle;
+  const gridClass = (board: Board): string =>
+    `grid${board.fixed ? ' grid--fixed' : ''}${dragging ? ' grid--dragging' : ''}`;
 
   if (error !== null) {
     return (
@@ -948,7 +913,7 @@ export function Gallery() {
       // 但「點資料夾卻只是進去、選不到它」也同樣不合直覺。
       <div
         key={node.id}
-        className={`card-wrap${selecting && selectedIds.has(node.id) ? ' card-wrap--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
+        className={`card-wrap${selecting && selectedIds.has(node.id) ? ' card-wrap--selected' : ''}`}
         {...bookmarkDrag.cardProps(node.id)}
       >
         <button
@@ -1007,7 +972,7 @@ export function Gallery() {
       <button
         key={node.id}
         type="button"
-        className={`card card--select${selectedIds.has(node.id) ? ' card--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
+        className={`card card--select${selectedIds.has(node.id) ? ' card--selected' : ''}`}
         {...bookmarkDrag.cardProps(node.id)}
         data-nav=""
         role="checkbox"
@@ -1037,7 +1002,7 @@ export function Gallery() {
     ) : (
       <a
         key={node.id}
-        className={`card${bookmarkDrag.dropClass(node.id)}`}
+        className={`card`}
         {...bookmarkDrag.cardProps(node.id)}
         data-nav=""
         href={node.url}
@@ -1058,20 +1023,27 @@ export function Gallery() {
       </a>
     );
 
-  /** 群組標題 ⋯ 選單的動作，兩個空間各接各的訊息 */
+  /** 群組標籤選單的動作，兩個空間各接各的訊息 */
   const groupCall = (
     space: Mode,
     groupId: string,
-    action: { kind: 'update'; patch: { name?: string; color?: number; collapsed?: boolean } } | { kind: 'dissolve' } | { kind: 'to-folder' },
+    action: { kind: 'update'; name?: string; color?: number } | { kind: 'dissolve' } | { kind: 'to-folder' },
   ): void => {
+    if (action.kind === 'update') {
+      gridOp(space, {
+        kind: 'group-update',
+        groupId,
+        ...(action.name === undefined ? {} : { name: action.name }),
+        ...(action.color === undefined ? {} : { color: action.color }),
+      });
+      return;
+    }
+    if (action.kind === 'dissolve') {
+      gridOp(space, { kind: 'dissolve', groupId });
+      return;
+    }
     if (space === 'vault') {
-      if (action.kind === 'update') {
-        void vault.groupUpdate(groupId, action.patch);
-      } else if (action.kind === 'dissolve') {
-        void vault.groupDissolve(groupId);
-      } else {
-        void vault.groupToFolder(groupId);
-      }
+      void vault.groupToFolder(groupId, vaultColumns);
       return;
     }
     if (currentFolder === undefined) {
@@ -1079,45 +1051,42 @@ export function Gallery() {
     }
     const parentId = currentFolder.id;
     applyBookmarks(async () => {
-      if (action.kind === 'update') {
-        await request('groups/update', { folderId: parentId, groupId, patch: action.patch });
-      } else if (action.kind === 'dissolve') {
-        await request('groups/dissolve', { folderId: parentId, groupId });
-      } else {
-        await request('groups/to-folder', { folderId: parentId, groupId });
-      }
+      await request('groups/to-folder', { folderId: parentId, groupId, columns });
     });
   };
 
-  /** 右鍵選單的「設定 tag…」「移出群組」「攤平成群組」 */
-  const bookmarkTagActions = (node: BookmarkNode) => {
-    const groupId = bookmarkMemberOf.get(node.id) ?? null;
-    const name = view.groups.find((group) => group.id === groupId)?.name ?? '';
+  /** 右鍵選單的「設定 tag…」「移出群組」 */
+  const tagActions = (space: Mode, id: string) => {
+    const board = boardOf(space);
+    const groupId = board.memberOf.get(id) ?? null;
+    const name = board.groups.find((group) => group.id === groupId)?.name ?? '';
     return {
       onSetTag: (x: number, y: number) => {
-        setTagPrompt({ space: 'bookmarks' as const, ids: [node.id], current: name, x, y });
+        setTagPrompt({ space, ids: [id], current: name, x, y });
       },
       onLeave:
-        groupId === null || currentFolder === undefined
+        groupId === null
           ? null
           : () => {
-              const parentId = currentFolder.id;
-              applyBookmarks(async () => {
-                await request('groups/assign', { folderId: parentId, ids: [node.id], target: { kind: 'none' }, arrange: false });
-              });
+              gridOp(space, { kind: 'untag', ids: [id] });
             },
-      onFlatten:
-        node.kind !== 'folder'
-          ? undefined
-          : node.children.some((child) => child.kind === 'folder')
-            ? null
-            : () => {
-                applyBookmarks(async () => {
-                  await request('groups/flatten', { folderId: node.id });
-                });
-              },
     };
   };
+
+  const bookmarkTagActions = (node: BookmarkNode) => ({
+    ...tagActions('bookmarks', node.id),
+    // 「攤平成群組」：子資料夾裡還有資料夾時不提供（那些資料夾沒有地方放）
+    onFlatten:
+      node.kind !== 'folder'
+        ? undefined
+        : node.children.some((child) => child.kind === 'folder')
+          ? null
+          : () => {
+              applyBookmarks(async () => {
+                await request('groups/flatten', { folderId: node.id, columns });
+              });
+            },
+  });
 
   const vaultTagActions = (target: VaultMenuTarget) => {
     if (target.kind === 'folder') {
@@ -1128,90 +1097,66 @@ export function Gallery() {
         onFlatten: view.folders.some((candidate) => candidate.parentId === folder.id)
           ? null
           : () => {
-              void vault.groupFlatten(folder.id);
+              void vault.groupFlatten(folder.id, vaultColumns);
             },
       };
     }
-    const id = target.record.id;
-    const groupId = vaultMemberOf.get(id) ?? null;
-    const name = vaultGroups(view.layout, vaultFolderId).find((group) => group.id === groupId)?.name ?? '';
-    return {
-      onSetTag: (x: number, y: number) => {
-        setTagPrompt({ space: 'vault' as const, ids: [id], current: name, x, y });
-      },
-      onLeave:
-        groupId === null
-          ? null
-          : () => {
-              void vault.groupAssign(vaultFolderId, [id], { kind: 'none' }, false);
-            },
-    };
+    return tagActions('vault', target.record.id);
   };
-
-  /** 群組標題列與卡片的群組動作，兩個空間各接各的訊息 */
-  const groupActions = (space: Mode, group: GroupInfo) => ({
-    toggle: () => {
-      if (space === 'vault') {
-        void vault.groupUpdate(group.id, { collapsed: !group.collapsed });
-      } else if (currentFolder !== undefined) {
-        const parentId = currentFolder.id;
-        applyBookmarks(async () => {
-          await request('groups/update', { folderId: parentId, groupId: group.id, patch: { collapsed: !group.collapsed } });
-        });
-      }
-    },
-  });
 
   /**
    * 畫出虛擬滾動範圍內的格子。
    *
-   * 每張卡片包一層 `display: contents` 的 `.cell`：版面上它不存在（卡片照樣是網格的直接
-   * 子元素），但它的 class 能決定卡片要不要從新的一列開始（`cell--row-start`）、要不要畫
-   * 群組的底色 —— 不必改動每一種卡片自己的樣式。
+   * 每一格是一個 `.cell`（`data-cell` = 格子索引，拖拽與方向鍵都認它）。群組的框線畫在格子上
+   * （`cell--g` + 要畫的那幾邊 `e-t/r/b/l`，見 `outlineEdges`），名稱標籤放在第一個成員那一格。
    */
-  const gridCells = <T extends { id: string }>(
-    model: GridModel<T>,
-    win: { start: number; end: number },
+  const gridCells = (
     space: Mode,
-    render: (item: T) => ReactNode,
+    board: Board,
+    win: { start: number; end: number },
+    render: (id: string) => ReactNode,
   ): ReactNode[] => {
     const drag = space === 'vault' ? vaultDrag : bookmarkDrag;
-    return model.cells.slice(win.start, win.end).map((cell, offset) => {
-      const at = win.start + offset;
-      if (cell.kind === 'header') {
-        const id = `${GROUP_PREFIX}${cell.group.id}`;
-        return (
-          <GroupHeader
-            key={id}
-            group={cell.group}
-            count={cell.count}
-            dropClass={drag.dropClass(id)}
-            drag={drag.cardProps(id)}
-            onToggle={groupActions(space, cell.group).toggle}
-            onMenu={(x, y) => {
-              setGroupMenu({ space, group: cell.group, x, y });
-            }}
-          />
-        );
+    const edges = outlineEdges(board.grid, (id) => board.memberOf.get(id) ?? null);
+    const groupById = new Map(board.groups.map((group) => [group.id, group]));
+    const tags = labels(board);
+    const out: ReactNode[] = [];
+    for (let at = win.start; at < win.end; at += 1) {
+      const id = board.grid.cells[at] ?? EMPTY;
+      if (id === EMPTY) {
+        out.push(<div key={`slot:${String(at)}`} className={`cell cell--empty${drag.dropClass(at)}`} data-cell={at} />);
+        continue;
       }
-      const rowStart = model.rows[model.rowOfCell[at] ?? -1]?.start === at;
-      const group = cell.group;
-      return (
-        <div
-          key={cell.item.id}
-          className={`cell${rowStart ? ' cell--row-start' : ''}${group === null ? '' : ` cell--grouped group-c${String(group.color)}`}`}
-        >
-          {render(cell.item)}
-        </div>
+      const edge = edges.get(at);
+      const group = groupById.get(board.memberOf.get(id) ?? '');
+      const outline =
+        edge === undefined || group === undefined
+          ? ''
+          : ` cell--g group-c${String(group.color)}${edge.top ? ' e-t' : ''}${edge.right ? ' e-r' : ''}${edge.bottom ? ' e-b' : ''}${edge.left ? ' e-l' : ''}`;
+      const tag = tags.get(at);
+      out.push(
+        <div key={id} className={`cell${outline}${drag.dropClass(at)}`} data-cell={at}>
+          {render(id)}
+          {tag !== undefined ? (
+            <GroupTag
+              group={tag}
+              drag={drag.labelProps(tag.id)}
+              onMenu={(x, y) => {
+                setGroupMenu({ space, group: tag, x, y });
+              }}
+            />
+          ) : null}
+        </div>,
       );
-    });
+    }
+    return out;
   };
 
   const vaultFolderCard = (folder: PrivateFolder) => (
     // 多選中點卡片是勾選，巡覽移到角落的箭頭（與側邊欄同一套規則）
     <div
       key={folder.id}
-      className={`card-wrap${vaultSelectedIds.has(folder.id) ? ' card-wrap--selected' : ''}${vaultDrag.dropClass(folder.id)}`}
+      className={`card-wrap${vaultSelectedIds.has(folder.id) ? ' card-wrap--selected' : ''}`}
       {...vaultDrag.cardProps(folder.id)}
     >
       <button
@@ -1266,7 +1211,7 @@ export function Gallery() {
       <button
         key={record.id}
         type="button"
-        className={`card card--select${vaultSelectedIds.has(record.id) ? ' card--selected' : ''}${vaultDrag.dropClass(record.id)}`}
+        className={`card card--select${vaultSelectedIds.has(record.id) ? ' card--selected' : ''}`}
         {...vaultDrag.cardProps(record.id)}
         data-nav=""
         role="checkbox"
@@ -1294,7 +1239,7 @@ export function Gallery() {
     ) : (
       <a
         key={record.id}
-        className={`card${vaultDrag.dropClass(record.id)}`}
+        className={`card`}
         {...vaultDrag.cardProps(record.id)}
         data-nav=""
         href={record.url}
@@ -1464,6 +1409,50 @@ export function Gallery() {
             {t('vault_lock_now')}
           </button>
         ) : null}
+
+        {layoutBoard?.fixed === true ? (
+          // 只在定下來的資料夾出現：還沒定下來的欄數跟著視窗走，沒有東西可調
+          <div className="grid-cols" role="group" aria-label={t('grid_columns')}>
+            <button
+              type="button"
+              className="toolbar__action toolbar__action--icon"
+              aria-label={t('grid_columns_less')}
+              title={t('grid_columns_less')}
+              disabled={layoutBoard.grid.columns <= MIN_COLUMNS}
+              onClick={() => {
+                gridOp(mode, { kind: 'columns', columns: layoutBoard.grid.columns - 1 });
+              }}
+            >
+              −
+            </button>
+            <span className="grid-cols__value">{t('grid_columns_n', String(layoutBoard.grid.columns))}</span>
+            <button
+              type="button"
+              className="toolbar__action toolbar__action--icon"
+              aria-label={t('grid_columns_more')}
+              title={t('grid_columns_more')}
+              disabled={layoutBoard.grid.columns >= MAX_COLUMNS}
+              onClick={() => {
+                gridOp(mode, { kind: 'columns', columns: layoutBoard.grid.columns + 1 });
+              }}
+            >
+              +
+            </button>
+            {/* 有群組時不提供：自動換行做不出不規則的形狀 */}
+            {layoutBoard.memberOf.size === 0 ? (
+              <button
+                type="button"
+                className="toolbar__action"
+                title={t('grid_auto_hint')}
+                onClick={() => {
+                  gridOp(mode, { kind: 'auto' });
+                }}
+              >
+                {t('grid_auto')}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {activeSelecting ? (
@@ -1593,16 +1582,23 @@ export function Gallery() {
               : t('folder_empty')}
           </p>
         ) : (
-          <div
-            ref={vaultGridRef}
-            onKeyDown={gridKeys('vault', vaultNav.onKeyDown)}
-            {...vaultDrag.gridProps}
-            className="grid"
-            style={{ ...gridStyle, paddingTop: vaultGrid.padTop, paddingBottom: vaultGrid.padBottom }}
-          >
-            {gridCells(vaultModel, vaultGrid, 'vault', ({ row }) =>
-              row.kind === 'folder' ? vaultFolderCard(row.folder) : vaultBookmarkCard(row.record),
-            )}
+          <div className="grid-scroll" ref={vaultScrollRef}>
+            <div
+              ref={vaultGridRef}
+              onKeyDown={gridKeys('vault', vaultNav.onKeyDown)}
+              {...vaultDrag.gridProps}
+              className={gridClass(vaultBoard)}
+              style={{ ...gridStyleFor(vaultBoard), paddingTop: vaultGrid.padTop, paddingBottom: vaultGrid.padBottom }}
+            >
+              {gridCells('vault', vaultBoard, vaultGrid, (id) => {
+                const row = vaultRowById.get(id);
+                return row === undefined
+                  ? null
+                  : row.kind === 'folder'
+                    ? vaultFolderCard(row.folder)
+                    : vaultBookmarkCard(row.record);
+              })}
+            </div>
           </div>
         )
       ) : roots === null ? (
@@ -1610,15 +1606,22 @@ export function Gallery() {
       ) : nodes.length === 0 ? (
         <p className="empty">{search !== null ? t('search_no_match') : t('folder_no_bookmarks')}</p>
       ) : (
-        <div
-          ref={gridRef}
-          onKeyDown={gridKeys('bookmarks', nav.onKeyDown)}
-          {...bookmarkDrag.gridProps}
-          className="grid"
-          // 墊高用 padding：網格用空 div 佔位還得跨滿整列，padding 沒有這個問題
-          style={{ ...gridStyle, paddingTop: gridRows.padTop, paddingBottom: gridRows.padBottom }}
-        >
-          {gridCells(bookmarkModel, gridRows, 'bookmarks', bookmarkCard)}
+        <div className="grid-scroll" ref={gridScrollRef}>
+          {bookmarkGridLoading ? null : (
+            <div
+              ref={gridRef}
+              onKeyDown={gridKeys('bookmarks', nav.onKeyDown)}
+              {...bookmarkDrag.gridProps}
+              className={gridClass(bookmarkBoard)}
+              // 墊高用 padding：網格用空 div 佔位還得跨滿整列，padding 沒有這個問題
+              style={{ ...gridStyleFor(bookmarkBoard), paddingTop: gridRows.padTop, paddingBottom: gridRows.padBottom }}
+            >
+              {gridCells('bookmarks', bookmarkBoard, gridRows, (id) => {
+                const node = index.byId.get(id);
+                return node === undefined ? null : bookmarkCard(node);
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1640,7 +1643,7 @@ export function Gallery() {
           onNotice={setNotice}
           reorder={
             canDragBookmarks
-              ? { earlier: stepper('bookmarks', menu.node.id, -1), later: stepper('bookmarks', menu.node.id, 1) }
+              ? { earlier: nudger('bookmarks', menu.node.id, 'left'), later: nudger('bookmarks', menu.node.id, 'right') }
               : undefined
           }
           tag={canDragBookmarks ? bookmarkTagActions(menu.node) : undefined}
@@ -1819,23 +1822,17 @@ export function Gallery() {
           x={groupMenu.x}
           y={groupMenu.y}
           reorder={{
-            earlier: stepper(groupMenu.space, `${GROUP_PREFIX}${groupMenu.group.id}`, -1),
-            later: stepper(groupMenu.space, `${GROUP_PREFIX}${groupMenu.group.id}`, 1),
+            earlier: groupNudger(groupMenu.space, groupMenu.group.id, 'left'),
+            later: groupNudger(groupMenu.space, groupMenu.group.id, 'right'),
           }}
           onClose={() => {
             setGroupMenu(null);
           }}
           onRename={(name) => {
-            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'update', patch: { name } });
+            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'update', name });
           }}
           onColor={(color) => {
-            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'update', patch: { color } });
-          }}
-          onToggle={() => {
-            groupCall(groupMenu.space, groupMenu.group.id, {
-              kind: 'update',
-              patch: { collapsed: !groupMenu.group.collapsed },
-            });
+            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'update', color });
           }}
           onDissolve={() => {
             groupCall(groupMenu.space, groupMenu.group.id, { kind: 'dissolve' });
@@ -1851,25 +1848,14 @@ export function Gallery() {
           x={tagPrompt.x}
           y={tagPrompt.y}
           current={tagPrompt.current}
-          names={(tagPrompt.space === 'vault' ? vaultGroups(view.layout, vaultFolderId) : view.groups)
-            .map((group) => group.name)
+          names={boardOf(tagPrompt.space)
+            .groups.map((group) => group.name)
             .filter((name) => name !== '')}
           onClose={() => {
             setTagPrompt(null);
           }}
           onSubmit={(name) => {
-            const { space, ids } = tagPrompt;
-            const target: GroupTarget = { kind: 'name', name };
-            if (space === 'vault') {
-              void vault.groupAssign(vaultFolderId, ids, target, true);
-              return;
-            }
-            if (currentFolder !== undefined) {
-              const parentId = currentFolder.id;
-              applyBookmarks(async () => {
-                await request('groups/assign', { folderId: parentId, ids, target, arrange: true });
-              });
-            }
+            gridOp(tagPrompt.space, { kind: 'tag', ids: tagPrompt.ids, name });
           }}
         />
       ) : null}
@@ -1888,21 +1874,10 @@ export function Gallery() {
             )
               ? () => {
                   const { space, targetId, ids } = merge;
-                  const members = [targetId, ...ids.filter((id) => id !== targetId)];
-                  const target: GroupTarget = { kind: 'new', name: '' };
                   if (ids.length > 1) {
                     exitSelection();
                   }
-                  if (space === 'vault') {
-                    void vault.groupAssign(vaultFolderId, members, target, true);
-                    return;
-                  }
-                  if (currentFolder !== undefined) {
-                    const parentId = currentFolder.id;
-                    applyBookmarks(async () => {
-                      await request('groups/assign', { folderId: parentId, ids: members, target, arrange: true });
-                    });
-                  }
+                  gridOp(space, { kind: 'merge-group', targetId, ids });
                 }
               : undefined
           }
@@ -1960,7 +1935,7 @@ export function Gallery() {
           onNotice={setNotice}
           reorder={(() => {
             const id = vaultMenu.kind === 'bookmark' ? vaultMenu.record.id : vaultMenu.folder.id;
-            return { earlier: stepper('vault', id, -1), later: stepper('vault', id, 1) };
+            return { earlier: nudger('vault', id, 'left'), later: nudger('vault', id, 'right') };
           })()}
           tag={vaultTagActions(vaultMenu)}
         />

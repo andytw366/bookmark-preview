@@ -10,7 +10,7 @@ The sidebar and the full-page view are both fully operable without a mouse.
 | `↑` `↓` | Previous / next row (in the grid: the same **column**, one row up or down) |
 | `←` `→` | Sidebar: go up a level / enter a folder. Grid: the adjacent card |
 | `Backspace` | Go up a level (both views) |
-| `Ctrl+Shift+←` / `Ctrl+Shift+→` | Full-page view: move the focused card one place earlier / later |
+| `Ctrl+Shift+←↑→↓` | Full-page view: move the focused card one cell (swap if taken); on a group's tag, move the whole group |
 | `Home` / `End` | First / last item |
 | `Enter` | Open the bookmark, or enter the folder |
 | `Menu` key or `Shift+F10` | Open that row's or card's context menu |
@@ -147,80 +147,93 @@ The sidebar has no history to go back through. It listens for the mouse back but
 delivers that button to page content** — GTK turns buttons 8/9 into a browser Back command,
 which navigates the active tab instead. Whether other platforms deliver it is unverified.
 
+### Fixed grid
+
+A folder you have never arranged wraps like any grid: as many columns as the window fits.
+The first drag, group or column change **pins** it: the current columns and arrangement
+are written down, and from then on every card remembers its cell (row × column), gaps
+allowed — like a phone home screen. Pinned grids keep the card size (small / medium /
+large) and scroll sideways when the window is too narrow, so irregular group shapes never
+get torn apart by re-wrapping. One extra row of empty cells always follows the last row as
+the "put it at the end" target; empty cells are faint dashed boxes, clearer while dragging.
+
+The toolbar shows `− N columns +` for a pinned folder, and *Automatic layout* to go back to
+wrapping (not offered while the folder has groups — wrapping cannot keep their shapes).
+Items without a cell (added elsewhere, by an older version, moved in) go after the last
+card, in their native / default order. Search results and Firefox's top-level folders are
+never pinned.
+
+`src/shared/grid.ts` (cells, insert-and-push, connected blocks, outline edges, arrow keys)
+and `src/shared/board.ts` (groups and every operation) are pure functions with tests; both
+spaces run the same `applyOp` in the background page, the page only sends *what* to do.
+
 ### Drag and drop
 
 Both grids (bookmarks and vault) accept drags. Where you let go decides what happens:
 
 | Drop on | Result |
 |---|---|
-| The left or right ~30% of a card | Insert before / after it (an insertion line shows where) |
-| The middle of a folder card | Move into that folder, at the end |
-| The middle of a bookmark card, held ~400 ms (dashed frame) | A small menu: *Create folder* — Enter accepts the default, Esc cancels |
+| An empty cell | The card goes into that cell |
+| The left or right ~30% of a card | Insert before / after it; the cards from there up to the next empty cell move one cell on (reading order), nothing after that gap moves |
+| The middle of a folder card | Move into that folder |
+| The middle of a bookmark card, held ~400 ms (dashed frame) | A small menu: *Create group* (default, Enter) / *Create folder*; Esc cancels |
 | A breadcrumb segment | Move up to that level |
-| Empty space in the grid | Move to the end |
 
-Dragging a checked card while selecting moves the whole selection, keeping its order.
-Search results and the top level of the bookmarks (Firefox's permanent folders) cannot be
-dragged. Data updates arriving mid-drag are held until you let go — a re-render could
-otherwise remove the card being dragged. Dragging close to the top or bottom edge of the
-window scrolls.
+While the pointer is in the gap between cells the last hint stays and a drop does what it
+showed. Dragging a checked card while selecting moves the whole selection, in reading order.
+Search results and the top level of the bookmarks cannot be dragged. Data updates arriving
+mid-drag are held until you let go. Dragging close to the top or bottom edge scrolls.
 
-Everything a drag can do the keyboard can too: *Move earlier / Move later* in the context
-menu, or `Ctrl+Shift+←` / `Ctrl+Shift+→` on a focused card (`Alt+←/→` are Firefox's
-back/forward).
+Keyboard: arrow keys move between cards, skipping empty cells (up/down pick the nearest
+column in the next row that has a card). `Ctrl+Shift+arrow` moves the focused card one cell
+(into an empty cell, or swapping with the card there); the context menu has *Move left /
+right*. Focus follows the card.
 
-**Bookmarks** reorder Firefox's own bookmarks (`bookmarks.move`), so the order shows up in
-the bookmarks menu and library too. A bookmark card dragged onto the tab strip opens it.
-Firefox's `index` for `move` is the **final** position after removal (Chrome uses the
-position before removal); `src/background/bookmark-order.ts` computes for that and re-checks.
+**Bookmarks**: Firefox's own order is kept equal to the grid's reading order
+(`bookmarks.move`, only the bookmarks whose relative order changed — longest increasing
+subsequence), so the bookmarks menu and library stay sensible without the extension. A
+bookmark card dragged onto the tab strip opens it. Firefox's `index` for `move` is the
+**final** position after removal; `src/background/bookmark-order.ts` computes for that and
+re-checks.
 
 **Vault cards carry no URL in the drag data at all** — dropping one on the tab strip would
-open it in a normal window and write it to history. Only an internal type is set; the
-order itself is stored as described in [vault.md](vault.md#order).
+open it in a normal window and write it to history. Only an internal type is set.
 
 ### Groups (tags)
 
-A group is a run of bookmarks inside one folder with a name, a colour and a collapsed
-state. **A named group is a tag**: names are unique per folder (trimmed, case-insensitive),
-and setting a bookmark's tag means joining the group of that name, creating it if needed.
-A bookmark belongs to at most one group. Unnamed groups exist too ("Untitled group").
-
-In the grid a group is a full-width header row (colour bar, name, count, ▸/▾, ⋯) with its
-members below on a shared tint. How to work with them:
+A group is a block of bookmarks in one folder that **touch up/down/left/right** (any
+shape), with a name and a colour, drawn as a coloured outline around the block with the
+name as a small tag on its top-left corner (on the first member in reading order). **A
+named group is a tag**: names are unique per folder (trimmed, case-insensitive). A bookmark
+belongs to at most one group; folders never do.
 
 | Action | How |
 |---|---|
-| Create | Drop one bookmark on another, hold → *Create group* (first item, Enter) |
-| Join | Drop on the header, on the middle of a member, or beside a member; *Set tag…* in the context menu |
-| Leave | Drop beside a card outside the group; *Remove from group* |
-| Move the group | Drag the header (to a position, into a folder card, onto a breadcrumb); ⋯ → *Move earlier/later*; `Ctrl+Shift+←/→` on the focused header |
-| Collapse | Click the header, or Enter on it |
-| ⋯ menu | Rename, colour, collapse, move, *Turn into folder* (a subfolder at the group's place, members in order), *Dissolve* (members stay) |
-| Folder context menu | *Flatten into a group*: the folder's bookmarks move up to where the folder was, as a group with its name (refused if it contains folders) |
+| Create | Drop one bookmark on another, hold → *Create group* (the dragged card goes to the right of the target, or below it at the row end); select touching bookmarks → *Frame as group* |
+| Join | Drop into a cell next to a member (if two groups touch, the card you aimed at wins, else the first in reading order); *Set tag…* (moves it into a free cell beside the group) |
+| Leave | Drop somewhere not touching the group; *Remove from group* |
+| Move the group | Drag the tag: the shape moves as is, and only onto empty cells (red when blocked); onto a folder card / breadcrumb moves it there, after the last row, joining a same-named group; `Ctrl+Shift+arrow` on the tag, or *Move left/right* in its menu |
+| Tag menu (click, Enter, right-click) | Rename, colour, move, *Turn into folder* (a subfolder in the tag's cell, members in reading order), *Dissolve* |
+| Folder context menu | *Flatten into a group*: its bookmarks fill in from the folder's cell, as a group with its name (refused if it contains folders) |
 
-Moving a group into another folder joins a same-named group there, otherwise it arrives
-with its name, colour and collapsed state. Moving a single bookmark to another folder
-leaves its group — groups belong to folders.
+Rules: **pushed cards keep their groups** — only the dragged cards join or leave — so a
+push can split *another* group into pieces (each piece outlined, the tag on the first; no
+one is removed). When the group a dragged card belonged to breaks apart, the pieces without
+the tag leave it. Each cell draws its own part of the outline (`outlineEdges`: a side is
+drawn when the neighbour is not in the same group), extending 8px into the gap so
+neighbours join.
 
-**Rows.** Groups make rows uneven (headers take a row; a group's last row may be short and
-the next part starts a new row). `src/shared/groups.ts` builds the row model as pure
-functions (`arrange`, `gridModel`, `rowNav`); `useVirtualRows` and `useListNav` take its
-row table, so virtual scrolling and arrow keys follow it. The CSS keeps the plain auto-fill
-grid: each card sits in a `display: contents` `.cell` whose class sets
-`grid-column-start: 1` on the first card of a row, and the group tint is a box-shadow
-spread of half the 16px gap, so adjacent cards' tints join into one block — no wrapper
-element, which virtual scrolling could not keep intact anyway.
+**Bookmarks** keep one document per folder under `grid:<folder guid>` in `storage.local`
+(`{ v, columns, cells, groups: [{ id, name, color, members }], updatedAt, deviceId }`,
+`columns: 0` = back to automatic, a tombstone) and **sync it by default** through
+`storage.sync` under the same key (see [sync-and-backup.md](sync-and-backup.md)). Cells
+naming a GUID this device does not have are shown empty but kept (the bookmark may not have
+synced yet). Deleting or moving bookmarks elsewhere is cleaned up via
+`bookmarks.onRemoved/onMoved`, through the same serial queue as the operations. The sidebar
+does not show groups yet.
 
-**Bookmarks** store groups in `storage.local` under `groups:<folder guid>`, plaintext
-(those are ordinary Firefox bookmarks) and **local only**: Firefox cannot read or write its
-own native tags from an extension, and syncing would eat the `storage.sync` quota the
-vault needs. Joining a group also moves the bookmark natively right after the last member,
-so members stay adjacent in Firefox's own bookmark menu. If something else scatters them,
-the grid still shows them together; the next group operation tidies them. Deleting or
-moving bookmarks elsewhere is cleaned up via `bookmarks.onRemoved/onMoved`, through the
-same serial queue as the group operations themselves. The sidebar does not show groups yet.
-
-**Vault** groups live in the encrypted layout document (see [vault.md](vault.md#groups)).
+**Vault** grids and groups live in the encrypted layout document (see
+[vault.md](vault.md#groups)).
 
 ### The top toolbar
 

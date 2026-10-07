@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { request, subscribe } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder, VaultState } from '@/shared/types';
 import { emptyLayout, type VaultLayout } from '@/shared/vault-layout';
-import type { GroupPatch, GroupTarget } from '@/shared/messages';
+import type { GridOp } from '@/shared/board';
 import { t, tn } from '@/shared/i18n';
 
 const KEEPALIVE_PORT = 'vault-keepalive';
@@ -71,18 +71,11 @@ interface VaultApi {
   reorder: (ids: string[], folderId: string | null, beforeId: string | null) => Promise<void>;
   /** 兩張疊在一起 → 建立資料夾 */
   mergeIntoFolder: (targetId: string, ids: string[], name: string) => Promise<void>;
-  /** 群組（＝ tag）。語意見 `vault/group-*` 訊息 */
-  groupAssign: (
-    folderId: string | null,
-    ids: string[],
-    target: GroupTarget,
-    arrange: boolean,
-  ) => Promise<void>;
-  groupUpdate: (groupId: string, patch: GroupPatch) => Promise<void>;
-  groupDissolve: (groupId: string) => Promise<void>;
-  groupToFolder: (groupId: string) => Promise<void>;
-  groupFlatten: (folderId: string) => Promise<void>;
-  groupMove: (groupId: string, toFolderId: string | null, beforeId: string | null) => Promise<void>;
+  /** 版面（固定格子與群組）。語意見 `vault/grid-apply` 與 `vault/group-*` 訊息 */
+  gridApply: (folderId: string | null, columns: number, op: GridOp) => Promise<void>;
+  groupToFolder: (groupId: string, columns: number) => Promise<void>;
+  groupFlatten: (folderId: string, columns: number) => Promise<void>;
+  groupMove: (groupId: string, toFolderId: string | null, columns: number) => Promise<void>;
   /** 重讀清單。重新命名之類的操作直接走 request，改完要讓 UI 跟上 */
   reload: () => Promise<void>;
   /**
@@ -435,39 +428,27 @@ export function useVault(options: UseVaultOptions = {}): VaultApi {
         await refreshAll();
       });
     },
-    groupAssign: async (folderId, ids, target, arrange) => {
+    gridApply: async (folderId, columns, op) => {
       await run(async () => {
-        await request('vault/group-assign', { folderId, ids, target, arrange });
+        await request('vault/grid-apply', { folderId, columns, op });
         await refreshAll();
       });
     },
-    groupUpdate: async (groupId, patch) => {
+    groupToFolder: async (groupId, columns) => {
       await run(async () => {
-        await request('vault/group-update', { groupId, patch });
+        await request('vault/group-to-folder', { groupId, columns });
         await refreshAll();
       });
     },
-    groupDissolve: async (groupId) => {
+    groupFlatten: async (folderId, columns) => {
       await run(async () => {
-        await request('vault/group-dissolve', { groupId });
+        await request('vault/group-flatten', { folderId, columns });
         await refreshAll();
       });
     },
-    groupToFolder: async (groupId) => {
+    groupMove: async (groupId, toFolderId, columns) => {
       await run(async () => {
-        await request('vault/group-to-folder', { groupId });
-        await refreshAll();
-      });
-    },
-    groupFlatten: async (folderId) => {
-      await run(async () => {
-        await request('vault/group-flatten', { folderId });
-        await refreshAll();
-      });
-    },
-    groupMove: async (groupId, toFolderId, beforeId) => {
-      await run(async () => {
-        await request('vault/group-move', { groupId, toFolderId, beforeId });
+        await request('vault/group-move', { groupId, toFolderId, columns });
         await refreshAll();
       });
     },

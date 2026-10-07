@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { rowContaining, type RowSpan } from '@/shared/groups';
 import { columnsForWidth, windowFor, type VirtualWindow } from '../lib/virtual';
 
-/** 被虛擬化的項目元素。與 `useListNav` 用同一個標記，兩者看的是同一批東西。 */
+/** 被虛擬化的項目元素（預設）。與 `useListNav` 用同一個標記，兩者看的是同一批東西。 */
 const ITEM = '[data-nav]';
 
 export interface VirtualRowsOptions {
@@ -29,10 +28,10 @@ export interface VirtualRowsOptions {
    */
   ref?: React.RefObject<HTMLDivElement | null>;
   /**
-   * 列長不一時（群組標題自己一列、群組的最後一列沒排滿）每一列從第幾個項目開始、有幾個。
-   * 省略就是每 `columns` 個一列。見 `shared/groups.ts` 的 `gridModel`。
+   * 一個項目是哪種元素（量列高用）。預設是可聚焦的項目（`[data-nav]`）；全頁瀏覽的固定格子
+   * 有空格（沒有可聚焦的東西），要改成量格子本身（`.cell`）。
    */
-  rows?: readonly RowSpan[] | undefined;
+  item?: string | undefined;
 }
 
 export interface VirtualRows extends VirtualWindow {
@@ -90,7 +89,7 @@ export function useVirtualRows({
   overscan = 4,
   resetKey = '',
   ref: externalRef,
-  rows,
+  item = ITEM,
 }: VirtualRowsOptions): VirtualRows {
   const ownRef = useRef<HTMLDivElement>(null);
   const ref = externalRef ?? ownRef;
@@ -102,9 +101,8 @@ export function useVirtualRows({
   const [measureTick, setMeasureTick] = useState(0);
 
   const cols = Math.max(1, columns);
-  const rowCount = rows === undefined ? Math.ceil(count / cols) : rows.length;
-  const rowStart = (row: number): number => (rows === undefined ? row * cols : (rows[row]?.start ?? count));
-  const rowLength = (row: number): number => (rows === undefined ? cols : (rows[row]?.count ?? 0));
+  const rowCount = Math.ceil(count / cols);
+  const rowStart = (row: number): number => row * cols;
 
   // 清單換了就把量測結果丟掉 —— 沿用舊的會讓捲軸長度與內容位置對不上
   const lastReset = useRef(resetKey);
@@ -212,16 +210,15 @@ export function useVirtualRows({
     if (content === null) {
       return;
     }
-    const items = [...content.querySelectorAll<HTMLElement>(ITEM)];
+    const items = [...content.querySelectorAll<HTMLElement>(item)];
     if (items.length === 0) {
       return;
     }
     const gap = Number.parseFloat(getComputedStyle(content).rowGap) || 0;
     let changed = false;
-    for (let offset = 0, row = win.firstRow; offset < items.length; offset += rowLength(row), row += 1) {
-      const length = Math.max(1, rowLength(row));
+    for (let offset = 0, row = win.firstRow; offset < items.length; offset += cols, row += 1) {
       let tallest = 0;
-      for (let cell = 0; cell < length && offset + cell < items.length; cell += 1) {
+      for (let cell = 0; cell < cols && offset + cell < items.length; cell += 1) {
         const item = items[offset + cell];
         if (item !== undefined) {
           tallest = Math.max(tallest, item.getBoundingClientRect().height);
@@ -255,7 +252,7 @@ export function useVirtualRows({
       if (content === null || scroller === null) {
         return;
       }
-      const row = rows === undefined ? Math.floor(index / cols) : rowContaining(rows, index);
+      const row = Math.floor(index / cols);
       let offset = 0;
       for (let before = 0; before < row; before += 1) {
         offset += heights.current.get(before) ?? estimate;
@@ -267,7 +264,7 @@ export function useVirtualRows({
       scroller.scrollTop += contentTop - viewTop + offset;
       measureViewport();
     },
-    [cols, estimate, measureViewport, rows],
+    [cols, estimate, measureViewport],
   );
 
   return {
@@ -277,6 +274,12 @@ export function useVirtualRows({
     end: Math.min(count, win.endRow >= rowCount ? count : rowStart(win.endRow)),
     scrollToIndex,
   };
+}
+
+/** 扣掉內距的寬度：全頁瀏覽量的是外面那層有內距的橫向捲動容器 */
+function contentWidth(element: Element): number {
+  const style = getComputedStyle(element);
+  return element.clientWidth - (Number.parseFloat(style.paddingLeft) || 0) - (Number.parseFloat(style.paddingRight) || 0);
 }
 
 /**
@@ -307,7 +310,7 @@ export function useGridColumns(
       return;
     }
     setColumns((current) => {
-      const next = columnsForWidth(element.clientWidth, min, gap);
+      const next = columnsForWidth(contentWidth(element), min, gap);
       return current === next ? current : next;
     });
     if (observed.current?.element === element) {
@@ -316,7 +319,7 @@ export function useGridColumns(
     observed.current?.observer.disconnect();
     const observer = new ResizeObserver(() => {
       setColumns((current) => {
-        const next = columnsForWidth(element.clientWidth, min, gap);
+        const next = columnsForWidth(contentWidth(element), min, gap);
         return current === next ? current : next;
       });
     });

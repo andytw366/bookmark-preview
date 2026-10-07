@@ -1,5 +1,4 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
-import { rowNav, type RowSpan } from '@/shared/groups';
 import { columnsOf, navMove } from '../lib/list-nav';
 
 /** 方向鍵可以聚焦的項目。書籤列與全頁瀏覽的卡片都掛這個屬性。 */
@@ -14,8 +13,16 @@ export interface ListNavVirtual {
   columns: number;
   /** 把某個項目捲進畫面，讓它被渲染出來 */
   scrollToIndex: (index: number) => void;
-  /** 列長不一時的列表（群組）。有它就用它算上下鍵，見 `rowNav` */
-  rows?: readonly RowSpan[] | undefined;
+  /**
+   * 固定格子（全頁瀏覽）：項目是 `[data-cell]` 格子裡的卡片，格子可以是空的，方向鍵由
+   * `nav` 決定（`shared/grid.ts` 的 `navCell`）。有它時所有索引都是**格子**的索引。
+   */
+  cells?: { nav: (key: string, at: number) => number | null } | undefined;
+}
+
+/** 固定格子裡第 index 格的卡片（空格或還沒渲染出來回 null） */
+function cardInCell(container: HTMLElement, index: number): HTMLElement | null {
+  return container.querySelector<HTMLElement>(`[data-cell="${String(index)}"] ${ITEM}`);
 }
 
 export interface ListNavActions {
@@ -95,6 +102,10 @@ export function useListNav(actions: ListNavActions, containerRef?: RefObject<HTM
       container.querySelector<HTMLElement>(ITEM)?.focus();
       return;
     }
+    if (actions.virtual?.cells !== undefined) {
+      cardInCell(container, target)?.focus();
+      return;
+    }
     const items = container.querySelectorAll<HTMLElement>(ITEM);
     items[target - (actions.virtual?.start ?? 0)]?.focus();
   });
@@ -114,6 +125,24 @@ export function useListNav(actions: ListNavActions, containerRef?: RefObject<HTM
     }
 
     const container = event.currentTarget;
+    const cells = actions.virtual?.cells;
+    if (cells !== undefined && event.key !== 'Backspace') {
+      const cell = active.closest<HTMLElement>('[data-cell]');
+      const target = cells.nav(event.key, cell === null ? -1 : Number(cell.dataset['cell']));
+      if (target === null) {
+        return;
+      }
+      event.preventDefault();
+      const element = cardInCell(container, target);
+      if (element !== null) {
+        element.focus();
+        return;
+      }
+      pending.current = target;
+      actions.virtual?.scrollToIndex(target);
+      return;
+    }
+
     const items = [...container.querySelectorAll<HTMLElement>(ITEM)];
     const current = itemOf(active, container);
     const local = current === null ? -1 : items.indexOf(current);
@@ -124,10 +153,7 @@ export function useListNav(actions: ListNavActions, containerRef?: RefObject<HTM
     const columns = actions.virtual?.columns ?? columnsOf(items);
     const at = local < 0 ? -1 : base + local;
 
-    const rows = actions.virtual?.rows;
-    const rowTarget =
-      rows === undefined || event.key === 'Backspace' ? null : rowNav(event.key, at, rows);
-    const move = rowTarget === null ? navMove(event.key, at, total, columns) : { kind: 'focus' as const, index: rowTarget };
+    const move = navMove(event.key, at, total, columns);
     if (move === null) {
       return;
     }

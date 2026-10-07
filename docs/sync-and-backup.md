@@ -89,11 +89,12 @@ and an older version rebuilding records field by field would strip anything it d
 know — after which the two devices' fingerprints never agree and they overwrite each other
 every two seconds. Old versions simply never touch the layout keys.
 
-From phase 3 the layout also carries vault groups (`groups`, `groupOf`); they sync and
-back up the same way. Native bookmark groups are local only.
+From phase 3 the layout also carries vault grids and groups (`grid`, `groups`, `groupOf`);
+they sync and back up the same way.
 
 Both documents share the 100 KB quota, so each upload checks that it fits **together with
-what the other one currently occupies**, and stops with the usual over-quota warning if not.
+what the other one currently occupies, plus the 20 KB reserved for bookmark layout** (when
+that is on, below), and stops with the usual over-quota warning if not.
 An older version does not know the layout exists and checks only its own size; near the
 limit it can fail its upload with a quota error. "Remove the cloud copy", deleting the
 vault and "overwrite the cloud" all clear the layout keys too.
@@ -101,6 +102,26 @@ vault and "overwrite the cloud" all clear the layout keys too.
 Merging is per entry, newer `updatedAt` wins, regardless of what the entry contains — so
 sections a version does not understand (groups, from phase 3 on) are kept and merged
 rather than dropped.
+
+### Bookmark layout and groups sync too (on by default)
+
+The native bookmarks' grids and groups (`grid:<folder guid>`, see
+[interface.md](interface.md#groups-tags)) are copied to `storage.sync` under the same keys.
+They are plain bookmark data, so this is **on by default** (Options → *Bookmark layout and
+groups*); turning it off removes the cloud copies and keeps the local ones.
+
+- Each folder is one item; the newer document wins (`updatedAt`, then `deviceId`). Firefox
+  Sync keeps bookmark GUIDs identical across devices, which is what makes this work.
+- A fixed **20 KB budget** (`src/storage/grid-sync.ts`). A folder whose document exceeds the
+  8 KB item limit stays local only; if all of them together exceed 20 KB, syncing layout stops
+  entirely (cloud copies removed) and the options page lists the largest folders — the space
+  stays with the vault.
+- Remote removals never delete local documents (stopping because of the budget would
+  otherwise wipe other devices); "back to automatic" is a `columns: 0` tombstone instead.
+
+Not verified with two real devices (a single profile cannot be two devices): checked that
+the `grid:*` items in `storage-sync-v2.sqlite` are correct and that turning the option off
+and on removes and re-uploads them. The 8 KB / 20 KB limits are covered by code only.
 
 ### Deletion
 

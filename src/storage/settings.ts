@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS: Settings = {
   vaultTrigger: DEFAULT_VAULT_TRIGGER,
   vaultExportFolderId: null,
   vaultSyncEnabled: false,
+  syncGrid: true,
 };
 
 export async function getSettings(): Promise<Settings> {

@@ -4,6 +4,7 @@ import {
   subscribe,
   type FolderChoice,
   type SyncOutcome,
+  type GridSyncStatus,
   type VaultSyncStatus,
 } from '@/shared/messages';
 import type { VaultEntry } from '@/shared/types';
@@ -136,6 +137,21 @@ export function Options() {
       shownKeyRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }, [shownKey]);
+
+  // 書籤的排列與群組的同步。背景頁打開／關掉之後要一點時間才算得出新的狀態，所以晚一點再問
+  const [gridSync, setGridSync] = useState<GridSyncStatus | null>(null);
+  useEffect(() => {
+    const load = (): void => {
+      void request('grid/sync-status', undefined).then(setGridSync, () => undefined);
+    };
+    load();
+    const timer = setTimeout(load, 1_000);
+    const off = subscribe('grid/changed', load);
+    return () => {
+      clearTimeout(timer);
+      off();
+    };
+  }, [settings?.syncGrid]);
 
   // 同步
   const [sync, setSync] = useState<VaultSyncStatus | null>(null);
@@ -721,6 +737,44 @@ export function Options() {
           </p>
         ) : null}
         {restoreStatus !== null ? <p className="options__status">{restoreStatus}</p> : null}
+      </section>
+
+      <section>
+        <h2>{t('options_grid_sync_title')}</h2>
+        <p className="options__hint">{t('options_grid_sync_hint')}</p>
+        <label className="options__check">
+          <input
+            type="checkbox"
+            checked={settings.syncGrid}
+            disabled={gridSync?.available === false}
+            onChange={(event) => {
+              update({ syncGrid: event.target.checked });
+            }}
+          />
+          {t('options_grid_sync_checkbox')}
+        </label>
+        {gridSync?.available === false ? (
+          <p className="options__hint">{t('options_grid_sync_unavailable')}</p>
+        ) : gridSync?.enabled === true ? (
+          <>
+            <p className={gridSync.over ? 'options__status' : 'options__hint'}>
+              {gridSync.over
+                ? t('options_grid_sync_over', formatBytes(gridSync.total), formatBytes(gridSync.budget))
+                : t('options_grid_sync_usage', formatBytes(gridSync.total), formatBytes(gridSync.budget))}
+            </p>
+            {gridSync.folders.length > 0 ? (
+              <ul className="options__hint">
+                {gridSync.folders.map((folder) => (
+                  <li key={folder.title}>
+                    {folder.localOnly
+                      ? t('options_grid_sync_local_only', folder.title, formatBytes(folder.bytes))
+                      : t('options_grid_sync_folder', folder.title, formatBytes(folder.bytes))}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        ) : null}
       </section>
 
       <section>

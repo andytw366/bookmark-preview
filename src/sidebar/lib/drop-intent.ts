@@ -11,8 +11,7 @@
  * 就變成另一個動作」用眼睛看不出對錯，而錯了的表現是「放開之後東西跑到奇怪的地方」。
  */
 
-/** `group` 是群組標題列：橫跨整列，放在上面一律是「加入這個群組」 */
-export type DropTarget = 'folder' | 'bookmark' | 'group';
+export type DropTarget = 'folder' | 'bookmark';
 
 export type DropIntent =
   | { kind: 'before' }
@@ -37,9 +36,6 @@ export function dropIntent(
   target: DropTarget,
   axis: 'horizontal' | 'vertical' = 'horizontal',
 ): DropIntent {
-  if (target === 'group') {
-    return { kind: 'into' };
-  }
   const span = axis === 'horizontal' ? box.width : box.height;
   const offset = axis === 'horizontal' ? x - box.left : y - box.top;
   // 量不到大小（還沒排版）時當成插到前面：最不會出事的那個動作

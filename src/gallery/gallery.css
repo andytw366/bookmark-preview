@@ -287,18 +287,14 @@
 }
 
 /*
- * 拖拽的落點提示。
+ * 拖拽的落點提示（畫在格子 `.cell` 上；群組框線用了 `::before`，提示一律用 `::after`）。
  *
  * 插入線畫在卡片外側、網格間距（16px）的正中間，看起來是「插在兩張之間」而不是
  * 「貼在這一張上」。移入資料夾與合併用外框：前者是實線（放開就搬進去），後者要停留
- * 一下才出現（`MERGE_DWELL_MS`），一路滑過去的卡片不會每張都亮。
+ * 一下才出現（`MERGE_DWELL_MS`），一路滑過去的卡片不會每張都亮。拖群組的標籤時，
+ * 整組平移之後會佔的格子亮起來；放不下就是紅色。
  */
-.drop--before,
-.drop--after {
-  position: relative;
-}
-
-.drop--before::before,
+.drop--before::after,
 .drop--after::after {
   position: absolute;
   top: 4px;
@@ -307,10 +303,9 @@
   background: var(--accent);
   border-radius: 2px;
   content: '';
-  pointer-events: none;
 }
 
-.drop--before::before {
+.drop--before::after {
   left: -10px;
 }
 
@@ -318,16 +313,35 @@
   right: -10px;
 }
 
-.drop--into,
-.drop--merge {
+.drop--into > :first-child,
+.drop--merge > :first-child {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 8px;
 }
 
-.drop--merge {
+.drop--merge > :first-child {
   outline-style: dashed;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.drop--slot::after,
+.drop--shape::after,
+.drop--blocked::after {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  content: '';
+}
+
+.drop--shape::after {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.drop--blocked::after {
+  border-color: #d64545;
+  background: color-mix(in srgb, #d64545 10%, transparent);
 }
 
 .crumbs__item--drop {
@@ -336,20 +350,51 @@
 }
 
 /*
- * 群組（＝ tag）。
+ * 格子（第 3 期改版）。
  *
- * 每張卡片外面有一層 `display: contents` 的 `.cell`（版面上不存在），用它的 class 控制卡片：
- * - `cell--row-start`：從新的一列開始。列是 `gridModel` 算的，CSS 照做，群組的最後一列沒排滿時
- *   下一段才不會接在同一列。
- * - `cell--grouped`：畫群組的底色。底色用 box-shadow 往外擴 8px（網格間距的一半），
- *   相鄰兩張剛好接起來，整組看起來是一塊底框 —— 不必包一層容器（虛擬滾動下包不起來）。
+ * 每一格是一個 `.cell`（`data-cell` = 格子索引），裝著卡片或什麼都沒有（空格）。
+ * 還沒定下來的資料夾照舊用 auto-fill 自動換行；定下來的（`.grid--fixed`）是固定欄數、
+ * 卡片維持「小／中／大」的寬度，視窗太窄時外層 `.grid-scroll` 橫向捲動。
+ *
+ * `.grid-scroll` 的 `overflow-y` 必須是 hidden 而不是 auto：虛擬滾動往上找「會捲的那一層」
+ * 時只認 auto／scroll，認錯了就會把它當成捲動容器。內距是留給群組的框線與標籤的
+ * （它們畫在格子外面 8px，會被 overflow 切掉）。
  */
-.cell {
-  display: contents;
+.grid-scroll {
+  margin: -14px -10px 0;
+  padding: 14px 10px 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
-.cell--row-start > * {
-  grid-column-start: 1;
+.grid--fixed {
+  grid-template-columns: repeat(var(--grid-cols, 4), var(--card-min, 200px));
+  width: max-content;
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  /* 群組框線的 z-index: -1 要壓在卡片底下、又不能跑到整頁背景後面 */
+  isolation: isolate;
+}
+
+.cell > .card,
+.cell > .card-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 空格：平常淡到幾乎看不見，拖拽時才看得出可以放哪裡 */
+.cell--empty {
+  min-height: calc(var(--card-min, 200px) * 0.5);
+  border: 1px dashed color-mix(in srgb, var(--border) 25%, transparent);
+  border-radius: 8px;
+}
+
+.grid--dragging .cell--empty {
+  border-color: var(--border);
 }
 
 .group-c0 { --group-color: #4f7cff; }
@@ -359,79 +404,73 @@
 .group-c4 { --group-color: #8a5cf6; }
 .group-c5 { --group-color: #1fa3b8; }
 
-.cell--grouped > *,
-.group-head {
-  --group-tint: color-mix(in srgb, var(--group-color) 9%, transparent);
-
-  box-shadow:
-    0 0 0 8px var(--group-tint),
-    inset 0 0 0 999px var(--group-tint);
+/*
+ * 群組的框：每一格各畫自己的那一塊（往外擴 8px = 網格間距的一半，相鄰的同組格子剛好接上），
+ * 只在「鄰格不是同一組」的那幾邊畫線（`e-t/r/b/l`，`outlineEdges` 算的）；
+ * 兩邊都有線的角是凸角，畫圓角。形狀不規則也一樣接得起來，不必包一層容器。
+ */
+.cell--g::before {
+  position: absolute;
+  inset: -8px;
+  z-index: -1;
+  background: color-mix(in srgb, var(--group-color) 8%, transparent);
+  border: 0 solid var(--group-color);
+  content: '';
+  pointer-events: none;
 }
 
-.group-head {
-  display: flex;
-  grid-column: 1 / -1;
-  align-items: stretch;
-  border-left: 4px solid var(--group-color);
-  border-radius: 6px;
-}
+.e-t::before { border-top-width: 2px; }
+.e-r::before { border-right-width: 2px; }
+.e-b::before { border-bottom-width: 2px; }
+.e-l::before { border-left-width: 2px; }
+.e-t.e-l::before { border-top-left-radius: 10px; }
+.e-t.e-r::before { border-top-right-radius: 10px; }
+.e-b.e-l::before { border-bottom-left-radius: 10px; }
+.e-b.e-r::before { border-bottom-right-radius: 10px; }
 
-.group-head__main {
-  display: flex;
-  flex: 1;
-  gap: 10px;
-  align-items: center;
-  min-width: 0;
-  padding: 6px 10px;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.group-head__main:focus-visible,
-.group-head__more:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.group-head__chevron {
-  width: 1em;
-  color: var(--group-color);
-}
-
-.group-head__name {
+/* 群組名稱：貼在框左上角的小色塊，壓在框線上。點它開選單、拖它整組搬 */
+.group-tag {
+  position: absolute;
+  top: -18px;
+  left: 0;
+  z-index: 2;
+  max-width: calc(100% - 8px);
   overflow: hidden;
+  padding: 1px 8px;
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
   font-weight: 600;
+  line-height: 1.5;
   white-space: nowrap;
   text-overflow: ellipsis;
+  background: var(--group-color);
+  border: none;
+  border-radius: 6px;
+  cursor: grab;
 }
 
-.group-head__name--untitled {
-  color: var(--fg-dim);
+.group-tag--untitled {
   font-style: italic;
   font-weight: 400;
 }
 
-.group-head__count {
+.group-tag:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.grid-cols {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.grid-cols__value {
+  min-width: 4.5em;
   color: var(--fg-dim);
   font-size: 0.85em;
-}
-
-.group-head__more {
-  padding: 0 12px;
-  color: var(--fg-dim);
-  font: inherit;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.group-head__more:hover,
-.group-head__main:hover {
-  background: var(--bg-hover);
+  text-align: center;
 }
 
 .group-menu__colors {

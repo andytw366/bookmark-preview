@@ -1,4 +1,5 @@
 import type { GroupInfo } from './groups';
+import { decodeCells, type Grid } from './grid';
 import { textDigest } from './vault-merge';
 
 /**
@@ -64,7 +65,6 @@ export interface VaultGroupEntry extends LayoutEntry {
   folderId: string | null;
   name: string;
   color: number;
-  collapsed: boolean;
   deleted?: true;
 }
 
@@ -82,9 +82,22 @@ function isGroupEntry(entry: LayoutEntry): entry is VaultGroupEntry {
   return (
     (entry.folderId === null || typeof entry.folderId === 'string') &&
     typeof entry.name === 'string' &&
-    typeof entry.color === 'number' &&
-    typeof entry.collapsed === 'boolean'
+    typeof entry.color === 'number'
   );
+}
+
+/**
+ * `grid` 區段（第 3 期改版）：一個資料夾一筆固定格子，鍵與 `order` 相同。
+ * `columns: 0` 是墓碑 = 恢復成自動排列（刪掉那一筆的話，另一台裝置的舊格子會在合併時回來）。
+ * `order` 區段照樣寫（= 格子的閱讀順序），第 2 期的裝置才看得到合理的順序。
+ */
+export interface FolderGridEntry extends LayoutEntry {
+  columns: number;
+  cells: string[];
+}
+
+function isGridEntry(entry: LayoutEntry): entry is FolderGridEntry {
+  return typeof entry.columns === 'number' && decodeCells(entry.cells) !== null;
 }
 
 function isGroupOf(entry: LayoutEntry): entry is GroupOfEntry {
@@ -96,6 +109,7 @@ const VALIDATORS: Record<string, (entry: LayoutEntry) => boolean> = {
   order: isOrder,
   groups: isGroupEntry,
   groupOf: isGroupOf,
+  grid: isGridEntry,
 };
 
 /**
@@ -309,7 +323,7 @@ function groupEntries(layout: VaultLayout): [string, VaultGroupEntry][] {
 export function vaultGroups(layout: VaultLayout, folderId: string | null): GroupInfo[] {
   return groupEntries(layout)
     .filter(([, entry]) => entry.folderId === folderId)
-    .map(([id, entry]) => ({ id, name: entry.name, color: entry.color, collapsed: entry.collapsed }));
+    .map(([id, entry]) => ({ id, name: entry.name, color: entry.color }));
 }
 
 export function vaultGroupEntry(layout: VaultLayout, groupId: string): VaultGroupEntry | null {
@@ -317,7 +331,7 @@ export function vaultGroupEntry(layout: VaultLayout, groupId: string): VaultGrou
   return entry !== undefined && isGroupEntry(entry) && entry.deleted !== true ? entry : null;
 }
 
-/** 記錄 → 群組 id。只是記下來的值；成員資格成不成立要再對資料夾（`arrange` 只認這個資料夾的群組） */
+/** 記錄 → 群組 id。只是記下來的值；成員資格成不成立要再對資料夾（`buildBoard` 只認這個資料夾的群組） */
 export function vaultGroupOf(layout: VaultLayout): (recordId: string) => string | null {
   const section = layout.sections.groupOf ?? {};
   return (recordId) => {
@@ -348,5 +362,29 @@ export function withGroupOf(
   for (const id of ids) {
     section[id] = { groupId, updatedAt: now };
   }
+  return next;
+}
+
+// ── 固定格子 ─────────────────────────────────────────────────────────
+
+/** 這個資料夾定下來的格子；還沒定下來（或恢復成自動排列）是 null */
+export function folderGrid(layout: VaultLayout, folderId: string | null): Grid | null {
+  const entry = layout.sections.grid?.[folderKey(folderId)];
+  if (entry === undefined || !isGridEntry(entry) || entry.columns <= 0) {
+    return null;
+  }
+  return { columns: entry.columns, cells: decodeCells(entry.cells) ?? [] };
+}
+
+/** `grid` null = 恢復自動排列（寫墓碑） */
+export function withFolderGrid(
+  layout: VaultLayout,
+  folderId: string | null,
+  grid: Grid | null,
+  now: number = Date.now(),
+): VaultLayout {
+  const next = sanitizeLayout(layout);
+  (next.sections.grid ??= {})[folderKey(folderId)] =
+    grid === null ? { columns: 0, cells: [], updatedAt: now } : { columns: grid.columns, cells: [...grid.cells], updatedAt: now };
   return next;
 }

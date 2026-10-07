@@ -772,15 +772,6 @@
   "merge_create_group": {
     "message": "建立群組"
   },
-  "group_expand": {
-    "message": "展開群組"
-  },
-  "group_collapse": {
-    "message": "收合群組"
-  },
-  "group_menu": {
-    "message": "群組選項"
-  },
   "group_name_label": {
     "message": "群組名稱（也就是 tag）"
   },
@@ -843,16 +834,16 @@
     "message": "新資料夾"
   },
   "row_move_earlier": {
-    "message": "往前移"
+    "message": "往左移"
   },
   "row_move_earlier_hint": {
-    "message": "在這個資料夾裡往前挪一格（Ctrl+Shift+←）"
+    "message": "往左挪一格，那一格有卡片就互換（Ctrl+Shift+方向鍵可以往四個方向挪）"
   },
   "row_move_later": {
-    "message": "往後移"
+    "message": "往右移"
   },
   "row_move_later_hint": {
-    "message": "在這個資料夾裡往後挪一格（Ctrl+Shift+→）"
+    "message": "往右挪一格，那一格有卡片就互換（Ctrl+Shift+方向鍵可以往四個方向挪）"
   },
   "row_open_in_gallery": {
     "message": "在全頁瀏覽開啟"
@@ -1823,5 +1814,105 @@
   },
   "gallery_vault_empty_hint": {
     "message": "還沒有隱私書籤。在側邊欄用書籤右側的鎖圖示或「選取」可以把書籤移進來。"
+  },
+  "group_links_only": {
+    "message": "只有書籤能放進群組，資料夾不行"
+  },
+  "grid_shape_blocked": {
+    "message": "那裡放不下整個群組：目標格子要全空（也不能超出左右邊界）"
+  },
+  "grid_auto_has_groups": {
+    "message": "這個資料夾有群組，不能恢復自動排列 —— 自動換行排不出不規則的形狀。先解散群組。"
+  },
+  "grid_frame_disconnected": {
+    "message": "勾選的書籤要上下左右相連才能框成一個群組"
+  },
+  "group_tag_hint": {
+    "message": "點一下開選單；拖曳可以整組搬移（Ctrl+Shift+方向鍵一次挪一格）"
+  },
+  "grid_frame": {
+    "message": "框成群組"
+  },
+  "grid_frame_hint": {
+    "message": "把勾選的書籤框成一個沒有名字的群組（要上下左右相連）"
+  },
+  "grid_columns": {
+    "message": "欄數"
+  },
+  "grid_columns_less": {
+    "message": "少一欄"
+  },
+  "grid_columns_more": {
+    "message": "多一欄"
+  },
+  "grid_columns_n": {
+    "message": "$N$ 欄",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "grid_auto": {
+    "message": "恢復自動排列"
+  },
+  "grid_auto_hint": {
+    "message": "不再固定欄數與位置，改回跟著視窗寬度自動換行"
+  },
+  "options_grid_sync_title": {
+    "message": "書籤的排列與群組"
+  },
+  "options_grid_sync_hint": {
+    "message": "全頁瀏覽裡排好的位置與群組（tag）跟著 Firefox 同步到其他裝置。固定佔用同步空間的 20 KB，其餘留給隱私空間。"
+  },
+  "options_grid_sync_checkbox": {
+    "message": "同步書籤的排列與群組"
+  },
+  "options_grid_sync_unavailable": {
+    "message": "這個 Firefox 不能使用同步儲存空間，排列與群組只存在這台裝置。"
+  },
+  "options_grid_sync_usage": {
+    "message": "已使用 $USED$ / $BUDGET$",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "budget": {
+        "content": "$2"
+      }
+    }
+  },
+  "options_grid_sync_over": {
+    "message": "排列與群組合計 $USED$，超過 $BUDGET$ 的預算，已停止同步（只存在這台裝置）。佔最多的是：",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "budget": {
+        "content": "$2"
+      }
+    }
+  },
+  "options_grid_sync_folder": {
+    "message": "「$TITLE$」$BYTES$",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      },
+      "bytes": {
+        "content": "$2"
+      }
+    }
+  },
+  "options_grid_sync_local_only": {
+    "message": "「$TITLE$」$BYTES$，超過單筆上限，只存在這台裝置",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      },
+      "bytes": {
+        "content": "$2"
+      }
+    }
   }
 }

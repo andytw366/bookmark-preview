@@ -4,16 +4,18 @@ import { clearSiteImageStats } from '@/storage/site-image-stats';
 import { getThumb, pruneOlderThan, usage } from '@/storage/thumbs-db';
 import { backfillThumbnails, backfillVaultThumbnails } from './backfill';
 import {
-  assignGroup,
-  dissolveGroup,
+  applyBookmarkGrid,
+  clearGridSync,
   flattenFolder,
+  getBookmarkGrid,
+  gridSyncStatus,
   groupToFolder,
-  listGroups,
+  mergeIntoFolder as mergeBookmarksIntoFolder,
   moveGroup,
-  startGroupWatcher,
-  updateGroup,
-} from './bookmark-groups';
-import { mergeIntoNewFolder as mergeBookmarksIntoFolder, reorderBookmarks } from './bookmark-order';
+  reconcileGridSync,
+  startGridWatcher,
+} from './bookmark-grid';
+import { reorderBookmarks } from './bookmark-order';
 import { collectFolderChoices, collectRoots } from './bookmark-tree';
 import { startBookmarkWatcher } from './bookmark-watcher';
 import { startCapturePipeline, startPermissionWatcher } from './capture';
@@ -36,11 +38,9 @@ import {
   listBookmarks,
   listFolders,
   lockVault,
-  assignVaultGroup,
-  dissolveVaultGroup,
+  applyVaultGrid,
   flattenVaultFolder,
   moveVaultGroup,
-  updateVaultGroup,
   vaultGroupToFolder,
   mergeIntoNewFolder,
   readLayout,
@@ -141,16 +141,13 @@ serve({
   'bookmarks/merge-folder': async ({ targetId, ids, title }) => ({
     id: await mergeBookmarksIntoFolder(targetId, ids, title),
   }),
-  'groups/list': async ({ folderId }) => listGroups(folderId),
-  'groups/assign': async ({ folderId, ids, target, arrange }) => ({
-    groupId: await assignGroup(folderId, ids, target, arrange),
-  }),
-  'groups/update': async ({ folderId, groupId, patch }) => updateGroup(folderId, groupId, patch),
-  'groups/dissolve': async ({ folderId, groupId }) => dissolveGroup(folderId, groupId),
-  'groups/to-folder': async ({ folderId, groupId }) => ({ id: await groupToFolder(folderId, groupId) }),
-  'groups/flatten': async ({ folderId }) => flattenFolder(folderId),
-  'groups/move': async ({ fromFolderId, groupId, toFolderId, beforeId }) =>
-    moveGroup(fromFolderId, groupId, toFolderId, beforeId),
+  'grid/get': async ({ folderId }) => getBookmarkGrid(folderId),
+  'grid/apply': async ({ folderId, columns, op }) => applyBookmarkGrid(folderId, columns, op),
+  'grid/sync-status': async () => gridSyncStatus(),
+  'groups/to-folder': async ({ folderId, groupId, columns }) => ({ id: await groupToFolder(folderId, groupId, columns) }),
+  'groups/flatten': async ({ folderId, columns }) => flattenFolder(folderId, columns),
+  'groups/move': async ({ fromFolderId, groupId, toFolderId, columns }) =>
+    moveGroup(fromFolderId, groupId, toFolderId, columns),
   'bookmarks/folders': async () => collectFolderChoices(),
   'bookmarks/folder-create': async ({ parentId, title }) => {
     // 沒有 url 就是資料夾
@@ -163,6 +160,11 @@ serve({
     // 剛打開同步就馬上跑一次：不然使用者要等到下一次寫入才看得到任何反應
     if (patch.vaultSyncEnabled === true) {
       scheduleVaultSync();
+    }
+    if (patch.syncGrid === true) {
+      await reconcileGridSync();
+    } else if (patch.syncGrid === false) {
+      await clearGridSync();
     }
     return next;
   },
@@ -259,30 +261,21 @@ serve({
     return { id };
   },
   // 群組的變動都要讓其他開著的頁面跟上（版面在 vault/changed 時重讀）
-  'vault/group-assign': async ({ folderId, ids, target, arrange }) => {
-    const groupId = await assignVaultGroup(folderId, ids, target, arrange);
-    await announceVault();
-    return { groupId };
-  },
-  'vault/group-update': async ({ groupId, patch }) => {
-    await updateVaultGroup(groupId, patch);
+  'vault/grid-apply': async ({ folderId, columns, op }) => {
+    await applyVaultGrid(folderId, columns, op);
     await announceVault();
   },
-  'vault/group-dissolve': async ({ groupId }) => {
-    await dissolveVaultGroup(groupId);
-    await announceVault();
-  },
-  'vault/group-to-folder': async ({ groupId }) => {
-    const id = await vaultGroupToFolder(groupId);
+  'vault/group-to-folder': async ({ groupId, columns }) => {
+    const id = await vaultGroupToFolder(groupId, columns);
     await announceVault();
     return { id };
   },
-  'vault/group-flatten': async ({ folderId }) => {
-    await flattenVaultFolder(folderId);
+  'vault/group-flatten': async ({ folderId, columns }) => {
+    await flattenVaultFolder(folderId, columns);
     await announceVault();
   },
-  'vault/group-move': async ({ groupId, toFolderId, beforeId }) => {
-    await moveVaultGroup(groupId, toFolderId, beforeId);
+  'vault/group-move': async ({ groupId, toFolderId, columns }) => {
+    await moveVaultGroup(groupId, toFolderId, columns);
     await announceVault();
   },
   'vault/backfill': async () => acted(backfillVaultThumbnails()),
@@ -335,7 +328,7 @@ serve({
 });
 
 startBookmarkWatcher();
-startGroupWatcher();
+startGridWatcher();
 startCapturePipeline();
 startPermissionWatcher();
 startVaultLock();

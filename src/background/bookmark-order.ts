@@ -32,7 +32,7 @@ async function indexOf(id: string): Promise<{ parentId: string | undefined; inde
 }
 
 /** 把 `id` 放到 `parentId` 裡 `beforeId` 的正前方（null = 最後） */
-async function placeBefore(id: string, parentId: string, beforeId: string | null): Promise<void> {
+export async function placeBefore(id: string, parentId: string, beforeId: string | null): Promise<void> {
   if (beforeId === null) {
     await browser.bookmarks.move(id, { parentId });
     return;

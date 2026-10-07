@@ -12,13 +12,12 @@ interface GroupMenuProps {
   onClose: () => void;
   onRename: (name: string) => void;
   onColor: (color: number) => void;
-  onToggle: () => void;
   onDissolve: () => void;
   onToFolder: () => void;
 }
 
 /**
- * 群組標題的 ⋯ 選單。兩個空間共用，差別只在呼叫端送哪一種訊息。
+ * 群組標籤的選單（點標籤、或在標籤上按 Enter／右鍵）。兩個空間共用，差別只在呼叫端送哪一種訊息。
  *
  * 「解散」不需要確認：成員留在原地，只是不再聚成一組，隨時可以再建回來。
  * 「轉成資料夾」也不需要：它是把群組換成一個子資料夾，內容一個都沒少。
@@ -31,7 +30,6 @@ export function GroupMenu({
   onClose,
   onRename,
   onColor,
-  onToggle,
   onDissolve,
   onToFolder,
 }: GroupMenuProps) {
@@ -99,9 +97,6 @@ export function GroupMenu({
           />
         ))}
       </div>
-      <button type="button" role="menuitem" className="rowmenu__item" onClick={run(onToggle)}>
-        {group.collapsed ? t('group_expand') : t('group_collapse')}
-      </button>
       <ReorderItems reorder={reorder} onClose={onClose} />
       <button
         type="button"
