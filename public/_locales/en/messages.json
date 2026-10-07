@@ -577,6 +577,9 @@
   "crumbs_label": {
     "message": "Bookmark folder path"
   },
+  "crumbs_up": {
+    "message": "Up one level"
+  },
   "crumbs_all": {
     "message": "All"
   },
@@ -748,6 +751,9 @@
   },
   "permission_dismiss": {
     "message": "Not now — keep the colour cards"
+  },
+  "row_open_in_gallery": {
+    "message": "Open in full page"
   },
   "row_open_folder": {
     "message": "Open this folder"

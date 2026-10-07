@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { request } from '@/shared/messages';
 import type { BookmarkNode, OpenTarget } from '@/shared/types';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
@@ -210,6 +210,39 @@ export function App() {
    * 這個數字只是拿來判斷「有沒有東西可移」與顯示用。
    */
   const selectedLinkCount = countLinks(selectedNodes);
+
+  /*
+   * 滑鼠側鍵（「上一頁」那顆）當「上一層」。側邊欄沒有網址列、沒有歷史可回，
+   * 但手已經習慣按那顆鍵往回走。兩個空間都接；搜尋結果與最上層沒有上一層。
+   */
+  const upOneLevel = (): void => {
+    if (tab === 'vault') {
+      if (vaultFolderId !== null) {
+        setVaultFolderId(
+          vault.folders.find((folder) => folder.id === vaultFolderId)?.parentId ?? null,
+        );
+      }
+      return;
+    }
+    if (search === null && currentFolder !== undefined) {
+      setFolderId(index.parentOf.get(currentFolder.id) ?? null);
+    }
+  };
+  // 監聽器只綁一次，要讀到最新的所在位置得經過 ref
+  const upOneLevelRef = useRef(upOneLevel);
+  upOneLevelRef.current = upOneLevel;
+  useEffect(() => {
+    const onMouseUp = (event: MouseEvent): void => {
+      if (event.button === 3) {
+        event.preventDefault();
+        upOneLevelRef.current();
+      }
+    };
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   if (error !== null) {
     return (

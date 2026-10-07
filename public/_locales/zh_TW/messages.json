@@ -577,6 +577,9 @@
   "crumbs_label": {
     "message": "書籤資料夾路徑"
   },
+  "crumbs_up": {
+    "message": "上一層"
+  },
   "crumbs_all": {
     "message": "全部"
   },
@@ -748,6 +751,9 @@
   },
   "permission_dismiss": {
     "message": "先不要，繼續使用色卡"
+  },
+  "row_open_in_gallery": {
+    "message": "在全頁瀏覽開啟"
   },
   "row_open_folder": {
     "message": "開啟這個資料夾"

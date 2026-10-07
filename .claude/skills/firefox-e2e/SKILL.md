@@ -50,6 +50,12 @@ npm run build && ./scripts/ff.sh start
 - **數字輸入框連續打字會掉字**（受控 input + 非同步 settings），每個字之間停 1 秒以上。
 - 進程名是 `firefox-bin`，`pkill -x firefox` 殺不掉；也**不要**用 `pkill -f firefox`（會殺到腳本自己）。用 `./scripts/ff.sh stop`。
 
+## 驗「有沒有寫到磁碟」
+
+隱私空間的東西不能出現在網址、`history.state` 這類會被 session restore 存下來的地方。
+操作完等 15 秒，`./scripts/session-entries.py --grep <名稱>` 直接解開 profile 裡的
+`recovery.jsonlz4` 看。這比在 DevTools 裡看 `history.state` 更接近真正的威脅（磁碟上的檔案）。
+
 ## 封面排序的驗證不必載入擴充套件
 
 要改 `cover.ts` 的評分時走擴充套件那條路很貴。`cover.ts` 沒有任何 import，`npx esbuild src/background/cover.ts --format=esm` 就是自足模組，把它注入 `tests/fixtures/site/` 的頁面即可拿到真實版面下的候選清單與分數。細節見 NEXT.md「測試環境的注意事項」。

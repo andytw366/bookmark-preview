@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { request } from '@/shared/messages';
 import type { BookmarkNode } from '@/shared/types';
+import { folderHash } from '../lib/gallery-history';
 import { FolderPicker } from './FolderPicker';
 import { Popover } from './Popover';
 import { t } from '@/shared/i18n';
@@ -178,7 +179,22 @@ export function RowMenu({
             {t('action_refresh_thumb')}
           </button>
         </>
-      ) : null}
+      ) : (
+        // 只有書籤這邊有：隱私資料夾的 id 不能出現在網址上（理由見 gallery-history）
+        <button
+          type="button"
+          role="menuitem"
+          className="rowmenu__item"
+          onClick={() => {
+            void browser.tabs.create({
+              url: `${browser.runtime.getURL('gallery/index.html')}${folderHash(node.id)}`,
+            });
+            onClose();
+          }}
+        >
+          {t('row_open_in_gallery')}
+        </button>
+      )}
 
       <button
         type="button"

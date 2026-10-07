@@ -113,6 +113,39 @@ Clicking opens **a new tab** by default (loading in the current tab would replac
 browsing view itself); Ctrl+click opens in the background. The context menu is literally
 the sidebar's (`RowMenu` is reused).
 
+### Back and up
+
+"Back" and "up a level" are two different things, and the full-page view has both:
+
+| | Goes to | Triggered by |
+|---|---|---|
+| Back | The folder you were **just in** (after a breadcrumb jump that is not the parent) | The browser's Back, `Alt+←`, the mouse back button |
+| Up a level | The **parent** folder | `Backspace`, the `↑` in front of the breadcrumb |
+
+Every folder change you make (card, breadcrumb, `↑`, `Backspace`, switching between bookmarks
+and the vault) is a `history.pushState`. Typing in the search box is not — one entry per
+keystroke would make Back useless. When the folder you are in disappears (deleted elsewhere)
+the view falls back to the top level with `replaceState`, so Back never returns to a folder
+that no longer exists.
+
+**Bookmarks** carry the folder in the address: `#folder=<guid>`. Reloading, or saving that
+address and opening it later, lands in the same folder. A folder's context menu (sidebar and
+full-page view) has "Open in full page", which opens a tab at that address.
+
+**The vault leaves nothing in the address or in `history.state`.** Firefox's session restore
+writes every tab's history entries — URL and state — to disk, so a folder id or even a "vault"
+flag there would undo `vaultEntry: 'hidden'`. A vault entry stores only a random token
+(`{ n: '<uuid>' }`) with no hash; the token → folder table lives in memory and is cleared on
+lock. Going back to a token the page does not recognise (locked since, or the page was
+reloaded) lands on the top level of the bookmarks — never on the unlock prompt, which would
+admit the vault exists. Vault folders have no "Open in full page" for the same reason.
+Logic and tests: `src/sidebar/lib/gallery-history.ts`.
+
+The sidebar has no history to go back through. It listens for the mouse back button
+(`mouseup` with `button === 3`) as "up a level" in both spaces, but **on Linux Firefox never
+delivers that button to page content** — GTK turns buttons 8/9 into a browser Back command,
+which navigates the active tab instead. Whether other platforms deliver it is unverified.
+
 ### The top toolbar
 
 Both modes (bookmarks / vault) share one set of rows in fixed positions:

@@ -1064,3 +1064,9 @@ body {
   gap: 8px;
   margin-bottom: 4px;
 }
+
+/* 全頁瀏覽的「上一層」：與麵包屑同一排，字形稍粗才看得出是按鈕而不是路徑 */
+.crumbs__up {
+  margin-right: 4px;
+  font-weight: 600;
+}

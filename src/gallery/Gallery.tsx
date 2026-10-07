@@ -22,6 +22,14 @@ import { useListNav } from '../sidebar/hooks/useListNav';
 import { useGridColumns, useVirtualRows } from '../sidebar/hooks/useVirtualRows';
 import { useSettings } from '../sidebar/hooks/useSettings';
 import { useVault } from '../sidebar/hooks/useVault';
+import {
+  VaultTokens,
+  historyEntry,
+  historyStep,
+  parseFolderHash,
+  placeFromHistory,
+  type GalleryPlace,
+} from '../sidebar/lib/gallery-history';
 import { contextMenuHandlers } from '../sidebar/lib/keys';
 import { buildIndex, countLinks, pathTo, searchLinks } from '../sidebar/lib/tree';
 import { vaultPathTo } from '../sidebar/lib/vault-tree';
@@ -77,7 +85,8 @@ export function Gallery() {
   const [mode, setMode] = useState<Mode>('bookmarks');
   // vaultInView 讓 useVault 知道要不要把使用者的操作算成「還在用隱私空間」
   const vault = useVault({ vaultInView: mode === 'vault' });
-  const [folderId, setFolderId] = useState<string | null>(null);
+  // 開頁時照網址的 #folder= 停在那個資料夾：重新整理、或把網址存起來再開都一樣
+  const [folderId, setFolderId] = useState<string | null>(() => parseFolderHash(location.hash));
   const [vaultFolderId, setVaultFolderId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [size, setSize] = useState<ColumnSize>(200);
@@ -117,17 +126,103 @@ export function Gallery() {
   const vaultStatus = vault.state?.status;
   const vaultUnlocked = vaultStatus === 'unlocked';
 
-  useEffect(() => {
-    if (folderId !== null && !index.byId.has(folderId)) {
-      setFolderId(null);
+  /*
+   * 資料夾巡覽接到瀏覽器的歷史紀錄（規則與隱私空間為什麼只放代號，見 gallery-history）。
+   *
+   * 歷史只在事件處理裡寫，不在 effect 裡寫 —— StrictMode 會把 effect 跑兩次，
+   * push 跑兩次就多一筆。唯一的例外是「退回」那幾個 effect，它們用 replace，跑幾次都一樣。
+   */
+  const tokensRef = useRef<VaultTokens | null>(null);
+  tokensRef.current ??= new VaultTokens();
+  const tokens = tokensRef.current;
+
+  const here: GalleryPlace =
+    mode === 'vault' ? { mode: 'vault', folderId: vaultFolderId } : { mode: 'bookmarks', folderId };
+
+  const writeHistory = (place: GalleryPlace, how: 'push' | 'replace'): void => {
+    const entry = historyEntry(place, tokens);
+    const url = `${location.pathname}${location.search}${entry.hash}`;
+    if (how === 'push') {
+      history.pushState(entry.state, '', url);
+      return;
     }
-  }, [index, folderId]);
+    history.replaceState(entry.state, '', url);
+  };
+
+  const showPlace = (place: GalleryPlace): void => {
+    if (place.mode === 'vault') {
+      setMode('vault');
+      setVaultFolderId(place.folderId);
+      return;
+    }
+    setMode('bookmarks');
+    setFolderId(place.folderId);
+  };
+
+  /** 使用者的巡覽一律走這裡，上一頁才回得來 */
+  const go = (place: GalleryPlace): void => {
+    const step = historyStep(here, place, 'user');
+    if (step !== 'none') {
+      writeHistory(place, step);
+    }
+    showPlace(place);
+  };
+
+  // popstate 的處理器只綁一次，要讀到最新的解鎖狀態得經過 ref
+  const vaultUnlockedRef = useRef(vaultUnlocked);
+  vaultUnlockedRef.current = vaultUnlocked;
+
+  useEffect(() => {
+    // 開頁時一定在書籤這邊：若重新整理前停在隱私空間，記憶體裡的代號表已經沒了
+    const initial = placeFromHistory(history.state, location.hash, tokens, false).place;
+    writeHistory(initial, 'replace');
+
+    const onPop = (event: PopStateEvent): void => {
+      const { place, known } = placeFromHistory(
+        event.state,
+        location.hash,
+        tokens,
+        vaultUnlockedRef.current,
+      );
+      if (!known) {
+        // 不認得的代號換成書籤最上層的項目，再按一次下一頁也不會回到這個死掉的代號
+        writeHistory(place, 'replace');
+      }
+      // 搜尋字留著的話，回到的資料夾會被搜尋結果蓋住，看起來像上一頁沒反應
+      setQuery('');
+      showPlace(place);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+    };
+    // 只在開頁時跑：writeHistory 與 tokens 都不會換
+  }, []);
+
+  // 所在的資料夾被刪掉時退回最上層。用 replace：上一頁不該回到一個不存在的地方。
+  // 書籤還沒讀進來時索引是空的，那時不能判斷 —— 否則網址帶的 #folder= 一開頁就被清掉
+  useEffect(() => {
+    if (roots !== null && folderId !== null && !index.byId.has(folderId)) {
+      setFolderId(null);
+      if (mode === 'bookmarks') {
+        writeHistory({ mode: 'bookmarks', folderId: null }, 'replace');
+      }
+    }
+  }, [roots, index, folderId, mode]);
+
+  // 上鎖時清掉代號表：之後按上一頁回到隱私空間的項目，一律當成不認得
+  useEffect(() => {
+    if (!vaultUnlocked) {
+      tokens.clear();
+    }
+  }, [vaultUnlocked, tokens]);
 
   // 上鎖後不要停在隱私空間 —— 隱密模式下那會留下一個解鎖畫面暴露它的存在
   useEffect(() => {
     if (!vaultUnlocked && mode === 'vault') {
       setMode('bookmarks');
       setVaultFolderId(null);
+      writeHistory({ mode: 'bookmarks', folderId }, 'replace');
     }
   }, [vaultUnlocked, mode]);
 
@@ -135,6 +230,9 @@ export function Gallery() {
   useEffect(() => {
     if (vaultFolderId !== null && !vault.folders.some((folder) => folder.id === vaultFolderId)) {
       setVaultFolderId(null);
+      if (mode === 'vault') {
+        writeHistory({ mode: 'vault', folderId: null }, 'replace');
+      }
     }
   }, [vault.folders, vaultFolderId]);
 
@@ -151,7 +249,7 @@ export function Gallery() {
       // 快取可能還停在「已解鎖」，那時跳進去只會看到一個什麼都做不了的畫面
       void vault.refreshState().then((fresh) => {
         if (fresh?.status === 'unlocked') {
-          setMode('vault');
+          go({ mode: 'vault', folderId: vaultFolderId });
           return;
         }
         setVaultPrompt(true);
@@ -249,6 +347,23 @@ export function Gallery() {
    * 網格裡左右鍵是相鄰的格子，沒得挪去做「進資料夾」—— 那件事交給 Enter，
    * 資料夾卡片本來就是按下去就進去。只有回上一層需要另外給鍵，用 Backspace。
    */
+  /** 「上一層」：Backspace 與麵包屑旁的 ↑ 共用。搜尋結果與最上層沒有上一層 */
+  const upBookmarks =
+    search !== null || currentFolder === undefined
+      ? undefined
+      : () => {
+          go({ mode: 'bookmarks', folderId: index.parentOf.get(currentFolder.id) ?? null });
+        };
+  const upVault =
+    vaultFolderId === null
+      ? undefined
+      : () => {
+          go({
+            mode: 'vault',
+            folderId: vault.folders.find((folder) => folder.id === vaultFolderId)?.parentId ?? null,
+          });
+        };
+
   const listKey = search === null ? (folderId ?? 'root') : `search:${trimmed}`;
   const columns = useGridColumns(gridRef, size, GRID_GAP);
   const gridRows = useVirtualRows({
@@ -260,12 +375,7 @@ export function Gallery() {
   });
   const nav = useListNav(
     {
-      onLeave:
-        search !== null || currentFolder === undefined
-          ? undefined
-          : () => {
-              setFolderId(index.parentOf.get(currentFolder.id) ?? null);
-            },
+      onLeave: upBookmarks,
       virtual: {
         start: gridRows.start,
         count: nodes.length,
@@ -286,14 +396,7 @@ export function Gallery() {
   });
   const vaultNav = useListNav(
     {
-      onLeave:
-        vaultFolderId === null
-          ? undefined
-          : () => {
-              setVaultFolderId(
-                vault.folders.find((folder) => folder.id === vaultFolderId)?.parentId ?? null,
-              );
-            },
+      onLeave: upVault,
       virtual: {
         start: vaultGrid.start,
         count: vaultRows.length,
@@ -419,7 +522,7 @@ export function Gallery() {
             toggleVaultSelect(folder.id);
             return;
           }
-          setVaultFolderId(folder.id);
+          go({ mode: 'vault', folderId: folder.id });
         }}
         {...contextMenuHandlers(({ x, y }) => {
           setVaultMenu({ kind: 'folder', folder, x, y });
@@ -447,7 +550,7 @@ export function Gallery() {
             title={t('row_open_folder')}
             aria-label={t('row_open_folder_named', folder.name || t('folder_untitled'))}
             onClick={() => {
-              setVaultFolderId(folder.id);
+              go({ mode: 'vault', folderId: folder.id });
             }}
           >
             ›
@@ -590,7 +693,7 @@ export function Gallery() {
                 // 表單開著時一併關掉：它建在「目前模式的目前資料夾」，
                 // 帶著它切換空間會建到另一邊去
                 setCreatingFolder(false);
-                setMode('bookmarks');
+                go({ mode: 'bookmarks', folderId });
               }}
             >
               {t('tab_bookmarks')}
@@ -604,7 +707,7 @@ export function Gallery() {
                 // 留下一排在隱私空間無處可用的動作按鈕
                 exitSelection();
                 setCreatingFolder(false);
-                setMode('vault');
+                go({ mode: 'vault', folderId: vaultFolderId });
               }}
             >
               {t('tab_vault')}
@@ -739,7 +842,13 @@ export function Gallery() {
 
       <div className="gallery__crumbs">
         {mode === 'vault' ? (
-          <Breadcrumb path={vaultPathTo(vault.folders, vaultFolderId)} onNavigate={setVaultFolderId} />
+          <Breadcrumb
+            path={vaultPathTo(vault.folders, vaultFolderId)}
+            onNavigate={(id) => {
+              go({ mode: 'vault', folderId: id });
+            }}
+            onUp={upVault}
+          />
         ) : search === null ? (
           <Breadcrumb
             path={
@@ -750,7 +859,10 @@ export function Gallery() {
                     title: folder.title,
                   }))
             }
-            onNavigate={setFolderId}
+            onNavigate={(id) => {
+              go({ mode: 'bookmarks', folderId: id });
+            }}
+            onUp={upBookmarks}
           />
         ) : (
           <p className="gallery__hint">
@@ -814,7 +926,7 @@ export function Gallery() {
                       toggleSelect(node.id);
                       return;
                     }
-                    setFolderId(node.id);
+                    go({ mode: 'bookmarks', folderId: node.id });
                     setQuery('');
                   }}
                   {...contextMenuHandlers(({ x, y }) => {
@@ -843,7 +955,7 @@ export function Gallery() {
                       title={t('row_open_folder')}
                       aria-label={t('row_open_folder_named', node.title || t('folder_untitled'))}
                       onClick={() => {
-                        setFolderId(node.id);
+                        go({ mode: 'bookmarks', folderId: node.id });
                         setQuery('');
                       }}
                     >
@@ -1074,13 +1186,13 @@ export function Gallery() {
           onCreate={vault.create}
           onCreated={() => {
             setVaultPrompt(false);
-            setMode('vault');
+            go({ mode: 'vault', folderId: vaultFolderId });
           }}
           onUnlockWithRecoveryKey={(code) => {
             void vault.unlockWithRecoveryKey(code).then((ok) => {
               if (ok) {
                 setVaultPrompt(false);
-                setMode('vault');
+                go({ mode: 'vault', folderId: vaultFolderId });
               }
             });
           }}
@@ -1088,7 +1200,7 @@ export function Gallery() {
             void vault.unlock(password).then((ok) => {
               if (ok) {
                 setVaultPrompt(false);
-                setMode('vault');
+                go({ mode: 'vault', folderId: vaultFolderId });
               }
             });
           }}
