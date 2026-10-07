@@ -61,8 +61,8 @@ import {
   type GalleryPlace,
 } from '../sidebar/lib/gallery-history';
 import { contextMenuHandlers } from '../sidebar/lib/keys';
-import { buildIndex, countLinks, pathTo, searchLinks } from '../sidebar/lib/tree';
-import { vaultPathTo } from '../sidebar/lib/vault-tree';
+import { buildIndex, countLinks, pathTo, searchTree } from '../sidebar/lib/tree';
+import { searchVault, vaultPathTo } from '../sidebar/lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
 import { useGridDrag } from './useGridDrag';
 import { GroupOutlines } from './GroupOutlines';
@@ -70,6 +70,7 @@ import { GroupTag } from './GroupTag';
 import { GroupMenu } from './GroupMenu';
 import { TagPrompt } from '../sidebar/components/TagItems';
 import { useBookmarkGrid } from '../sidebar/hooks/useBookmarkGrid';
+import { useTagSearch } from '../sidebar/hooks/useTagSearch';
 
 /**
  * 獨立分頁的全頁書籤瀏覽。
@@ -260,6 +261,10 @@ export function Gallery() {
   };
 
   const showPlace = (place: GalleryPlace): void => {
+    // 換到另一個空間就清掉搜尋字：兩邊各搜各的，隱私空間的搜尋字也不該留到書籤那邊
+    if (place.mode !== mode) {
+      setQuery('');
+    }
     if (place.mode === 'vault') {
       setMode('vault');
       setVaultFolderId(place.folderId);
@@ -331,6 +336,7 @@ export function Gallery() {
   useEffect(() => {
     if (!vaultUnlocked && mode === 'vault') {
       setMode('bookmarks');
+      setQuery('');
       setVaultFolderId(null);
       writeHistory({ mode: 'bookmarks', folderId }, 'replace');
     }
@@ -412,9 +418,13 @@ export function Gallery() {
   const trimmed = query.trim();
   const currentNode = folderId === null ? undefined : index.byId.get(folderId);
   const currentFolder = currentNode?.kind === 'folder' ? currentNode : undefined;
-  const search = trimmed === '' ? null : searchLinks(viewRoots ?? [], trimmed);
+  const tagged = useTagSearch(mode === 'bookmarks' ? trimmed : '', index);
+  const search = trimmed === '' ? null : searchTree(viewRoots ?? [], trimmed, tagged);
   const nodes: BookmarkNode[] =
-    search !== null ? search.links : (currentFolder?.children ?? viewRoots ?? []);
+    search !== null ? search.nodes : (currentFolder?.children ?? viewRoots ?? []);
+  /** 隱私空間的搜尋（全在記憶體裡做，規則與書籤那邊一樣）。null = 沒在搜尋 */
+  const vaultSearch =
+    mode === 'vault' && trimmed !== '' ? searchVault(view.folders, view.bookmarks, view.layout, trimmed) : null;
 
   // 勾選跨資料夾保留，所以要從整棵樹的索引還原成節點，並濾掉已不存在的 id
   const selectedNodes: BookmarkNode[] = [...selectedIds]
@@ -443,7 +453,8 @@ export function Gallery() {
     }
   }
 
-  const vaultRows: VaultGridRow[] = vaultChildren(view.folders, view.bookmarks, vaultFolderId, view.layout);
+  const vaultRows: VaultGridRow[] =
+    vaultSearch ?? vaultChildren(view.folders, view.bookmarks, vaultFolderId, view.layout);
 
   /*
    * 兩個網格各有一組虛擬滾動與鍵盤巡覽。
@@ -525,25 +536,25 @@ export function Gallery() {
   );
 
   const vaultColumns = useGridColumns(vaultScrollRef, size, GRID_GAP);
+  // 搜尋結果與書籤那邊一樣：照順序排、沒有群組、不能拖
+  const vaultFixed = vaultSearch === null ? folderColumns(view.layout, vaultFolderId) : null;
   const vaultBoard: Board = buildBoard({
-    stored: (() => {
-      const fixed = folderColumns(view.layout, vaultFolderId);
-      return fixed === null ? null : { columns: fixed, cells: vaultRows.map(vaultChildId) };
-    })(),
-    fixed: folderColumns(view.layout, vaultFolderId) !== null,
+    stored: vaultFixed === null ? null : { columns: vaultFixed, cells: vaultRows.map(vaultChildId) },
+    fixed: vaultFixed !== null,
     children: vaultRows.map(vaultChildId),
     autoColumns: vaultColumns,
-    groups: vaultGroups(view.layout, vaultFolderId),
+    groups: vaultSearch === null ? vaultGroups(view.layout, vaultFolderId) : [],
     groupOf: vaultGroupOf(view.layout),
   });
   const vaultCols = vaultBoard.grid.columns;
   const vaultShown: Grid = layoutGrid(vaultBoard);
-  const vaultCellCount = vaultShown.cells.length + 1;
+  const canDragVault = mode === 'vault' && vaultSearch === null;
+  const vaultCellCount = vaultShown.cells.length + (canDragVault ? 1 : 0);
   const vaultGrid = useVirtualRows({
     count: vaultCellCount,
     columns: vaultCols,
     estimate: cardEstimate(size),
-    resetKey: `${vaultFolderId ?? 'root'}/${String(size)}/${String(vaultSelecting)}/${String(vaultCols)}`,
+    resetKey: `${vaultSearch === null ? (vaultFolderId ?? 'root') : `search:${trimmed}`}/${String(size)}/${String(vaultSelecting)}/${String(vaultCols)}`,
     ref: vaultGridRef,
     item: '.cell',
   });
@@ -695,7 +706,7 @@ export function Gallery() {
 
   const vaultDrag = useGridDrag({
     ...dragSpace('vault'),
-    enabled: mode === 'vault',
+    enabled: canDragVault,
     kindOf: (id) => vaultRowById.get(id)?.kind,
     selected: vaultSelecting ? vaultSelectedIds : NO_SELECTION,
     // 隱私書籤永遠不帶網址：拖到分頁列會在一般視窗打開、寫進瀏覽記錄
@@ -742,7 +753,7 @@ export function Gallery() {
 
   /** 卡片往某個方向挪一格。null = 這個方向出界了、或這個畫面不能排 */
   const nudger = (space: Mode, id: string, direction: Direction): (() => void) | null => {
-    if (space === 'bookmarks' && !canDragBookmarks) {
+    if (space === 'bookmarks' ? !canDragBookmarks : !canDragVault) {
       return null;
     }
     // 方向是畫面上的方向：群組繞著擺時，上下左右的鄰居不等於順序上的前後
@@ -857,7 +868,7 @@ export function Gallery() {
     return {
       label: t('grid_frame'),
       title: t('grid_frame_hint'),
-      disabled: ids.length === 0 || (space === 'bookmarks' && !canDragBookmarks),
+      disabled: ids.length === 0 || (space === 'bookmarks' ? !canDragBookmarks : !canDragVault),
       onPick: () => {
         exitSelection();
         gridOp(space, { kind: 'frame', ids });
@@ -911,7 +922,8 @@ export function Gallery() {
         ];
   const gridStyle = { '--card-min': `${String(size)}px` } as CSSProperties;
   /** 工具列的欄數控制看的是哪一份版面（搜尋結果與最上層沒有） */
-  const layoutBoard: Board | null = mode === 'vault' ? vaultBoard : canDragBookmarks ? bookmarkBoard : null;
+  const layoutBoard: Board | null =
+    mode === 'vault' ? (canDragVault ? vaultBoard : null) : canDragBookmarks ? bookmarkBoard : null;
   // 定下來的格子：固定欄數、卡片固定寬度（放不下就橫向捲動）
   const gridStyleFor = (board: Board): CSSProperties =>
     board.fixed ? ({ ...gridStyle, '--grid-cols': String(board.grid.columns) } as CSSProperties) : gridStyle;
@@ -1199,6 +1211,7 @@ export function Gallery() {
             return;
           }
           go({ mode: 'vault', folderId: folder.id });
+          setQuery('');
         }}
         {...contextMenuHandlers(({ x, y }) => {
           setVaultMenu({ kind: 'folder', folder, x, y });
@@ -1227,6 +1240,7 @@ export function Gallery() {
             aria-label={t('row_open_folder_named', folder.name || t('folder_untitled'))}
             onClick={() => {
               go({ mode: 'vault', folderId: folder.id });
+              setQuery('');
             }}
           >
             ›
@@ -1305,8 +1319,9 @@ export function Gallery() {
           className="gallery__search"
           type="search"
           value={query}
-          placeholder={t('search_placeholder')}
-          aria-label={t('search_label')}
+          placeholder={mode === 'vault' ? t('vault_search_placeholder') : t('search_placeholder')}
+          aria-label={mode === 'vault' ? t('vault_search_placeholder') : t('search_label')}
+          title={t('search_tag_hint')}
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => {
@@ -1566,7 +1581,9 @@ export function Gallery() {
       ) : null}
 
       <div className="gallery__crumbs">
-        {mode === 'vault' ? (
+        {mode === 'vault' && vaultSearch !== null ? (
+          <p className="gallery__hint">{tn('search_results', vaultSearch.length)}</p>
+        ) : mode === 'vault' ? (
           <Breadcrumb
             path={vaultPathTo(vault.folders, vaultFolderId)}
             onNavigate={(id) => {
@@ -1601,14 +1618,16 @@ export function Gallery() {
           />
         ) : (
           <p className="gallery__hint">
-            {tn('search_results', search.links.length)}
+            {tn('search_results', search.nodes.length)}
             {search.truncated ? t('search_truncated') : ''}
           </p>
         )}
       </div>
 
       {mode === 'vault' ? (
-        vaultFolders.length === 0 && vaultBookmarks.length === 0 ? (
+        vaultSearch !== null && vaultSearch.length === 0 ? (
+          <p className="empty">{t('search_no_match')}</p>
+        ) : vaultSearch === null && vaultFolders.length === 0 && vaultBookmarks.length === 0 ? (
           <p className="empty">
             {vaultFolderId === null
               ? t('gallery_vault_empty_hint')
@@ -1972,7 +1991,7 @@ export function Gallery() {
             const id = vaultMenu.kind === 'bookmark' ? vaultMenu.record.id : vaultMenu.folder.id;
             return { earlier: nudger('vault', id, 'left'), later: nudger('vault', id, 'right') };
           })()}
-          tag={vaultTagActions(vaultMenu)}
+          tag={canDragVault ? vaultTagActions(vaultMenu) : undefined}
         />
       ) : null}
 

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildBoard, type GridOp } from '@/shared/board';
 import { request } from '@/shared/messages';
 import type { BookmarkNode, OpenTarget } from '@/shared/types';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
+import { vaultChildId, vaultChildren, vaultGroupOf, vaultGroups } from '@/shared/vault-layout';
+import { useGridDrag } from '../gallery/useGridDrag';
 import { BookmarkList } from './components/BookmarkList';
 import { Breadcrumb } from './components/Breadcrumb';
 import { FolderPicker } from './components/FolderPicker';
@@ -16,14 +19,19 @@ import { VaultFolderPicker } from './components/VaultFolderPicker';
 import { VaultPrompt } from './components/VaultPrompt';
 import { VaultRowMenu, type VaultMenuTarget } from './components/VaultRowMenu';
 import { VaultView } from './components/VaultView';
+import { useBookmarkGrid } from './hooks/useBookmarkGrid';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useHostPermission } from './hooks/useHostPermission';
+import { useListBoard } from './hooks/useListBoard';
 import { useSettings } from './hooks/useSettings';
+import { useTagSearch } from './hooks/useTagSearch';
 import { useVault } from './hooks/useVault';
-import { buildIndex, countLinks, pathTo, searchLinks } from './lib/tree';
+import { buildIndex, countLinks, pathTo, searchTree } from './lib/tree';
 import { t, tn } from '@/shared/i18n';
 
 type Tab = 'bookmarks' | 'vault';
+
+const NO_SELECTION: ReadonlySet<string> = new Set();
 
 export function App() {
   const { roots, error, reload } = useBookmarks();
@@ -67,8 +75,35 @@ export function App() {
   const [vaultFolderId, setVaultFolderId] = useState<string | null>(null);
   const [vaultSelecting, setVaultSelecting] = useState(false);
   const [vaultSelectedIds, setVaultSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  /** 隱私空間的搜尋字。只在記憶體裡，上鎖時清掉 */
+  const [vaultQuery, setVaultQuery] = useState('');
+  const liveGrid = useBookmarkGrid(folderId);
+  /** 拖拽中。拖拽期間資料凍結（見下面的 `frozen`） */
+  const [dragging, setDragging] = useState(false);
 
-  const index = useMemo(() => buildIndex(roots ?? []), [roots]);
+  /*
+   * 拖拽期間畫面用的是**開始拖之前**的資料（理由同全頁瀏覽：中途重繪會把被拖的那一列拆掉，
+   * 之後 drop／dragend 都送不到）。放開之後才換成最新的。
+   */
+  const frozen = useRef({
+    roots,
+    grid: liveGrid,
+    bookmarks: vault.bookmarks,
+    folders: vault.folders,
+    layout: vault.layout,
+  });
+  if (!dragging) {
+    frozen.current = {
+      roots,
+      grid: liveGrid,
+      bookmarks: vault.bookmarks,
+      folders: vault.folders,
+      layout: vault.layout,
+    };
+  }
+  const view = frozen.current;
+
+  const index = useMemo(() => buildIndex(view.roots ?? []), [view.roots]);
 
   // 目前所在的資料夾若被刪除或改名搬移，退回根層而不是卡在空畫面
   useEffect(() => {
@@ -97,6 +132,7 @@ export function App() {
       setVaultSelecting(false);
       setVaultSelectedIds(new Set());
       setVaultFolderId(null);
+      setVaultQuery('');
     }
   }, [vaultStatus]);
 
@@ -193,9 +229,9 @@ export function App() {
   const currentNode = folderId === null ? undefined : index.byId.get(folderId);
   const currentFolder = currentNode?.kind === 'folder' ? currentNode : undefined;
 
-  const search = trimmed === '' ? null : searchLinks(roots ?? [], trimmed);
-  const nodes: BookmarkNode[] =
-    search !== null ? search.links : (currentFolder?.children ?? roots ?? []);
+  const tagged = useTagSearch(trimmed, index);
+  const search = trimmed === '' ? null : searchTree(view.roots ?? [], trimmed, tagged);
+  const folderNodes: BookmarkNode[] = currentFolder?.children ?? view.roots ?? [];
 
   // 勾選是跨資料夾保留的，所以要從整棵樹的索引還原成節點，而不是只看目前這一層。
   // 順帶濾掉已經不存在的 id（書籤在勾選後被刪掉）。
@@ -243,6 +279,163 @@ export function App() {
       window.removeEventListener('mouseup', onMouseUp);
     };
   }, []);
+
+  /*
+   * 群組與拖拽（第 4 期）。側邊欄只有一欄，版面就是順序本身：群組是連續的幾列。
+   * 規則與全頁瀏覽完全一樣（`shared/board.ts`），送的也是同一組訊息，欄數一律報 1
+   * （只影響還沒定欄數的資料夾怎麼算「上下」，側邊欄用不到）。
+   * 搜尋結果與最上層（Firefox 的永久資料夾）不能排、沒有群組。
+   */
+  const inFolderView = search === null && currentFolder !== undefined;
+  const bookmarkGroupOf = new Map(
+    (inFolderView ? (view.grid?.groups ?? []) : []).flatMap((group) =>
+      group.members.map((member) => [member, group.id] as const),
+    ),
+  );
+  const bookmarkBoard = buildBoard({
+    stored: null,
+    fixed: false,
+    children: folderNodes.map((node) => node.id),
+    autoColumns: 1,
+    groups: inFolderView ? (view.grid?.groups ?? []).map(({ members: _members, ...group }) => group) : [],
+    groupOf: (id) => bookmarkGroupOf.get(id) ?? null,
+  });
+  // 版面還在讀（undefined）時先不讓拖：落點會算在還沒有群組的順序上
+  const canArrange = inFolderView && view.grid !== undefined;
+  const nodes: BookmarkNode[] =
+    search !== null
+      ? search.nodes
+      : bookmarkBoard.grid.cells.flatMap((id) => {
+          const node = index.byId.get(id);
+          return node === undefined ? [] : [node];
+        });
+
+  /** 書籤這邊的請求做完就重讀；失敗就說出來（也重讀，畫面才不會停在半路） */
+  const applyBookmarks = (work: () => Promise<unknown>): void => {
+    void work().then(reload, (cause: unknown) => {
+      setMoveResult(cause instanceof Error ? cause.message : String(cause));
+      reload();
+    });
+  };
+  const bookmarkGridOp = (op: GridOp): void => {
+    if (currentFolder === undefined) {
+      return;
+    }
+    const parentId = currentFolder.id;
+    applyBookmarks(() => request('grid/apply', { folderId: parentId, columns: 1, op }));
+  };
+  const bookmarkList = useListBoard({
+    board: bookmarkBoard,
+    enabled: canArrange,
+    apply: bookmarkGridOp,
+    toFolder: (groupId) => {
+      if (currentFolder !== undefined) {
+        const parentId = currentFolder.id;
+        applyBookmarks(() => request('groups/to-folder', { folderId: parentId, groupId, columns: 1 }));
+      }
+    },
+    mergeFolder: (targetId, ids, title) => {
+      applyBookmarks(() => request('bookmarks/merge-folder', { targetId, ids, title }));
+    },
+    isLink: (id) => index.byId.get(id)?.kind === 'link',
+    onBatch: exitSelection,
+  });
+  const scroller = (): HTMLElement | null => document.querySelector<HTMLElement>('.body');
+  const bookmarkDrag = useGridDrag({
+    ...bookmarkList.dragHandlers,
+    enabled: canArrange,
+    cells: bookmarkBoard.grid.cells,
+    axis: 'vertical',
+    scroller,
+    onDragChange: setDragging,
+    kindOf: (id) => {
+      const node = index.byId.get(id);
+      return node === undefined ? undefined : node.kind === 'folder' ? 'folder' : 'bookmark';
+    },
+    selected: selecting ? selectedIds : NO_SELECTION,
+    linkOf: (id) => {
+      const node = index.byId.get(id);
+      return node?.kind === 'link' ? { url: node.url, title: node.title } : null;
+    },
+    onInto: (ids, target) => {
+      // 原生書籤的最上層只能放 Firefox 的永久資料夾，麵包屑的「全部」不接受拖放
+      if (target === null || currentFolder === undefined || target === currentFolder.id) {
+        return;
+      }
+      if (ids.length > 1) {
+        exitSelection();
+      }
+      applyBookmarks(async () => {
+        const report = await request('bookmarks/reorder', { ids, parentId: target, beforeId: null });
+        if (report.failed > 0) {
+          setMoveResult(
+            t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
+          );
+        }
+      });
+    },
+    onGroupInto: (groupId, target) => {
+      if (target === null || currentFolder === undefined || target === currentFolder.id) {
+        return;
+      }
+      const fromFolderId = currentFolder.id;
+      applyBookmarks(() => request('groups/move', { fromFolderId, groupId, toFolderId: target, columns: 1 }));
+    },
+  });
+
+  /** 隱私空間這邊：同一套，資料在加密的版面文件裡（`useVault` 的那幾個方法） */
+  const vaultRows = vaultChildren(view.folders, view.bookmarks, vaultFolderId, view.layout);
+  const vaultRowById = new Map(vaultRows.map((row) => [vaultChildId(row), row]));
+  const vaultBoard = buildBoard({
+    stored: null,
+    fixed: false,
+    children: vaultRows.map(vaultChildId),
+    autoColumns: 1,
+    groups: vaultGroups(view.layout, vaultFolderId),
+    groupOf: vaultGroupOf(view.layout),
+  });
+  const canArrangeVault = vaultStatus === 'unlocked' && vaultQuery.trim() === '';
+  const vaultList = useListBoard({
+    board: vaultBoard,
+    enabled: canArrangeVault,
+    apply: (op) => {
+      void vault.gridApply(vaultFolderId, 1, op);
+    },
+    toFolder: (groupId) => {
+      void vault.groupToFolder(groupId, 1);
+    },
+    mergeFolder: (targetId, ids, name) => {
+      void vault.mergeIntoFolder(targetId, ids, name);
+    },
+    isLink: (id) => vaultRowById.get(id)?.kind === 'bookmark',
+    onBatch: exitVaultSelection,
+  });
+  const vaultDrag = useGridDrag({
+    ...vaultList.dragHandlers,
+    enabled: canArrangeVault,
+    cells: vaultBoard.grid.cells,
+    axis: 'vertical',
+    scroller,
+    onDragChange: setDragging,
+    kindOf: (id) => vaultRowById.get(id)?.kind,
+    selected: vaultSelecting ? vaultSelectedIds : NO_SELECTION,
+    // 隱私書籤永遠不帶網址：拖到分頁列會在一般視窗打開、寫進瀏覽記錄
+    linkOf: () => null,
+    onInto: (ids, target) => {
+      if (target === vaultFolderId) {
+        return;
+      }
+      if (ids.length > 1) {
+        exitVaultSelection();
+      }
+      void vault.reorder(ids, target, null);
+    },
+    onGroupInto: (groupId, target) => {
+      if (target !== vaultFolderId) {
+        void vault.groupMove(groupId, target, 1);
+      }
+    },
+  });
 
   if (error !== null) {
     return (
@@ -341,9 +534,9 @@ export function App() {
           {vault.state.status === 'unlocked' ? (
             <VaultView
               state={vault.state}
-              bookmarks={vault.bookmarks}
-              folders={vault.folders}
-              layout={vault.layout}
+              bookmarks={view.bookmarks}
+              folders={view.folders}
+              layout={view.layout}
               density={settings.density}
               onOpenLink={openLink}
               onLock={() => {
@@ -362,10 +555,16 @@ export function App() {
                 setVaultMenu({ kind: 'folder', folder, x, y });
               }}
               folderId={vaultFolderId}
-              onNavigate={setVaultFolderId}
+              onNavigate={(id) => {
+                setVaultFolderId(id);
+                setVaultQuery('');
+              }}
               selecting={vaultSelecting}
               selected={vaultSelectedIds}
               onToggleSelect={toggleVaultSelect}
+              query={vaultQuery}
+              onQueryChange={setVaultQuery}
+              grouping={{ board: vaultList, drag: vaultDrag }}
             />
           ) : (
             <VaultGate
@@ -452,6 +651,15 @@ export function App() {
                 <Breadcrumb
                   path={currentFolder === undefined ? [] : pathTo(index, currentFolder.id)}
                   onNavigate={setFolderId}
+                  drop={
+                    canArrange
+                      ? {
+                          // 「全部」那一層只能放 Firefox 的永久資料夾，不接受拖放
+                          props: (id) => bookmarkDrag.crumbProps(id, id !== null),
+                          className: bookmarkDrag.crumbClass,
+                        }
+                      : undefined
+                  }
                 />
                 {/* 放在麵包屑旁邊而不是底部工具列：它建在「目前這個資料夾」裡，
                     放在路徑旁邊才看得出那個「目前」是哪裡；工具列在 320px 下也已經滿了 */}
@@ -472,7 +680,7 @@ export function App() {
               </div>
             ) : (
               <p className="head__hint">
-                {tn('search_results', search.links.length)}
+                {tn('search_results', search.nodes.length)}
                 {search.truncated ? t('search_truncated') : ''}
               </p>
             )}
@@ -553,6 +761,7 @@ export function App() {
               onToggleSelect={toggleSelect}
               // 換資料夾或換搜尋字串時，虛擬滾動要把量到的列高丟掉
               listKey={search === null ? (folderId ?? 'root') : `search:${trimmed}`}
+              grouping={inFolderView ? { board: bookmarkList, drag: bookmarkDrag } : undefined}
               // 搜尋結果沒有「上一層」可回，最上層也沒有 —— 兩者都不提供，
               // Backspace 於是不做事，而不是把人送到一個看起來像退格失效的地方
               onNavigateUp={
@@ -642,6 +851,25 @@ export function App() {
           }}
           onChanged={reload}
           onNotice={setMoveResult}
+          reorder={bookmarkList.reorder(menu.node.id)}
+          tag={(() => {
+            const tag = bookmarkList.tagActions(menu.node.id);
+            const node = menu.node;
+            return tag === undefined
+              ? undefined
+              : {
+                  ...tag,
+                  // 「攤平成群組」：子資料夾裡還有資料夾時不提供（那些資料夾沒有地方放）
+                  onFlatten:
+                    node.kind !== 'folder'
+                      ? undefined
+                      : node.children.some((child) => child.kind === 'folder')
+                        ? null
+                        : () => {
+                            applyBookmarks(() => request('groups/flatten', { folderId: node.id, columns: 1 }));
+                          },
+                };
+          })()}
         />
       ) : null}
 
@@ -680,8 +908,29 @@ export function App() {
             void vault.reload();
           }}
           onNotice={setMoveResult}
+          reorder={vaultList.reorder(vaultMenu.kind === 'bookmark' ? vaultMenu.record.id : vaultMenu.folder.id)}
+          tag={(() => {
+            if (!canArrangeVault) {
+              return undefined;
+            }
+            if (vaultMenu.kind === 'folder') {
+              const folder = vaultMenu.folder;
+              return {
+                onSetTag: () => undefined,
+                onLeave: null,
+                onFlatten: vault.folders.some((candidate) => candidate.parentId === folder.id)
+                  ? null
+                  : () => {
+                      void vault.groupFlatten(folder.id, 1);
+                    },
+              };
+            }
+            return vaultList.tagActions(vaultMenu.record.id);
+          })()}
         />
       ) : null}
+
+      {tab === 'vault' ? vaultList.popovers : bookmarkList.popovers}
 
       {folderPicker !== null ? (
         <FolderPicker

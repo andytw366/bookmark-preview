@@ -837,13 +837,13 @@
     "message": "往左移"
   },
   "row_move_earlier_hint": {
-    "message": "往左挪一格，與那一格的卡片換位（Ctrl+Shift+方向鍵可以往四個方向挪）"
+    "message": "往左挪一格，後面的卡片自動讓位（Ctrl+Shift+方向鍵可以往四個方向挪）"
   },
   "row_move_later": {
     "message": "往右移"
   },
   "row_move_later_hint": {
-    "message": "往右挪一格，與那一格的卡片換位（Ctrl+Shift+方向鍵可以往四個方向挪）"
+    "message": "往右挪一格，後面的卡片自動讓位（Ctrl+Shift+方向鍵可以往四個方向挪）"
   },
   "row_open_in_gallery": {
     "message": "在全頁瀏覽開啟"
@@ -1913,5 +1913,23 @@
         "content": "$1"
       }
     }
+  },
+  "row_move_up": {
+    "message": "往上移"
+  },
+  "row_move_up_hint": {
+    "message": "往上挪一個位置；挪到群組的成員旁邊就加入那個群組（Ctrl+Shift+↑）"
+  },
+  "row_move_down": {
+    "message": "往下移"
+  },
+  "row_move_down_hint": {
+    "message": "往下挪一個位置；挪出群組的最後一個就離開（Ctrl+Shift+↓）"
+  },
+  "vault_search_placeholder": {
+    "message": "搜尋隱私書籤…"
+  },
+  "search_tag_hint": {
+    "message": "打 #名稱 可以找出所有資料夾裡這個 tag 的書籤"
   }
 }

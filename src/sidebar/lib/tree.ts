@@ -1,3 +1,4 @@
+import { tagQuery } from '@/shared/groups';
 import type { BookmarkFolder, BookmarkLink, BookmarkNode } from '@/shared/types';
 
 export interface TreeIndex {
@@ -43,7 +44,7 @@ export function pathTo(index: TreeIndex, folderId: string): BookmarkFolder[] {
 }
 
 /**
- * 全樹搜尋連結。搜尋時忽略目前所在的資料夾，比對標題與網址。
+ * 搜尋結果的上限。
  *
  * 上限原本是 300，理由是「沒有上限會一次渲染數千列而卡頓」。**清單改成虛擬
  * 滾動之後那個理由消失了** —— 渲染量只跟視窗大小有關，與結果筆數無關
@@ -56,33 +57,53 @@ export function pathTo(index: TreeIndex, folderId: string): BookmarkFolder[] {
 const SEARCH_LIMIT = 5000;
 
 export interface SearchOutcome {
-  links: BookmarkLink[];
+  /** 命中的資料夾在前（找資料夾通常就是要進去），書籤在後；各自照樹的順序 */
+  nodes: BookmarkNode[];
   truncated: boolean;
 }
 
-export function searchLinks(roots: BookmarkNode[], query: string): SearchOutcome {
-  const needle = query.toLowerCase();
+/**
+ * 全樹搜尋。忽略目前所在的資料夾。
+ *
+ * - 一般的字：資料夾比對名稱，書籤比對標題與網址。
+ * - `#名稱`（`tagQuery`）：`tagged` 裡的書籤，也就是名稱相符的群組成員（跨資料夾）。
+ *   群組資料在背景頁，由呼叫端先問好（`groups/find`）；還沒問到時傳 null，結果是空的。
+ */
+export function searchTree(
+  roots: BookmarkNode[],
+  query: string,
+  tagged: ReadonlySet<string> | null = null,
+): SearchOutcome {
+  const tag = tagQuery(query) !== null;
+  const needle = query.trim().toLowerCase();
+  const folders: BookmarkNode[] = [];
   const links: BookmarkLink[] = [];
   let truncated = false;
 
   const walk = (nodes: BookmarkNode[]): void => {
     for (const node of nodes) {
-      if (links.length >= SEARCH_LIMIT) {
+      if (folders.length + links.length >= SEARCH_LIMIT) {
         truncated = true;
         return;
       }
       if (node.kind === 'folder') {
+        if (!tag && node.title.toLowerCase().includes(needle)) {
+          folders.push(node);
+        }
         walk(node.children);
         continue;
       }
-      if (node.title.toLowerCase().includes(needle) || node.url.toLowerCase().includes(needle)) {
+      const hit = tag
+        ? tagged?.has(node.id) === true
+        : node.title.toLowerCase().includes(needle) || node.url.toLowerCase().includes(needle);
+      if (hit) {
         links.push(node);
       }
     }
   };
 
   walk(roots);
-  return { links, truncated };
+  return { nodes: [...folders, ...links], truncated };
 }
 
 /*

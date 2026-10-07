@@ -10,7 +10,8 @@ The sidebar and the full-page view are both fully operable without a mouse.
 | `↑` `↓` | Previous / next row (in the grid: the same **column**, one row up or down) |
 | `←` `→` | Sidebar: go up a level / enter a folder. Grid: the adjacent card |
 | `Backspace` | Go up a level (both views) |
-| `Ctrl+Shift+←↑→↓` | Full-page view: move the focused card one cell (swapping with the card there); on a group's tag, move the whole group |
+| `Ctrl+Shift+←↑→↓` | Full-page view: move the focused card one cell (the others make room); on a group's tag, move the whole group |
+| `Ctrl+Shift+↑↓` | Sidebar: move the focused row up / down one place; on a group's tag, move the whole group |
 | `Home` / `End` | First / last item |
 | `Enter` | Open the bookmark, or enter the folder |
 | `Menu` key or `Shift+F10` | Open that row's or card's context menu |
@@ -178,8 +179,15 @@ updates arriving mid-drag are held until you let go. Dragging close to the top o
 edge scrolls.
 
 Keyboard: arrow keys move between cards. `Ctrl+Shift+arrow` moves the focused card one cell
-(swapping with the card there); the context menu has *Move left / right*. Focus follows
-the card.
+(the others make room); the context menu has *Move left / right*. Focus follows the card.
+
+**The sidebar** does the same with one column: the edges are the top and bottom ~30% of a
+row (`dropIntent(…, 'vertical')`), the drop hint is a line between rows, and there is no end
+slot (drop on the last row's lower edge). `Ctrl+Shift+↑↓` and *Move up / down* in the context
+menu move a row one place, joining a group when it lands next to a member and leaving it when
+it steps past the last one (`listNudge`). Search results and Firefox's top level cannot be
+rearranged, the same as in the grid. It is the same hook (`useGridDrag` with `axis` and
+`scroller`) and the same messages, so the rules cannot drift apart.
 
 **Bookmarks**: the order *is* Firefox's own order (`bookmarks.move`, only the bookmarks
 whose relative order changed — longest increasing subsequence), so the bookmarks menu and
@@ -237,10 +245,31 @@ neighbour moves away.
 = automatic) and **sync it by default** through `storage.sync` under the same key (see
 [sync-and-backup.md](sync-and-backup.md)). Members this device does not have yet are kept.
 Deleting or moving bookmarks elsewhere is cleaned up via `bookmarks.onRemoved/onMoved`,
-through the same serial queue as the operations. The sidebar does not show groups yet.
+through the same serial queue as the operations.
+
+**In the sidebar** a group is its consecutive rows with a coloured bar on the left; a named
+group shows its tag above the first member, an untitled one a plain colour chip in the same
+place (as in the grid). The tag is the same component as in the grid — click for the menu, drag to move
+the group. Everything in the table above works there too (`useListBoard`).
 
 **Vault** columns and groups live in the encrypted layout document (see
 [vault.md](vault.md#groups)).
+
+### Search
+
+Both views and both spaces search the same way:
+
+- **Plain text** matches folder names and bookmark titles and URLs across the whole tree.
+  Matching folders are listed first; clicking one opens it.
+- **`#name`** lists every bookmark in a group whose name starts with `name` (trimmed,
+  case-insensitive), across all folders — groups with the same name in different folders
+  count as the same tag. Untitled groups are not tags and never match.
+
+Bookmark groups live in the background page, so `#name` asks it (`groups/find`) and keeps
+only members still in that group's folder. The vault is searched entirely in the page
+from the already-decrypted data (`searchVault`); the query is never sent anywhere and is
+cleared on lock and when switching between bookmarks and the vault. Results have no groups
+and cannot be rearranged.
 
 ### The top toolbar
 

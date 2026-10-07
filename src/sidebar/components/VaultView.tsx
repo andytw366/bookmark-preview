@@ -7,13 +7,17 @@ import type {
   VaultState,
 } from '@/shared/types';
 import { hostnameOf } from '@/shared/url';
-import { vaultChildren, type VaultLayout } from '@/shared/vault-layout';
+import { vaultChildId, vaultChildren, type VaultLayout } from '@/shared/vault-layout';
+import type { GridDrag } from '../../gallery/useGridDrag';
+import type { ListBoard } from '../hooks/useListBoard';
 import { useListNav } from '../hooks/useListNav';
 import { useVirtualRows } from '../hooks/useVirtualRows';
 import { contextMenuHandlers } from '../lib/keys';
-import { vaultPathTo } from '../lib/vault-tree';
+import { searchVault, vaultPathTo } from '../lib/vault-tree';
 import { Breadcrumb } from './Breadcrumb';
+import { ListCell } from './ListCell';
 import { NewFolderForm } from './NewFolderForm';
+import { SearchBar } from './SearchBar';
 import { FolderThumb } from './Thumb';
 import { VaultThumb } from './VaultThumb';
 import { t, tn } from '@/shared/i18n';
@@ -30,7 +34,7 @@ interface VaultViewProps {
   state: Extract<VaultState, { status: 'unlocked' }>;
   bookmarks: PrivateBookmark[];
   folders: PrivateFolder[];
-  /** 全頁瀏覽排過的順序。側邊欄還不能拖（第 4 期），但要照同一個順序顯示 */
+  /** 版面（順序與群組）。搜尋要用它找 `#名稱` */
   layout: VaultLayout;
   density: Density;
   onOpenLink: (url: string, where: OpenTarget) => void;
@@ -45,6 +49,11 @@ interface VaultViewProps {
   selecting: boolean;
   selected: ReadonlySet<string>;
   onToggleSelect: (id: string) => void;
+  /** 搜尋字。由 App 持有：上鎖時要一起清掉 */
+  query: string;
+  onQueryChange: (query: string) => void;
+  /** 群組與拖拽（第 4 期）。搜尋中不用（順序沒有意義） */
+  grouping: { board: ListBoard; drag: GridDrag };
 }
 
 export function VaultView({
@@ -64,6 +73,9 @@ export function VaultView({
   selecting,
   selected,
   onToggleSelect,
+  query,
+  onQueryChange,
+  grouping,
 }: VaultViewProps) {
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -79,6 +91,7 @@ export function VaultView({
   const childFolders = folders.filter((folder) => folder.parentId === folderId);
   const childBookmarks = bookmarks.filter((record) => record.folderId === folderId);
   const empty = childFolders.length === 0 && childBookmarks.length === 0;
+  const searching = query.trim() !== '';
 
   /*
    * 資料夾與書籤合成一份陣列。
@@ -86,7 +99,17 @@ export function VaultView({
    * 虛擬滾動的單位是「第幾列」，兩段各自 map 的話就沒有一個共同的索引可以切 ——
    * 而且「先資料夾後書籤」本來就是同一份清單的順序，只是原本分兩段畫。
    */
-  const rows: VaultRow[] = vaultChildren(folders, bookmarks, folderId, layout);
+  const rows: VaultRow[] = searching
+    ? searchVault(folders, bookmarks, layout, query)
+    : (() => {
+        // 照版面的順序（群組聚成連續的幾列）；`order` 與這裡用的是同一份 `vaultChildren`
+        const byId = new Map(vaultChildren(folders, bookmarks, folderId, layout).map((row) => [vaultChildId(row), row]));
+        return grouping.board.order.flatMap((id) => {
+          const row = byId.get(id);
+          return row === undefined ? [] : [row];
+        });
+      })();
+  const listGrouping = searching ? undefined : grouping;
 
   /*
    * 每個資料夾直接裝了幾個書籤，一次算完。
@@ -105,14 +128,15 @@ export function VaultView({
     count: rows.length,
     columns: 1,
     estimate: ESTIMATE[density],
-    resetKey: `${folderId ?? 'root'}/${density}/${String(selecting)}`,
+    resetKey: `${searching ? `search:${query}` : (folderId ?? 'root')}/${density}/${String(selecting)}`,
+    item: '[data-cell]',
   });
   const nav = useListNav(
     {
       onEnterFolder: onNavigate,
-      // 最上層沒有上一層可回
+      // 最上層與搜尋結果沒有上一層可回
       onLeave:
-        folderId === null
+        folderId === null || searching
           ? undefined
           : () => {
               onNavigate(parentId);
@@ -135,10 +159,10 @@ export function VaultView({
    */
   const folderRow = (folder: PrivateFolder) => (
     <div
-      key={folder.id}
       className={`vault__row row-wrap${selecting ? ' row-wrap--selecting' : ''}${
         selecting && selected.has(folder.id) ? ' row-wrap--selected' : ''
       }`}
+      {...listGrouping?.drag.cardProps(folder.id)}
       {...contextMenuHandlers(({ x, y }) => {
         onFolderMenu(folder, x, y);
       })}
@@ -194,10 +218,10 @@ export function VaultView({
 
   const bookmarkRow = (record: PrivateBookmark) => (
     <div
-      key={record.id}
       className={`vault__row row-wrap${selecting ? ' row-wrap--selecting' : ''}${
         selecting && selected.has(record.id) ? ' row-wrap--selected' : ''
       }`}
+      {...listGrouping?.drag.cardProps(record.id)}
       {...contextMenuHandlers(({ x, y }) => {
         onBookmarkMenu(record, x, y);
       })}
@@ -268,7 +292,17 @@ export function VaultView({
         </button>
       </div>
 
-      <Breadcrumb path={vaultPathTo(folders, folderId)} onNavigate={onNavigate} />
+      <SearchBar value={query} onChange={onQueryChange} placeholder={t('vault_search_placeholder')} />
+
+      {searching ? (
+        <p className="head__hint">{tn('search_results', rows.length)}</p>
+      ) : (
+        <Breadcrumb
+          path={vaultPathTo(folders, folderId)}
+          onNavigate={onNavigate}
+          drop={{ props: (id) => grouping.drag.crumbProps(id, true), className: grouping.drag.crumbClass }}
+        />
+      )}
 
       {creatingFolder ? (
         <NewFolderForm
@@ -282,7 +316,9 @@ export function VaultView({
         />
       ) : null}
 
-      {empty ? (
+      {searching && rows.length === 0 ? (
+        <p className="empty">{t('search_no_match')}</p>
+      ) : !searching && empty ? (
         <p className="empty">
           {folderId === null
             ? t('vault_empty_hint')
@@ -291,15 +327,21 @@ export function VaultView({
       ) : (
         <div
           ref={virtual.ref}
-          onKeyDown={nav.onKeyDown}
-          className={`list list--${density}`}
+          onKeyDown={listGrouping === undefined ? nav.onKeyDown : listGrouping.board.onKeyDown(nav.onKeyDown)}
+          {...listGrouping?.drag.gridProps}
+          className={`list list--${density}${listGrouping?.drag.dragging === true ? ' list--dragging' : ''}`}
           // 墊高用 padding 而不是墊兩個空 div：`.list` 有 gap，空 div 會多出兩道
           // 間距，讓內容比計算出來的位置多偏移幾個像素
           style={{ paddingTop: virtual.padTop, paddingBottom: virtual.padBottom }}
         >
-          {rows
-            .slice(virtual.start, virtual.end)
-            .map((row) => (row.kind === 'folder' ? folderRow(row.folder) : bookmarkRow(row.record)))}
+          {rows.slice(virtual.start, virtual.end).map((row, offset) => {
+            const id = vaultChildId(row);
+            return (
+              <ListCell key={id} id={id} at={virtual.start + offset} grouping={listGrouping}>
+                {row.kind === 'folder' ? folderRow(row.folder) : bookmarkRow(row.record)}
+              </ListCell>
+            );
+          })}
         </div>
       )}
 

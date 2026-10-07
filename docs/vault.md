@@ -147,7 +147,7 @@ subtree) and the background page's `isWithin` check is the second line.
 
 ## Order
 
-Vault folders can be rearranged in the full-page view (drag, or *Move left / right*; see also [Groups](#groups)).
+Vault folders can be rearranged in the full-page view and the sidebar (drag, or *Move left / right* / *Move up / down*; see also [Groups](#groups)).
 The order lives in a separate encrypted **layout** document (`src/shared/vault-layout.ts`),
 not on the bookmark records: an older version rebuilding records field by field would drop
 an unknown `order` field during sync, and the two devices would then disagree forever about
@@ -184,6 +184,9 @@ All merge with the generic per-entry rule, travel with sync and backups, and are
 stored in plaintext — group names are as private as the bookmarks. Only entries that
 actually changed are rewritten, so an unchanged entry does not win a merge against another
 device's edit.
+
+Searching the vault (plain text or `#tag`, see [interface.md](interface.md#search)) happens
+in the page over the decrypted data; the query lives only in memory and is cleared on lock.
 
 ## Whole folders move in and out, structure intact
 

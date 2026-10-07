@@ -12,7 +12,7 @@ import {
   type GridOp,
 } from '@/shared/board';
 import { indexOfId, readingOrder, unmoved } from '@/shared/grid';
-import { nextColor, sameName, type GroupInfo } from '@/shared/groups';
+import { nextColor, sameName, tagMatches, type GroupInfo } from '@/shared/groups';
 import { t } from '@/shared/i18n';
 import { isPreviewableUrl } from '@/shared/url';
 import { getSettings } from '@/storage/settings';
@@ -352,6 +352,23 @@ async function localDocs(): Promise<Map<string, GridDoc>> {
     const doc = key.startsWith(GRID_PREFIX) ? asDoc(value) : null;
     if (doc !== null) {
       out.set(key, doc);
+    }
+  }
+  return out;
+}
+
+/**
+ * 搜尋的 `#名稱`：所有資料夾裡名稱相符（`tagMatches`）的群組成員。成員是不是真的還在那個資料夾裡
+ * 由畫面對照書籤樹判斷（清理是非同步的，這裡讀到的可能慢一步）。
+ */
+export async function findTagged(name: string): Promise<{ folderId: string; id: string }[]> {
+  const out: { folderId: string; id: string }[] = [];
+  for (const [key, doc] of await localDocs()) {
+    const folderId = key.slice(GRID_PREFIX.length);
+    for (const group of doc.groups) {
+      if (tagMatches(group.name, name)) {
+        out.push(...group.members.map((id) => ({ folderId, id })));
+      }
     }
   }
   return out;

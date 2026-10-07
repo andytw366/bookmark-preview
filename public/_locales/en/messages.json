@@ -837,13 +837,13 @@
     "message": "Move left"
   },
   "row_move_earlier_hint": {
-    "message": "Move one cell left, swapping with the card there (Ctrl+Shift+arrow keys move in all four directions)"
+    "message": "Move one cell left; the cards after it make room (Ctrl+Shift+arrow keys move in all four directions)"
   },
   "row_move_later": {
     "message": "Move right"
   },
   "row_move_later_hint": {
-    "message": "Move one cell right, swapping with the card there (Ctrl+Shift+arrow keys move in all four directions)"
+    "message": "Move one cell right; the cards after it make room (Ctrl+Shift+arrow keys move in all four directions)"
   },
   "row_open_in_gallery": {
     "message": "Open in full page"
@@ -1913,5 +1913,23 @@
         "content": "$1"
       }
     }
+  },
+  "row_move_up": {
+    "message": "Move up"
+  },
+  "row_move_up_hint": {
+    "message": "Move up one place; moving next to a group member joins that group (Ctrl+Shift+Up)"
+  },
+  "row_move_down": {
+    "message": "Move down"
+  },
+  "row_move_down_hint": {
+    "message": "Move down one place; moving past the last member leaves the group (Ctrl+Shift+Down)"
+  },
+  "vault_search_placeholder": {
+    "message": "Search private bookmarks…"
+  },
+  "search_tag_hint": {
+    "message": "Type #name to find every bookmark with that tag, across all folders"
   }
 }

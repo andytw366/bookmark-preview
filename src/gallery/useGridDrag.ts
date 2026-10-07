@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'r
 import { dropIntent, type DropTarget } from '../sidebar/lib/drop-intent';
 
 /**
- * 全頁瀏覽網格的拖拽（第 3 期改版：緊密排列）。
+ * 全頁瀏覽網格與側邊欄清單的拖拽（第 3 期改版：緊密排列；側邊欄用 `axis: 'vertical'`）。
  *
  * 兩個網格（書籤、隱私空間）各掛一份，差別只在 `space` 的回呼與「能不能帶網址」。
  *
@@ -69,6 +69,12 @@ export interface DragSpace {
   onGroupInto: (groupId: string, folderId: string | null) => void;
   /** 開始／結束拖拽。呼叫端要在拖拽期間凍結資料（理由見 Gallery 的 `frozen`） */
   onDragChange: (dragging: boolean) => void;
+  /**
+   * 前後看哪個方向：網格看左右（預設），側邊欄的清單只有一欄、看上下（`dropIntent` 的 `axis`）。
+   */
+  axis?: 'horizontal' | 'vertical';
+  /** 拖到上下緣時要捲的容器。省略 = 整個視窗（全頁瀏覽）；側邊欄捲的是 `.body` */
+  scroller?: () => HTMLElement | null;
 }
 
 type DragState = { kind: 'cards'; ids: string[] } | { kind: 'group'; groupId: string };
@@ -100,10 +106,19 @@ export function useGridDrag(space: DragSpace) {
       return;
     }
     const onWindowDragOver = (event: DragEvent): void => {
-      if (event.clientY < SCROLL_EDGE) {
-        window.scrollBy(0, -Math.ceil((SCROLL_EDGE - event.clientY) / 3));
-      } else if (event.clientY > window.innerHeight - SCROLL_EDGE) {
-        window.scrollBy(0, Math.ceil((event.clientY - (window.innerHeight - SCROLL_EDGE)) / 3));
+      const element = spaceRef.current.scroller?.() ?? null;
+      const box = element?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+      const scrollBy = (dy: number): void => {
+        if (element === null) {
+          window.scrollBy(0, dy);
+        } else {
+          element.scrollBy(0, dy);
+        }
+      };
+      if (event.clientY < box.top + SCROLL_EDGE) {
+        scrollBy(-Math.ceil((box.top + SCROLL_EDGE - event.clientY) / 3));
+      } else if (event.clientY > box.bottom - SCROLL_EDGE) {
+        scrollBy(Math.ceil((event.clientY - (box.bottom - SCROLL_EDGE)) / 3));
       }
     };
     const onStale = (): void => {
@@ -200,7 +215,7 @@ export function useGridDrag(space: DragSpace) {
     const intent =
       kind === undefined || card === null
         ? null
-        : dropIntent(card.getBoundingClientRect(), event.clientX, event.clientY, kind);
+        : dropIntent(card.getBoundingClientRect(), event.clientX, event.clientY, kind, current.axis);
 
     if (id === '') {
       return { cell, kind: 'slot' };
@@ -209,10 +224,12 @@ export function useGridDrag(space: DragSpace) {
       if (intent === null || intent.kind === 'into') {
         return intent === null ? null : { cell, kind: 'into' };
       }
-      // 群組不能「合併」：書籤卡片中央照游標在左半或右半算前後
+      // 群組不能「合併」：書籤卡片中央照游標在左半或右半（清單是上半或下半）算前後
       if (intent.kind === 'merge' && card !== null) {
         const box = card.getBoundingClientRect();
-        return { cell, kind: event.clientX < box.left + box.width / 2 ? 'before' : 'after' };
+        const first =
+          current.axis === 'vertical' ? event.clientY < box.top + box.height / 2 : event.clientX < box.left + box.width / 2;
+        return { cell, kind: first ? 'before' : 'after' };
       }
       return { cell, kind: intent.kind === 'merge' ? 'before' : intent.kind };
     }
@@ -348,3 +365,5 @@ export function useGridDrag(space: DragSpace) {
 
   return { dragging, hint, cardProps, labelProps, gridProps, crumbProps, dropClass, crumbClass };
 }
+
+export type GridDrag = ReturnType<typeof useGridDrag>;

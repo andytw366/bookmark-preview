@@ -1,7 +1,10 @@
 import type { BookmarkNode, Density, OpenTarget } from '@/shared/types';
 import { useListNav } from '../hooks/useListNav';
 import { useVirtualRows } from '../hooks/useVirtualRows';
+import type { GridDrag } from '../../gallery/useGridDrag';
+import type { ListBoard } from '../hooks/useListBoard';
 import { BookmarkRow } from './BookmarkRow';
+import { ListCell } from './ListCell';
 
 interface BookmarkListProps {
   nodes: BookmarkNode[];
@@ -24,6 +27,11 @@ interface BookmarkListProps {
    * 長度與內容位置對不上。
    */
   listKey: string;
+  /**
+   * 群組與拖拽（第 4 期）。`nodes` 要已經照版面排好（群組是連續的幾列）。
+   * 搜尋結果與 Firefox 的永久資料夾那一層不傳：那裡的順序沒有意義、也不能排。
+   */
+  grouping?: { board: ListBoard; drag: GridDrag } | undefined;
 }
 
 /**
@@ -47,6 +55,7 @@ export function BookmarkList({
   onToggleSelect,
   onNavigateUp,
   listKey,
+  grouping,
 }: BookmarkListProps) {
   // hook 不能寫在 early return 後面，所以擺在空清單那個分支之前
   const virtual = useVirtualRows({
@@ -55,6 +64,8 @@ export function BookmarkList({
     estimate: ESTIMATE[density],
     // 密度也要進來：切了密度之後每一列的高度就變了
     resetKey: `${listKey}/${density}/${String(selecting)}`,
+    // 量整個格子：群組第一列上面多一個名稱標籤，只量可聚焦的那一列會少算
+    item: '[data-cell]',
   });
   const nav = useListNav(
     {
@@ -77,24 +88,27 @@ export function BookmarkList({
   return (
     <div
       ref={virtual.ref}
-      onKeyDown={nav.onKeyDown}
-      className={`list list--${density}`}
+      onKeyDown={grouping === undefined ? nav.onKeyDown : grouping.board.onKeyDown(nav.onKeyDown)}
+      {...grouping?.drag.gridProps}
+      className={`list list--${density}${grouping?.drag.dragging === true ? ' list--dragging' : ''}`}
       // 用 padding 而不是墊兩個空 div：`.list` 有 gap，空 div 會多出兩道間距，
       // 讓內容比計算的位置多偏移幾個像素
       style={{ paddingTop: virtual.padTop, paddingBottom: virtual.padBottom }}
     >
-      {nodes.slice(virtual.start, virtual.end).map((node) => (
-        <BookmarkRow
-          key={node.id}
-          node={node}
-          onOpenFolder={onOpenFolder}
-          onOpenLink={onOpenLink}
-          onMoveToVault={onMoveToVault}
-          onContextMenu={onContextMenu}
-          selecting={selecting}
-          selected={selected.has(node.id)}
-          onToggleSelect={onToggleSelect}
-        />
+      {nodes.slice(virtual.start, virtual.end).map((node, offset) => (
+        <ListCell key={node.id} id={node.id} at={virtual.start + offset} grouping={grouping}>
+          <BookmarkRow
+            node={node}
+            onOpenFolder={onOpenFolder}
+            onOpenLink={onOpenLink}
+            onMoveToVault={onMoveToVault}
+            onContextMenu={onContextMenu}
+            selecting={selecting}
+            selected={selected.has(node.id)}
+            onToggleSelect={onToggleSelect}
+            dragProps={grouping?.drag.cardProps(node.id)}
+          />
+        </ListCell>
       ))}
     </div>
   );

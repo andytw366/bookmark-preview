@@ -6,6 +6,7 @@ import { backfillThumbnails, backfillVaultThumbnails } from './backfill';
 import {
   applyBookmarkGrid,
   clearGridSync,
+  findTagged,
   flattenFolder,
   getBookmarkGrid,
   gridSyncStatus,
@@ -147,6 +148,7 @@ serve({
   'groups/flatten': async ({ folderId, columns }) => flattenFolder(folderId, columns),
   'groups/move': async ({ fromFolderId, groupId, toFolderId, columns }) =>
     moveGroup(fromFolderId, groupId, toFolderId, columns),
+  'groups/find': async ({ name }) => findTagged(name),
   'bookmarks/folders': async () => collectFolderChoices(),
   'bookmarks/folder-create': async ({ parentId, title }) => {
     // 沒有 url 就是資料夾

@@ -48,3 +48,25 @@ export function nextColor(existing: readonly GroupInfo[]): number {
   }
   return best;
 }
+
+/**
+ * 搜尋框裡的 `#名稱`：找出所有名為這個 tag 的群組成員（跨資料夾）。回傳要比對的名稱，
+ * 不是 tag 搜尋就回 null。只打一個 `#` 還不算（那時當成普通的字去找）。
+ */
+export function tagQuery(query: string): string | null {
+  const trimmed = query.trim();
+  if (!trimmed.startsWith('#')) {
+    return null;
+  }
+  const name = trimmed.slice(1).trim();
+  return name === '' ? null : name;
+}
+
+/**
+ * 群組名稱合不合 `#` 後面打的字：去頭尾空白、不分大小寫的**開頭相符**，打到一半就看得到結果。
+ * 沒名字的群組不是 tag，永遠不合。不同資料夾裡同名的群組視為同一個 tag。
+ */
+export function tagMatches(groupName: string, needle: string): boolean {
+  const name = normalizeName(groupName);
+  return name !== '' && name.startsWith(normalizeName(needle));
+}

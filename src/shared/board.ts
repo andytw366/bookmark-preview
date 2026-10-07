@@ -639,3 +639,18 @@ export function displayColors(board: Board, shown: Grid, colors: number): Map<st
   }
   return out;
 }
+
+/**
+ * 側邊欄（只有一欄）的鍵盤挪動：往上（-1）／往下（1）插到順序上相鄰那一張的前／後。
+ * 加入與離開照拖拽的規則（`place` 對準那一張）：挪到群組成員旁邊就加入，挪出最後一個成員就離開。
+ * 到頭了回 null。
+ */
+export function listNudge(board: Board, id: string, step: -1 | 1): GridOp | null {
+  const cells = board.grid.cells;
+  const at = cells.indexOf(id);
+  const target = at === -1 ? undefined : cells[at + step];
+  if (target === undefined) {
+    return null;
+  }
+  return { kind: 'place', ids: [id], at: step < 0 ? at + step : at + step + 1, aimed: target };
+}

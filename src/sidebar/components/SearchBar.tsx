@@ -4,6 +4,8 @@ import { t } from '@/shared/i18n';
 interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
+  /** 隱私空間用另一句（「搜尋隱私書籤…」），否則分不出在搜哪一邊 */
+  placeholder?: string | undefined;
 }
 
 /**
@@ -15,7 +17,7 @@ interface SearchBarProps {
  *
  * 觸發字串的比對由呼叫端在 onChange 裡做：那裡才拿得到設定值。
  */
-export function SearchBar({ value, onChange }: SearchBarProps) {
+export function SearchBar({ value, onChange, placeholder }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 側邊欄開啟時直接可以打字搜尋
@@ -29,7 +31,8 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
         ref={inputRef}
         type="search"
         className="search__input"
-        placeholder={t('search_placeholder')}
+        placeholder={placeholder ?? t('search_placeholder')}
+        title={t('search_tag_hint')}
         value={value}
         autoComplete="off"
         spellCheck={false}
@@ -41,7 +44,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
             onChange('');
           }
         }}
-        aria-label={t('search_label')}
+        aria-label={placeholder ?? t('search_label')}
       />
     </div>
   );

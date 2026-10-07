@@ -27,6 +27,8 @@ interface BookmarkRowProps {
   selecting: boolean;
   selected: boolean;
   onToggleSelect: (node: BookmarkNode) => void;
+  /** 拖拽（`useGridDrag` 的 `cardProps`），掛在整列外層。不能拖的畫面不傳 */
+  dragProps?: object | undefined;
 }
 
 /** 依修飾鍵決定開啟位置，比照 Firefox 原生書籤的慣例。 */
@@ -47,6 +49,7 @@ export function BookmarkRow({
   selecting,
   selected,
   onToggleSelect,
+  dragProps,
 }: BookmarkRowProps) {
   /** 三種列都要有右鍵選單，滑鼠與鍵盤各一個入口 */
   const menuProps = contextMenuHandlers(({ x, y }) => {
@@ -65,7 +68,7 @@ export function BookmarkRow({
 
     if (!selecting) {
       return (
-        <div className="row-wrap" {...menuProps}>
+        <div className="row-wrap" {...dragProps} {...menuProps}>
           <button
             type="button"
             className="row row--folder"
@@ -114,6 +117,7 @@ export function BookmarkRow({
     return (
       <div
         className={`row-wrap row-wrap--selecting${selected ? ' row-wrap--selected' : ''}`}
+        {...dragProps}
         {...menuProps}
       >
         <button
@@ -158,6 +162,7 @@ export function BookmarkRow({
     return (
       <div
         className={`row-wrap row-wrap--selecting${selected ? ' row-wrap--selected' : ''}`}
+        {...dragProps}
         {...menuProps}
       >
         <button
@@ -181,7 +186,7 @@ export function BookmarkRow({
   }
 
   return (
-    <div className="row-wrap" {...menuProps}>
+    <div className="row-wrap" {...dragProps} {...menuProps}>
       <a
         className="row row--link"
         data-nav=""
