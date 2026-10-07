@@ -165,6 +165,21 @@ Stored locally as `vaultLayout` (+ its fingerprint), encrypted with the data key
 together with the vault. Decryption failure on unlock yields an empty layout rather than a
 failed unlock — the order is not worth locking anyone out over.
 
+## Groups
+
+Vault groups are two sections of the encrypted layout document:
+
+- `groups` — `{ id: { folderId, name, color, collapsed, updatedAt, deleted? } }`.
+  Dissolving writes a tombstone rather than removing the entry; removing it would let an
+  older copy on another device bring it back on merge.
+- `groupOf` — `{ recordId: { groupId | null, updatedAt } }`. Membership only counts when
+  the group's folder is the record's current folder, so moving a bookmark out of a folder
+  needs no write here.
+
+Both merge with the generic per-entry rule, travel with sync and backups, and are never
+stored in plaintext — group names are as private as the bookmarks. The order written back
+for a folder always has a group's members adjacent.
+
 ## Whole folders move in and out, structure intact
 
 Pressing the lock icon on a bookmark folder (or "Move the whole folder into the vault")

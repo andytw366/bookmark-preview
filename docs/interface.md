@@ -178,6 +178,50 @@ position before removal); `src/background/bookmark-order.ts` computes for that a
 open it in a normal window and write it to history. Only an internal type is set; the
 order itself is stored as described in [vault.md](vault.md#order).
 
+### Groups (tags)
+
+A group is a run of bookmarks inside one folder with a name, a colour and a collapsed
+state. **A named group is a tag**: names are unique per folder (trimmed, case-insensitive),
+and setting a bookmark's tag means joining the group of that name, creating it if needed.
+A bookmark belongs to at most one group. Unnamed groups exist too ("Untitled group").
+
+In the grid a group is a full-width header row (colour bar, name, count, ▸/▾, ⋯) with its
+members below on a shared tint. How to work with them:
+
+| Action | How |
+|---|---|
+| Create | Drop one bookmark on another, hold → *Create group* (first item, Enter) |
+| Join | Drop on the header, on the middle of a member, or beside a member; *Set tag…* in the context menu |
+| Leave | Drop beside a card outside the group; *Remove from group* |
+| Move the group | Drag the header (to a position, into a folder card, onto a breadcrumb); ⋯ → *Move earlier/later*; `Ctrl+Shift+←/→` on the focused header |
+| Collapse | Click the header, or Enter on it |
+| ⋯ menu | Rename, colour, collapse, move, *Turn into folder* (a subfolder at the group's place, members in order), *Dissolve* (members stay) |
+| Folder context menu | *Flatten into a group*: the folder's bookmarks move up to where the folder was, as a group with its name (refused if it contains folders) |
+
+Moving a group into another folder joins a same-named group there, otherwise it arrives
+with its name, colour and collapsed state. Moving a single bookmark to another folder
+leaves its group — groups belong to folders.
+
+**Rows.** Groups make rows uneven (headers take a row; a group's last row may be short and
+the next part starts a new row). `src/shared/groups.ts` builds the row model as pure
+functions (`arrange`, `gridModel`, `rowNav`); `useVirtualRows` and `useListNav` take its
+row table, so virtual scrolling and arrow keys follow it. The CSS keeps the plain auto-fill
+grid: each card sits in a `display: contents` `.cell` whose class sets
+`grid-column-start: 1` on the first card of a row, and the group tint is a box-shadow
+spread of half the 16px gap, so adjacent cards' tints join into one block — no wrapper
+element, which virtual scrolling could not keep intact anyway.
+
+**Bookmarks** store groups in `storage.local` under `groups:<folder guid>`, plaintext
+(those are ordinary Firefox bookmarks) and **local only**: Firefox cannot read or write its
+own native tags from an extension, and syncing would eat the `storage.sync` quota the
+vault needs. Joining a group also moves the bookmark natively right after the last member,
+so members stay adjacent in Firefox's own bookmark menu. If something else scatters them,
+the grid still shows them together; the next group operation tidies them. Deleting or
+moving bookmarks elsewhere is cleaned up via `bookmarks.onRemoved/onMoved`, through the
+same serial queue as the group operations themselves. The sidebar does not show groups yet.
+
+**Vault** groups live in the encrypted layout document (see [vault.md](vault.md#groups)).
+
 ### The top toolbar
 
 Both modes (bookmarks / vault) share one set of rows in fixed positions:

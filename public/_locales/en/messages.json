@@ -752,6 +752,87 @@
   "permission_dismiss": {
     "message": "Not now — keep the colour cards"
   },
+  "group_not_found": {
+    "message": "That group no longer exists (it may have been dissolved elsewhere)"
+  },
+  "group_name_taken": {
+    "message": "This folder already has a group called “$NAME$”",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_untitled": {
+    "message": "Untitled group"
+  },
+  "group_flatten_has_folders": {
+    "message": "This folder contains other folders, which would have nowhere to go. Move them out first."
+  },
+  "merge_create_group": {
+    "message": "Create group"
+  },
+  "group_expand": {
+    "message": "Expand group"
+  },
+  "group_collapse": {
+    "message": "Collapse group"
+  },
+  "group_menu": {
+    "message": "Group options"
+  },
+  "group_name_label": {
+    "message": "Group name (the tag)"
+  },
+  "group_color": {
+    "message": "Group colour"
+  },
+  "group_to_folder": {
+    "message": "Turn into folder"
+  },
+  "group_to_folder_hint": {
+    "message": "Create a subfolder where the group is and move its members in, in order"
+  },
+  "group_dissolve": {
+    "message": "Dissolve group"
+  },
+  "group_dissolve_hint": {
+    "message": "The members stay where they are; they are just no longer grouped"
+  },
+  "group_flatten": {
+    "message": "Flatten into a group"
+  },
+  "group_flatten_hint": {
+    "message": "Move the bookmarks inside up to this level as a group with the same name, and remove the folder"
+  },
+  "tag_set": {
+    "message": "Set tag…"
+  },
+  "tag_leave": {
+    "message": "Remove from group"
+  },
+  "tag_placeholder": {
+    "message": "Tag name"
+  },
+  "tag_label": {
+    "message": "Tag for this bookmark (an existing name joins that group)"
+  },
+  "group_menu_named": {
+    "message": "Options for the group “$NAME$”",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_color_n": {
+    "message": "Colour $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "merge_heading": {
     "message": "Combine"
   },

@@ -45,8 +45,13 @@ export interface DragSpace {
   selected: ReadonlySet<string>;
   /** 書籤卡片拖到分頁列要能打開；隱私空間永遠回 null */
   linkOf: (id: string) => { url: string; title: string } | null;
-  onReorder: (ids: string[], beforeId: string | null) => void;
-  onInto: (ids: string[], folderId: string | null) => void;
+  /**
+   * 插到某張卡片前後（`targetId` 是放上去的那張，用來決定加入／離開哪個群組），
+   * 或放在空隙（`targetId` null，排到最後）。
+   */
+  onReorder: (ids: string[], beforeId: string | null, targetId: string | null) => void;
+  /** 移進資料夾、群組標題（`group:<id>`）或麵包屑的某一層（null = 最上層） */
+  onInto: (ids: string[], targetId: string | null) => void;
   onMerge: (targetId: string, ids: string[], x: number, y: number) => void;
   /** 開始／結束拖拽。呼叫端要在拖拽期間凍結資料（理由見 Gallery 的 `frozen`） */
   onDragChange: (dragging: boolean) => void;
@@ -199,7 +204,7 @@ export function useGridDrag(space: DragSpace) {
       if (id === undefined || shown === null || shown.kind === 'crumb' || shown.id !== id) {
         // 放在空隙：排到最後。這也是「拖到最後一張後面」最自然的做法
         if (id === undefined && !isNoop(current.order, drag.ids, null)) {
-          current.onReorder(drag.ids, null);
+          current.onReorder(drag.ids, null, null);
         }
         return;
       }
@@ -214,9 +219,7 @@ export function useGridDrag(space: DragSpace) {
         return;
       }
       const beforeId = anchorFor(current.order, id, { kind: shown.kind === 'after' ? 'after' : 'before' });
-      if (!isNoop(current.order, drag.ids, beforeId)) {
-        current.onReorder(drag.ids, beforeId);
-      }
+      current.onReorder(drag.ids, beforeId, id);
     },
     onDragLeave: (event: ReactDragEvent<HTMLElement>) => {
       // 只在離開整個網格時清掉；卡片之間移動也會觸發 dragleave

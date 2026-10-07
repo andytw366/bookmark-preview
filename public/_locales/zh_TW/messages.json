@@ -752,6 +752,87 @@
   "permission_dismiss": {
     "message": "先不要，繼續使用色卡"
   },
+  "group_not_found": {
+    "message": "找不到這個群組（可能已經在別處解散了）"
+  },
+  "group_name_taken": {
+    "message": "這個資料夾裡已經有叫「$NAME$」的群組了",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_untitled": {
+    "message": "未命名群組"
+  },
+  "group_flatten_has_folders": {
+    "message": "子資料夾裡還有資料夾，攤平之後它們沒有地方放。先把裡面的資料夾移走再攤平。"
+  },
+  "merge_create_group": {
+    "message": "建立群組"
+  },
+  "group_expand": {
+    "message": "展開群組"
+  },
+  "group_collapse": {
+    "message": "收合群組"
+  },
+  "group_menu": {
+    "message": "群組選項"
+  },
+  "group_name_label": {
+    "message": "群組名稱（也就是 tag）"
+  },
+  "group_color": {
+    "message": "群組顏色"
+  },
+  "group_to_folder": {
+    "message": "轉成資料夾"
+  },
+  "group_to_folder_hint": {
+    "message": "在群組的位置建一個子資料夾，照順序把成員搬進去"
+  },
+  "group_dissolve": {
+    "message": "解散群組"
+  },
+  "group_dissolve_hint": {
+    "message": "成員留在原地，只是不再聚成一組"
+  },
+  "group_flatten": {
+    "message": "攤平成群組"
+  },
+  "group_flatten_hint": {
+    "message": "把裡面的書籤搬回這一層、原地成為一個同名群組，資料夾本身刪掉"
+  },
+  "tag_set": {
+    "message": "設定 tag…"
+  },
+  "tag_leave": {
+    "message": "移出群組"
+  },
+  "tag_placeholder": {
+    "message": "tag 名稱"
+  },
+  "tag_label": {
+    "message": "這個書籤的 tag（同名就加入那個群組）"
+  },
+  "group_menu_named": {
+    "message": "「$NAME$」群組的選項",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_color_n": {
+    "message": "顏色 $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
   "merge_heading": {
     "message": "疊在一起"
   },

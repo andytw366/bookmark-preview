@@ -5,6 +5,7 @@ import { folderHash } from '../lib/gallery-history';
 import { FolderPicker } from './FolderPicker';
 import { Popover } from './Popover';
 import { ReorderItems, type ReorderActions } from './ReorderItems';
+import { TagItems, type TagActions } from './TagItems';
 import { t } from '@/shared/i18n';
 
 export interface MenuTarget {
@@ -24,6 +25,8 @@ interface RowMenuProps {
   onNotice: (message: string) => void;
   /** 全頁瀏覽的「往前移／往後移」。省略就不顯示（側邊欄、搜尋結果、最上層） */
   reorder?: ReorderActions | undefined;
+  /** 全頁瀏覽的群組（＝ tag）項目。省略就不顯示 */
+  tag?: TagActions | undefined;
 }
 
 /**
@@ -42,6 +45,7 @@ export function RowMenu({
   onChanged,
   onNotice,
   reorder,
+  tag,
 }: RowMenuProps) {
   const { node } = target;
   const [renaming, setRenaming] = useState(false);
@@ -223,6 +227,10 @@ export function RowMenu({
       </button>
 
       {reorder !== undefined ? <ReorderItems reorder={reorder} onClose={onClose} /> : null}
+
+      {tag !== undefined ? (
+        <TagItems tag={tag} x={target.x} y={target.y} isFolder={node.kind === 'folder'} onClose={onClose} />
+      ) : null}
 
       {canMoveToVault ? (
         <button

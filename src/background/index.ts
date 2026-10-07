@@ -3,6 +3,16 @@ import { getSettings, patchSettings } from '@/storage/settings';
 import { clearSiteImageStats } from '@/storage/site-image-stats';
 import { getThumb, pruneOlderThan, usage } from '@/storage/thumbs-db';
 import { backfillThumbnails, backfillVaultThumbnails } from './backfill';
+import {
+  assignGroup,
+  dissolveGroup,
+  flattenFolder,
+  groupToFolder,
+  listGroups,
+  moveGroup,
+  startGroupWatcher,
+  updateGroup,
+} from './bookmark-groups';
 import { mergeIntoNewFolder as mergeBookmarksIntoFolder, reorderBookmarks } from './bookmark-order';
 import { collectFolderChoices, collectRoots } from './bookmark-tree';
 import { startBookmarkWatcher } from './bookmark-watcher';
@@ -26,6 +36,12 @@ import {
   listBookmarks,
   listFolders,
   lockVault,
+  assignVaultGroup,
+  dissolveVaultGroup,
+  flattenVaultFolder,
+  moveVaultGroup,
+  updateVaultGroup,
+  vaultGroupToFolder,
   mergeIntoNewFolder,
   readLayout,
   reorder,
@@ -125,6 +141,16 @@ serve({
   'bookmarks/merge-folder': async ({ targetId, ids, title }) => ({
     id: await mergeBookmarksIntoFolder(targetId, ids, title),
   }),
+  'groups/list': async ({ folderId }) => listGroups(folderId),
+  'groups/assign': async ({ folderId, ids, target, arrange }) => ({
+    groupId: await assignGroup(folderId, ids, target, arrange),
+  }),
+  'groups/update': async ({ folderId, groupId, patch }) => updateGroup(folderId, groupId, patch),
+  'groups/dissolve': async ({ folderId, groupId }) => dissolveGroup(folderId, groupId),
+  'groups/to-folder': async ({ folderId, groupId }) => ({ id: await groupToFolder(folderId, groupId) }),
+  'groups/flatten': async ({ folderId }) => flattenFolder(folderId),
+  'groups/move': async ({ fromFolderId, groupId, toFolderId, beforeId }) =>
+    moveGroup(fromFolderId, groupId, toFolderId, beforeId),
   'bookmarks/folders': async () => collectFolderChoices(),
   'bookmarks/folder-create': async ({ parentId, title }) => {
     // 沒有 url 就是資料夾
@@ -232,6 +258,33 @@ serve({
     await announceVault();
     return { id };
   },
+  // 群組的變動都要讓其他開著的頁面跟上（版面在 vault/changed 時重讀）
+  'vault/group-assign': async ({ folderId, ids, target, arrange }) => {
+    const groupId = await assignVaultGroup(folderId, ids, target, arrange);
+    await announceVault();
+    return { groupId };
+  },
+  'vault/group-update': async ({ groupId, patch }) => {
+    await updateVaultGroup(groupId, patch);
+    await announceVault();
+  },
+  'vault/group-dissolve': async ({ groupId }) => {
+    await dissolveVaultGroup(groupId);
+    await announceVault();
+  },
+  'vault/group-to-folder': async ({ groupId }) => {
+    const id = await vaultGroupToFolder(groupId);
+    await announceVault();
+    return { id };
+  },
+  'vault/group-flatten': async ({ folderId }) => {
+    await flattenVaultFolder(folderId);
+    await announceVault();
+  },
+  'vault/group-move': async ({ groupId, toFolderId, beforeId }) => {
+    await moveVaultGroup(groupId, toFolderId, beforeId);
+    await announceVault();
+  },
   'vault/backfill': async () => acted(backfillVaultThumbnails()),
   'vault/export': async ({ id, parentId }) => {
     await exportToNative(id, parentId);
@@ -282,6 +335,7 @@ serve({
 });
 
 startBookmarkWatcher();
+startGroupWatcher();
 startCapturePipeline();
 startPermissionWatcher();
 startVaultLock();

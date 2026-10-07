@@ -8,7 +8,11 @@ import {
   moveIds,
   orderChildren,
   sanitizeLayout,
+  vaultGroupOf,
+  vaultGroups,
   withFolderOrder,
+  withGroup,
+  withGroupOf,
   type VaultLayout,
 } from '@/shared/vault-layout';
 import { anchorFor, dropIntent, isNoop } from '@/sidebar/lib/drop-intent';
@@ -38,10 +42,11 @@ describe('版面的合併', () => {
   });
 
   it('不認得的區段原封不動保留並照同一條規則合併 —— 新版的資料不會被這一版剝掉', () => {
-    const future = layoutWith({ groups: { g1: { name: '秘密', color: 3, updatedAt: 50 } } });
-    const older = layoutWith({ groups: { g1: { name: '舊名', color: 1, updatedAt: 40 } } });
+    // 「未來版本才有的區段」用一個這一版不認得的名字代表
+    const future = layoutWith({ pins: { g1: { name: '秘密', color: 3, updatedAt: 50 } } });
+    const older = layoutWith({ pins: { g1: { name: '舊名', color: 1, updatedAt: 40 } } });
     const merged = mergeLayouts(older, future);
-    expect(merged.sections.groups?.g1).toEqual({ name: '秘密', color: 3, updatedAt: 50 });
+    expect(merged.sections.pins?.g1).toEqual({ name: '秘密', color: 3, updatedAt: 50 });
     expect(sanitizeLayout(JSON.parse(JSON.stringify(future)))).toEqual(future);
   });
 
@@ -69,6 +74,42 @@ describe('版面的合併', () => {
     const a = { version: 1, sections: { order: { F: { updatedAt: 1, ids: ['1'] } } } } as VaultLayout;
     const b = { sections: { order: { F: { ids: ['1'], updatedAt: 1 } } }, version: 1 } as VaultLayout;
     expect(await layoutTag(a)).toBe(await layoutTag(b));
+  });
+});
+
+describe('群組區段', () => {
+  const base = layoutWith({
+    groups: {
+      g1: { folderId: 'F', name: '讀', color: 1, collapsed: false, updatedAt: 1 },
+      g2: { folderId: 'F', name: '散', color: 2, collapsed: false, updatedAt: 1, deleted: true },
+      g3: { folderId: null, name: '頂', color: 0, collapsed: true, updatedAt: 1 },
+      bad: { folderId: 'F', updatedAt: 1 },
+    },
+    groupOf: { a: { groupId: 'g1', updatedAt: 1 }, b: { groupId: null, updatedAt: 1 }, c: { groupId: 7, updatedAt: 1 } },
+  });
+
+  it('只列出這個資料夾裡活著的群組；形狀不對的丟掉', () => {
+    const clean = sanitizeLayout(base);
+    expect(vaultGroups(clean, 'F').map((group) => group.id)).toEqual(['g1']);
+    expect(vaultGroups(clean, null).map((group) => group.id)).toEqual(['g3']);
+  });
+
+  it('groupOf 讀得到記下的值，壞掉的當成沒有', () => {
+    const groupOf = vaultGroupOf(sanitizeLayout(base));
+    expect(groupOf('a')).toBe('g1');
+    expect(groupOf('b')).toBeNull();
+    expect(groupOf('c')).toBeNull();
+    expect(groupOf('missing')).toBeNull();
+  });
+
+  it('解散（墓碑）比較新時，合併後群組不再出現', () => {
+    const dissolved = withGroup(base, 'g1', { folderId: 'F', name: '讀', color: 1, collapsed: false, deleted: true }, 5);
+    expect(vaultGroups(mergeLayouts(base, dissolved), 'F')).toEqual([]);
+  });
+
+  it('withGroupOf 一次記好幾筆', () => {
+    const next = withGroupOf(emptyLayout(), ['x', 'y'], 'g9', 3);
+    expect(vaultGroupOf(next)('y')).toBe('g9');
   });
 });
 
@@ -102,8 +143,9 @@ describe('moveIds', () => {
     expect(moveIds(order, ['b'], null)).toEqual(['a', 'c', 'd', 'e', 'b']);
   });
 
-  it('一批保持原本的相對順序', () => {
-    expect(moveIds(order, ['e', 'b'], 'a')).toEqual(['b', 'e', 'a', 'c', 'd']);
+  it('一批照傳進來的順序放（呼叫端傳的是畫面順序）', () => {
+    expect(moveIds(order, ['b', 'e'], 'a')).toEqual(['b', 'e', 'a', 'c', 'd']);
+    expect(moveIds(order, ['e', 'b'], 'a')).toEqual(['e', 'b', 'a', 'c', 'd']);
   });
 
   it('錨點自己在這一批裡時，往後找第一個不在批裡的', () => {

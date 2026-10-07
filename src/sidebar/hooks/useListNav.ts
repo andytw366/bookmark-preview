@@ -1,4 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
+import { rowNav, type RowSpan } from '@/shared/groups';
 import { columnsOf, navMove } from '../lib/list-nav';
 
 /** 方向鍵可以聚焦的項目。書籤列與全頁瀏覽的卡片都掛這個屬性。 */
@@ -13,6 +14,8 @@ export interface ListNavVirtual {
   columns: number;
   /** 把某個項目捲進畫面，讓它被渲染出來 */
   scrollToIndex: (index: number) => void;
+  /** 列長不一時的列表（群組）。有它就用它算上下鍵，見 `rowNav` */
+  rows?: readonly RowSpan[] | undefined;
 }
 
 export interface ListNavActions {
@@ -121,7 +124,10 @@ export function useListNav(actions: ListNavActions, containerRef?: RefObject<HTM
     const columns = actions.virtual?.columns ?? columnsOf(items);
     const at = local < 0 ? -1 : base + local;
 
-    const move = navMove(event.key, at, total, columns);
+    const rows = actions.virtual?.rows;
+    const rowTarget =
+      rows === undefined || event.key === 'Backspace' ? null : rowNav(event.key, at, rows);
+    const move = rowTarget === null ? navMove(event.key, at, total, columns) : { kind: 'focus' as const, index: rowTarget };
     if (move === null) {
       return;
     }

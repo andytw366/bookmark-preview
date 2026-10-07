@@ -19,6 +19,7 @@ import type {
   ThumbSource,
   VaultState,
 } from './types';
+import type { GroupInfo } from './groups';
 import type { VaultLayout } from './vault-layout';
 import type { MergeReport } from './vault-merge';
 
@@ -149,6 +150,30 @@ export interface VaultSyncStatus {
   lastOutcome: SyncOutcome | null;
 }
 
+/** 原生書籤的群組（存在 `storage.local`，見 `background/bookmark-groups.ts`） */
+export interface StoredGroup extends GroupInfo {
+  members: string[];
+}
+
+/**
+ * 要加入哪個群組：
+ * - `none`：移出群組
+ * - `id`：加入這個群組（拖到群組裡、合併到已在群組裡的卡片）
+ * - `name`：設定 tag —— 同一個資料夾裡有同名的就加入，沒有就建一個
+ * - `new`：一律建新的（合併選單的「建立群組」，名稱通常是空的）
+ */
+export type GroupTarget =
+  | { kind: 'none' }
+  | { kind: 'id'; groupId: string }
+  | { kind: 'name'; name: string }
+  | { kind: 'new'; name: string };
+
+export interface GroupPatch {
+  name?: string;
+  color?: number;
+  collapsed?: boolean;
+}
+
 export type Protocol = {
   'health/ping': { request: void; response: { version: string } };
   'bookmarks/roots': { request: void; response: BookmarkFolder[] };
@@ -172,6 +197,22 @@ export type Protocol = {
   'bookmarks/merge-folder': {
     request: { targetId: string; ids: string[]; title: string };
     response: { id: string };
+  };
+  'groups/list': { request: { folderId: string }; response: StoredGroup[] };
+  /** `arrange`：順便搬原生書籤讓成員相鄰。拖拽時傳 false（位置已經是使用者放的） */
+  'groups/assign': {
+    request: { folderId: string; ids: string[]; target: GroupTarget; arrange: boolean };
+    response: { groupId: string | null };
+  };
+  'groups/update': { request: { folderId: string; groupId: string; patch: GroupPatch }; response: void };
+  'groups/dissolve': { request: { folderId: string; groupId: string }; response: void };
+  'groups/to-folder': { request: { folderId: string; groupId: string }; response: { id: string } };
+  /** 子資料夾攤平成上層的一個同名群組 */
+  'groups/flatten': { request: { folderId: string }; response: void };
+  /** 拖群組標題：整組搬到 `toFolderId` 的 `beforeId` 前面 */
+  'groups/move': {
+    request: { fromFolderId: string; groupId: string; toFolderId: string; beforeId: string | null };
+    response: void;
   };
   'bookmarks/folders': { request: void; response: FolderChoice[] };
   /**
@@ -240,6 +281,19 @@ export type Protocol = {
     request: { targetId: string; ids: string[]; name: string };
     response: { id: string };
   };
+  /** 隱私空間的群組，語意與 `groups/*` 相同；資料在加密的版面文件裡 */
+  'vault/group-assign': {
+    request: { folderId: string | null; ids: string[]; target: GroupTarget; arrange: boolean };
+    response: { groupId: string | null };
+  };
+  'vault/group-update': { request: { groupId: string; patch: GroupPatch }; response: void };
+  'vault/group-dissolve': { request: { groupId: string }; response: void };
+  'vault/group-to-folder': { request: { groupId: string }; response: { id: string } };
+  'vault/group-flatten': { request: { folderId: string }; response: void };
+  'vault/group-move': {
+    request: { groupId: string; toFolderId: string | null; beforeId: string | null };
+    response: void;
+  };
   'vault/refresh-thumb': { request: { id: string }; response: RefreshReport };
   'vault/backfill': { request: void; response: BackfillReport };
   'vault/export': { request: { id: string; parentId?: string }; response: VaultState };
@@ -274,6 +328,8 @@ export type Protocol = {
 
 export type EventMap = {
   'bookmarks/invalidated': void;
+  /** 某個資料夾的群組變了（書籤那邊；隱私空間走 `vault/changed`） */
+  'groups/changed': { folderId: string };
   'thumbs/updated': { key: string };
   /**
    * 全部的預覽圖都被清掉了（設定頁的「清除所有預覽圖」）。

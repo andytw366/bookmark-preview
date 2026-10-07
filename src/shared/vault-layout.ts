@@ -1,3 +1,4 @@
+import type { GroupInfo } from './groups';
 import { textDigest } from './vault-merge';
 
 /**
@@ -56,6 +57,48 @@ function isOrder(entry: LayoutEntry): entry is FolderOrder {
 }
 
 /**
+ * `groups` 區段：一個群組一筆。解散是墓碑（`deleted`），不是刪掉那一筆 —— 刪掉的話
+ * 另一台裝置還留著的舊版本會在合併時把它救回來。
+ */
+export interface VaultGroupEntry extends LayoutEntry {
+  folderId: string | null;
+  name: string;
+  color: number;
+  collapsed: boolean;
+  deleted?: true;
+}
+
+/**
+ * `groupOf` 區段：一個記錄一筆，記它屬於哪個群組。
+ *
+ * 書籤被搬到別的資料夾**不用改這裡**：群組綁在資料夾上，成員資格要「群組的資料夾 =
+ * 記錄現在的資料夾」才成立。少寫一筆就少一個與搬動同步不了的地方。
+ */
+export interface GroupOfEntry extends LayoutEntry {
+  groupId: string | null;
+}
+
+function isGroupEntry(entry: LayoutEntry): entry is VaultGroupEntry {
+  return (
+    (entry.folderId === null || typeof entry.folderId === 'string') &&
+    typeof entry.name === 'string' &&
+    typeof entry.color === 'number' &&
+    typeof entry.collapsed === 'boolean'
+  );
+}
+
+function isGroupOf(entry: LayoutEntry): entry is GroupOfEntry {
+  return entry.groupId === null || typeof entry.groupId === 'string';
+}
+
+/** 認得的區段要驗形狀；不認得的原封不動（見檔頭） */
+const VALIDATORS: Record<string, (entry: LayoutEntry) => boolean> = {
+  order: isOrder,
+  groups: isGroupEntry,
+  groupOf: isGroupOf,
+};
+
+/**
  * 把解出來的 JSON 轉成可信的版面。形狀不對的項目丟掉，不認得的區段保留。
  *
  * 保留不認得的區段是這個格式能向前相容的唯一理由（見檔頭），所以這裡**不能**
@@ -79,7 +122,8 @@ export function sanitizeLayout(value: unknown): VaultLayout {
       }
       // 深拷貝：呼叫端手上的物件不該因為合併而被改到
       const entry = JSON.parse(JSON.stringify(rawEntry)) as LayoutEntry;
-      if (name === 'order' && !isOrder(entry)) {
+      const valid = VALIDATORS[name];
+      if (valid !== undefined && !valid(entry)) {
         continue;
       }
       section[id] = entry;
@@ -172,7 +216,11 @@ export function orderChildren<T extends { id: string }>(
 }
 
 /**
- * 把 `moving` 這幾個 id 挪到 `beforeId` 前面（null = 最後），保持它們原本的相對順序。
+ * 把 `moving` 這幾個 id **照傳進來的順序**挪到 `beforeId` 前面（null = 最後）。
+ *
+ * 照傳進來的順序而不是照 `current` 裡的順序：呼叫端傳的是畫面順序；而剛從別的資料夾搬過來
+ * 的記錄在 `current` 裡的位置只是預設排序（新的在前），拿它當順序，整組搬過去就會被打亂。
+ * 原生書籤那邊的 `reorderBookmarks` 也是照傳進來的順序放，兩邊一致。
  *
  * `current` 是畫面上現在的完整順序。`beforeId` 本身在 `moving` 裡時，往後找第一個
  * 不在 `moving` 裡的當錨點 —— 拖一批卡片放到其中一張的前面，意思是「留在這一帶」。
@@ -183,13 +231,7 @@ export function moveIds(
   beforeId: string | null,
 ): string[] {
   const movingSet = new Set(moving);
-  const ordered = current.filter((id) => movingSet.has(id));
-  // 不在目前清單裡的（剛從別的資料夾搬進來）接在選取順序後面
-  for (const id of moving) {
-    if (!current.includes(id) && !ordered.includes(id)) {
-      ordered.push(id);
-    }
-  }
+  const ordered = [...movingSet];
   let anchor = beforeId;
   if (anchor !== null && movingSet.has(anchor)) {
     const start = current.indexOf(anchor);
@@ -253,4 +295,58 @@ export function vaultChildren<
 
 export function vaultChildId<F extends { id: string }, B extends { id: string }>(child: VaultChild<F, B>): string {
   return child.kind === 'folder' ? child.folder.id : child.record.id;
+}
+
+// ── 群組 ─────────────────────────────────────────────────────────────
+
+function groupEntries(layout: VaultLayout): [string, VaultGroupEntry][] {
+  return Object.entries(layout.sections.groups ?? {}).filter(
+    (pair): pair is [string, VaultGroupEntry] => isGroupEntry(pair[1]) && pair[1].deleted !== true,
+  );
+}
+
+/** 這個資料夾裡還活著的群組 */
+export function vaultGroups(layout: VaultLayout, folderId: string | null): GroupInfo[] {
+  return groupEntries(layout)
+    .filter(([, entry]) => entry.folderId === folderId)
+    .map(([id, entry]) => ({ id, name: entry.name, color: entry.color, collapsed: entry.collapsed }));
+}
+
+export function vaultGroupEntry(layout: VaultLayout, groupId: string): VaultGroupEntry | null {
+  const entry = layout.sections.groups?.[groupId];
+  return entry !== undefined && isGroupEntry(entry) && entry.deleted !== true ? entry : null;
+}
+
+/** 記錄 → 群組 id。只是記下來的值；成員資格成不成立要再對資料夾（`arrange` 只認這個資料夾的群組） */
+export function vaultGroupOf(layout: VaultLayout): (recordId: string) => string | null {
+  const section = layout.sections.groupOf ?? {};
+  return (recordId) => {
+    const entry = section[recordId];
+    return entry !== undefined && isGroupOf(entry) ? entry.groupId : null;
+  };
+}
+
+export function withGroup(
+  layout: VaultLayout,
+  groupId: string,
+  entry: Omit<VaultGroupEntry, 'updatedAt'>,
+  now: number = Date.now(),
+): VaultLayout {
+  const next = sanitizeLayout(layout);
+  (next.sections.groups ??= {})[groupId] = { ...entry, updatedAt: now };
+  return next;
+}
+
+export function withGroupOf(
+  layout: VaultLayout,
+  ids: readonly string[],
+  groupId: string | null,
+  now: number = Date.now(),
+): VaultLayout {
+  const next = sanitizeLayout(layout);
+  const section = (next.sections.groupOf ??= {});
+  for (const id of ids) {
+    section[id] = { groupId, updatedAt: now };
+  }
+  return next;
 }

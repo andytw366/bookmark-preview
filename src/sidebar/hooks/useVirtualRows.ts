@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { rowContaining, type RowSpan } from '@/shared/groups';
 import { columnsForWidth, windowFor, type VirtualWindow } from '../lib/virtual';
 
 /** 被虛擬化的項目元素。與 `useListNav` 用同一個標記，兩者看的是同一批東西。 */
@@ -27,6 +28,11 @@ export interface VirtualRowsOptions {
    * 而那個值又是這個 hook 的輸入 —— 由 hook 自己建 ref 會繞不出來。
    */
   ref?: React.RefObject<HTMLDivElement | null>;
+  /**
+   * 列長不一時（群組標題自己一列、群組的最後一列沒排滿）每一列從第幾個項目開始、有幾個。
+   * 省略就是每 `columns` 個一列。見 `shared/groups.ts` 的 `gridModel`。
+   */
+  rows?: readonly RowSpan[] | undefined;
 }
 
 export interface VirtualRows extends VirtualWindow {
@@ -84,6 +90,7 @@ export function useVirtualRows({
   overscan = 4,
   resetKey = '',
   ref: externalRef,
+  rows,
 }: VirtualRowsOptions): VirtualRows {
   const ownRef = useRef<HTMLDivElement>(null);
   const ref = externalRef ?? ownRef;
@@ -95,7 +102,9 @@ export function useVirtualRows({
   const [measureTick, setMeasureTick] = useState(0);
 
   const cols = Math.max(1, columns);
-  const rowCount = Math.ceil(count / cols);
+  const rowCount = rows === undefined ? Math.ceil(count / cols) : rows.length;
+  const rowStart = (row: number): number => (rows === undefined ? row * cols : (rows[row]?.start ?? count));
+  const rowLength = (row: number): number => (rows === undefined ? cols : (rows[row]?.count ?? 0));
 
   // 清單換了就把量測結果丟掉 —— 沿用舊的會讓捲軸長度與內容位置對不上
   const lastReset = useRef(resetKey);
@@ -209,10 +218,10 @@ export function useVirtualRows({
     }
     const gap = Number.parseFloat(getComputedStyle(content).rowGap) || 0;
     let changed = false;
-    for (let offset = 0; offset < items.length; offset += cols) {
-      const row = win.firstRow + offset / cols;
+    for (let offset = 0, row = win.firstRow; offset < items.length; offset += rowLength(row), row += 1) {
+      const length = Math.max(1, rowLength(row));
       let tallest = 0;
-      for (let cell = 0; cell < cols && offset + cell < items.length; cell += 1) {
+      for (let cell = 0; cell < length && offset + cell < items.length; cell += 1) {
         const item = items[offset + cell];
         if (item !== undefined) {
           tallest = Math.max(tallest, item.getBoundingClientRect().height);
@@ -246,7 +255,7 @@ export function useVirtualRows({
       if (content === null || scroller === null) {
         return;
       }
-      const row = Math.floor(index / cols);
+      const row = rows === undefined ? Math.floor(index / cols) : rowContaining(rows, index);
       let offset = 0;
       for (let before = 0; before < row; before += 1) {
         offset += heights.current.get(before) ?? estimate;
@@ -258,14 +267,14 @@ export function useVirtualRows({
       scroller.scrollTop += contentTop - viewTop + offset;
       measureViewport();
     },
-    [cols, estimate, measureViewport],
+    [cols, estimate, measureViewport, rows],
   );
 
   return {
     ...win,
     ref,
-    start: win.firstRow * cols,
-    end: Math.min(count, win.endRow * cols),
+    start: rowStart(win.firstRow),
+    end: Math.min(count, win.endRow >= rowCount ? count : rowStart(win.endRow)),
     scrollToIndex,
   };
 }

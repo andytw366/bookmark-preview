@@ -334,3 +334,122 @@
   outline: 2px solid var(--accent);
   background: var(--bg-hover);
 }
+
+/*
+ * 群組（＝ tag）。
+ *
+ * 每張卡片外面有一層 `display: contents` 的 `.cell`（版面上不存在），用它的 class 控制卡片：
+ * - `cell--row-start`：從新的一列開始。列是 `gridModel` 算的，CSS 照做，群組的最後一列沒排滿時
+ *   下一段才不會接在同一列。
+ * - `cell--grouped`：畫群組的底色。底色用 box-shadow 往外擴 8px（網格間距的一半），
+ *   相鄰兩張剛好接起來，整組看起來是一塊底框 —— 不必包一層容器（虛擬滾動下包不起來）。
+ */
+.cell {
+  display: contents;
+}
+
+.cell--row-start > * {
+  grid-column-start: 1;
+}
+
+.group-c0 { --group-color: #4f7cff; }
+.group-c1 { --group-color: #2aa876; }
+.group-c2 { --group-color: #e08a1e; }
+.group-c3 { --group-color: #d6457a; }
+.group-c4 { --group-color: #8a5cf6; }
+.group-c5 { --group-color: #1fa3b8; }
+
+.cell--grouped > *,
+.group-head {
+  --group-tint: color-mix(in srgb, var(--group-color) 9%, transparent);
+
+  box-shadow:
+    0 0 0 8px var(--group-tint),
+    inset 0 0 0 999px var(--group-tint);
+}
+
+.group-head {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: stretch;
+  border-left: 4px solid var(--group-color);
+  border-radius: 6px;
+}
+
+.group-head__main {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 10px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.group-head__main:focus-visible,
+.group-head__more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.group-head__chevron {
+  width: 1em;
+  color: var(--group-color);
+}
+
+.group-head__name {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.group-head__name--untitled {
+  color: var(--fg-dim);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.group-head__count {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+.group-head__more {
+  padding: 0 12px;
+  color: var(--fg-dim);
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.group-head__more:hover,
+.group-head__main:hover {
+  background: var(--bg-hover);
+}
+
+.group-menu__colors {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.group-menu__swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: var(--group-color);
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.group-menu__swatch--on {
+  border-color: var(--fg, currentColor);
+}

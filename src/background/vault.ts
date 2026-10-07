@@ -35,9 +35,16 @@ import {
   sanitizeLayout,
   vaultChildId,
   vaultChildren,
+  vaultGroupEntry,
+  vaultGroupOf,
+  vaultGroups,
   withFolderOrder,
+  withGroup,
+  withGroupOf,
   type VaultLayout,
 } from '@/shared/vault-layout';
+import { arrange, nextColor, sameName } from '@/shared/groups';
+import type { GroupPatch, GroupTarget } from '@/shared/messages';
 import { planFolderExport, planFolderImport } from '@/shared/vault-subtree';
 import {
   contentTag,
@@ -1649,6 +1656,244 @@ export async function mergeIntoNewFolder(
     layout = next;
     await persistLayout();
     return id;
+  });
+}
+
+// ── 群組（＝ tag）─────────────────────────────────────────────────────
+
+/**
+ * 一個資料夾在畫面上的順序，**群組成員聚在一起**（群組在第一個成員的位置）。
+ * 寫回版面的順序一律用這個，成員在記下來的順序裡就是相鄰的。
+ */
+function arrangedIds(folderId: string | null, from: VaultLayout): string[] {
+  const children = vaultChildren(listFolders(), listBookmarks(), folderId, from).map((child) => ({
+    id: vaultChildId(child),
+  }));
+  return arrange(children, vaultGroups(from, folderId), vaultGroupOf(from)).flatMap((part) =>
+    part.kind === 'item' ? [part.item.id] : part.items.map((item) => item.id),
+  );
+}
+
+/** 這個群組現在的成員，照畫面順序 */
+function groupMembers(groupId: string, from: VaultLayout): string[] {
+  const entry = vaultGroupEntry(from, groupId);
+  if (entry === null) {
+    return [];
+  }
+  const groupOf = vaultGroupOf(from);
+  return arrangedIds(entry.folderId, from).filter((id) => groupOf(id) === groupId);
+}
+
+function requireGroup(from: VaultLayout, groupId: string) {
+  const entry = vaultGroupEntry(from, groupId);
+  if (entry === null) {
+    throw new Error(t('group_not_found'));
+  }
+  return entry;
+}
+
+/** 語意同 `background/bookmark-groups.ts` 的 `assignGroup` */
+export async function assignVaultGroup(
+  folderId: string | null,
+  ids: readonly string[],
+  target: GroupTarget,
+  arrangeOrder: boolean,
+): Promise<string | null> {
+  return exclusive(async () => {
+    requireUnlocked();
+    const now = Date.now();
+    let next = layout ?? emptyLayout();
+    if (target.kind === 'none') {
+      layout = withGroupOf(next, ids, null, now);
+      await persistLayout();
+      return null;
+    }
+    const groups = vaultGroups(next, folderId);
+    let groupId =
+      target.kind === 'id'
+        ? groups.find((group) => group.id === target.groupId)?.id
+        : target.kind === 'name' && target.name.trim() !== ''
+          ? groups.find((group) => sameName(group.name, target.name))?.id
+          : undefined;
+    if (groupId === undefined) {
+      if (target.kind === 'id') {
+        throw new Error(t('group_not_found'));
+      }
+      groupId = crypto.randomUUID();
+      next = withGroup(
+        next,
+        groupId,
+        { folderId, name: target.name.trim(), color: nextColor(groups), collapsed: false },
+        now,
+      );
+    }
+    const moving = new Set(ids);
+    const before = groupMembers(groupId, next).filter((id) => !moving.has(id));
+    /*
+     * 順序要用**加入之前**的成員資格算：先記下成員資格的話，新成員已經算在群組裡，
+     * 群組會改成出現在新成員原本的位置（第一個成員的位置），整組跟著跳走。
+     */
+    const order = arrangedIds(folderId, next);
+    next = withGroupOf(next, ids, groupId, now);
+    if (arrangeOrder) {
+      // 加到最後一個成員後面；新群組則聚到第一個的位置
+      const lastAt = before.length === 0 ? -1 : order.lastIndexOf(before[before.length - 1] ?? '');
+      const anchor =
+        lastAt === -1 ? (ids[0] ?? null) : (order.slice(lastAt + 1).find((id) => !moving.has(id)) ?? null);
+      next = withFolderOrder(next, folderId, moveIds(order, ids, anchor), new Set(order), now);
+      next = withFolderOrder(next, folderId, arrangedIds(folderId, next), new Set(order), now);
+    }
+    layout = next;
+    await persistLayout();
+    return groupId;
+  });
+}
+
+export async function updateVaultGroup(groupId: string, patch: GroupPatch): Promise<void> {
+  return exclusive(async () => {
+    requireUnlocked();
+    const current = layout ?? emptyLayout();
+    const entry = requireGroup(current, groupId);
+    const name = patch.name === undefined ? entry.name : patch.name.trim();
+    if (
+      patch.name !== undefined &&
+      name !== '' &&
+      vaultGroups(current, entry.folderId).some((group) => group.id !== groupId && sameName(group.name, name))
+    ) {
+      throw new Error(t('group_name_taken', name));
+    }
+    layout = withGroup(current, groupId, {
+      folderId: entry.folderId,
+      name,
+      color: patch.color ?? entry.color,
+      collapsed: patch.collapsed ?? entry.collapsed,
+    });
+    await persistLayout();
+  });
+}
+
+/** 解散：留墓碑，成員的 `groupOf` 不用動（指向已解散的群組 = 不在任何群組） */
+export async function dissolveVaultGroup(groupId: string): Promise<void> {
+  return exclusive(async () => {
+    requireUnlocked();
+    const current = layout ?? emptyLayout();
+    const entry = requireGroup(current, groupId);
+    layout = withGroup(current, groupId, { ...entry, deleted: true });
+    await persistLayout();
+  });
+}
+
+/** 轉成資料夾：在群組的位置建子資料夾，照順序搬進去。回傳新資料夾 id */
+export async function vaultGroupToFolder(groupId: string): Promise<string> {
+  return exclusive(async () => {
+    const { payload: current } = requireUnlocked();
+    const before = layout ?? emptyLayout();
+    const entry = requireGroup(before, groupId);
+    const members = groupMembers(groupId, before);
+    const parentOrder = arrangedIds(entry.folderId, before);
+    const now = Date.now();
+
+    const id = crypto.randomUUID();
+    current.folders.push({
+      id,
+      name: entry.name === '' ? t('group_untitled') : entry.name,
+      parentId: entry.folderId,
+      updatedAt: now,
+    });
+    for (const member of members) {
+      placeUnder(current, member, id, now);
+    }
+    await persist();
+
+    const memberSet = new Set(members);
+    const first = parentOrder.findIndex((member) => memberSet.has(member));
+    const nextParent = parentOrder.filter((member) => !memberSet.has(member));
+    nextParent.splice(first === -1 ? nextParent.length : first, 0, id);
+    let next = withGroup(before, groupId, { ...entry, deleted: true }, now);
+    next = withFolderOrder(next, entry.folderId, nextParent, new Set(childIdsOf(entry.folderId)), now);
+    next = withFolderOrder(next, id, members, memberSet, now);
+    layout = next;
+    await persistLayout();
+    return id;
+  });
+}
+
+/**
+ * 攤平成群組：子資料夾裡的書籤搬回上層、放在子資料夾原本的位置，成為一個同名群組，
+ * 子資料夾刪掉。子資料夾裡還有資料夾時拒絕（理由見 `bookmark-groups.ts`）。
+ */
+export async function flattenVaultFolder(subfolderId: string): Promise<void> {
+  return exclusive(async () => {
+    const { payload: current } = requireUnlocked();
+    const sub = requireFolder(current, subfolderId);
+    if (current.folders.some((folder) => folder.deleted !== true && folder.parentId === subfolderId)) {
+      throw new Error(t('group_flatten_has_folders'));
+    }
+    const before = layout ?? emptyLayout();
+    const inside = arrangedIds(subfolderId, before);
+    const parentOrder = arrangedIds(sub.parentId, before);
+    const now = Date.now();
+    for (const id of inside) {
+      placeUnder(current, id, sub.parentId, now);
+    }
+    sub.deleted = true;
+    sub.updatedAt = now;
+    await persist();
+
+    const at = parentOrder.indexOf(subfolderId);
+    const nextParent = parentOrder.filter((id) => id !== subfolderId);
+    nextParent.splice(at === -1 ? nextParent.length : at, 0, ...inside);
+    let next = withFolderOrder(before, sub.parentId, nextParent, new Set(childIdsOf(sub.parentId)), now);
+    const groups = vaultGroups(next, sub.parentId);
+    let groupId = groups.find((group) => sub.name.trim() !== '' && sameName(group.name, sub.name))?.id;
+    if (groupId === undefined) {
+      groupId = crypto.randomUUID();
+      next = withGroup(
+        next,
+        groupId,
+        { folderId: sub.parentId, name: sub.name.trim(), color: nextColor(groups), collapsed: false },
+        now,
+      );
+    }
+    layout = withGroupOf(next, inside, groupId, now);
+    await persistLayout();
+  });
+}
+
+/** 拖群組標題：整組搬。換資料夾時那裡有同名群組就併進去，沒有就把這個群組帶過去 */
+export async function moveVaultGroup(
+  groupId: string,
+  toFolderId: string | null,
+  beforeId: string | null,
+): Promise<void> {
+  return exclusive(async () => {
+    const { payload: current } = requireUnlocked();
+    if (toFolderId !== null) {
+      requireFolder(current, toFolderId);
+    }
+    let next = layout ?? emptyLayout();
+    const entry = requireGroup(next, groupId);
+    const members = groupMembers(groupId, next);
+    const now = Date.now();
+    if (toFolderId !== entry.folderId) {
+      for (const member of members) {
+        placeUnder(current, member, toFolderId, now);
+      }
+      await persist();
+      const same = vaultGroups(next, toFolderId).find(
+        (group) => entry.name !== '' && sameName(group.name, entry.name),
+      );
+      if (same === undefined) {
+        next = withGroup(next, groupId, { ...entry, folderId: toFolderId }, now);
+      } else {
+        next = withGroup(next, groupId, { ...entry, deleted: true }, now);
+        next = withGroupOf(next, members, same.id, now);
+      }
+    }
+    const order = arrangedIds(toFolderId, next);
+    next = withFolderOrder(next, toFolderId, moveIds(order, members, beforeId), new Set(order), now);
+    layout = next;
+    await persistLayout();
   });
 }
 

@@ -89,6 +89,9 @@ and an older version rebuilding records field by field would strip anything it d
 know — after which the two devices' fingerprints never agree and they overwrite each other
 every two seconds. Old versions simply never touch the layout keys.
 
+From phase 3 the layout also carries vault groups (`groups`, `groupOf`); they sync and
+back up the same way. Native bookmark groups are local only.
+
 Both documents share the 100 KB quota, so each upload checks that it fits **together with
 what the other one currently occupies**, and stops with the usual over-quota warning if not.
 An older version does not know the layout exists and checks only its own size; near the

@@ -5,10 +5,19 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from 'react';
 import { request } from '@/shared/messages';
 import type { BookmarkNode, PrivateBookmark, PrivateFolder } from '@/shared/types';
-import { vaultChildId, vaultChildren, type VaultChild } from '@/shared/vault-layout';
+import {
+  vaultChildId,
+  vaultChildren,
+  vaultGroupOf,
+  vaultGroups,
+  type VaultChild,
+} from '@/shared/vault-layout';
+import { arrange, gridModel, type Arranged, type Cell, type GridModel, type GroupInfo } from '@/shared/groups';
+import type { GroupTarget } from '@/shared/messages';
 import { hostnameOf } from '@/shared/url';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
 import { Breadcrumb } from '../sidebar/components/Breadcrumb';
@@ -44,6 +53,11 @@ import { buildIndex, countLinks, pathTo, searchLinks } from '../sidebar/lib/tree
 import { vaultPathTo } from '../sidebar/lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
 import { useGridDrag } from './useGridDrag';
+import { GroupHeader } from './GroupHeader';
+import { GroupMenu } from './GroupMenu';
+import { TagPrompt } from '../sidebar/components/TagItems';
+import { useBookmarkGroups } from '../sidebar/hooks/useBookmarkGroups';
+import { isNoop } from '../sidebar/lib/drop-intent';
 
 /**
  * 獨立分頁的全頁書籤瀏覽。
@@ -85,6 +99,70 @@ const cardEstimate = (size: ColumnSize): number => size * 0.72 + 82;
 type VaultGridRow = VaultChild<PrivateFolder, PrivateBookmark>;
 
 const NO_SELECTION: ReadonlySet<string> = new Set();
+
+/** 隱私空間的格子要帶 id，`arrange` 才分得出誰是誰 */
+interface VaultItem {
+  id: string;
+  row: VaultGridRow;
+}
+
+/** 群組標題在拖拽與鍵盤巡覽裡的 id。書籤 id 與隱私記錄 id 都不會以這個開頭 */
+const GROUP_PREFIX = 'group:';
+
+function groupIdOf(id: string): string | null {
+  return id.startsWith(GROUP_PREFIX) ? id.slice(GROUP_PREFIX.length) : null;
+}
+
+function cellId<T extends { id: string }>(cell: Cell<T>): string {
+  return cell.kind === 'header' ? `${GROUP_PREFIX}${cell.group.id}` : cell.item.id;
+}
+
+function partId<T extends { id: string }>(part: Arranged<T>): string {
+  return part.kind === 'group' ? `${GROUP_PREFIX}${part.group.id}` : part.item.id;
+}
+
+/** 畫面順序的項目 id（群組成員聚在一起，收合的也算） */
+function flatIds<T extends { id: string }>(parts: readonly Arranged<T>[]): string[] {
+  return parts.flatMap((part) => (part.kind === 'item' ? [part.item.id] : part.items.map((item) => item.id)));
+}
+
+/** 項目 → 它**在畫面上**屬於的群組（只算這個資料夾裡成立的成員資格） */
+function memberMap<T extends { id: string }>(parts: readonly Arranged<T>[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const part of parts) {
+    if (part.kind === 'group') {
+      for (const item of part.items) {
+        out.set(item.id, part.group.id);
+      }
+    }
+  }
+  return out;
+}
+
+/** 「放在群組標題前面」= 放在那個群組第一個成員的前面 */
+function resolveAnchor<T extends { id: string }>(parts: readonly Arranged<T>[], beforeId: string | null): string | null {
+  const group = beforeId === null ? null : groupIdOf(beforeId);
+  if (group === null) {
+    return beforeId;
+  }
+  const part = parts.find((candidate) => candidate.kind === 'group' && candidate.group.id === group);
+  return part?.kind === 'group' ? (part.items[0]?.id ?? null) : null;
+}
+
+interface GroupMenuState {
+  space: Mode;
+  group: GroupInfo;
+  x: number;
+  y: number;
+}
+
+interface TagPromptState {
+  space: Mode;
+  ids: string[];
+  current: string;
+  x: number;
+  y: number;
+}
 
 /** 合併選單：兩張卡片疊在一起之後要問的事 */
 interface PendingMerge {
@@ -131,6 +209,9 @@ export function Gallery() {
   const [optionsMenu, setOptionsMenu] = useState<{ x: number; y: number } | null>(null);
   const backfill = useBackfill();
   const [merge, setMerge] = useState<PendingMerge | null>(null);
+  const [groupMenu, setGroupMenu] = useState<GroupMenuState | null>(null);
+  const [tagPrompt, setTagPrompt] = useState<TagPromptState | null>(null);
+  const liveGroups = useBookmarkGroups(folderId);
   /** 拖拽中。拖拽期間資料凍結（見下面的 `frozen`） */
   const [dragging, setDragging] = useState(false);
   const [pendingMove, setPendingMove] = useState<{
@@ -151,14 +232,29 @@ export function Gallery() {
    * 可能因此被拆掉 —— 那之後 drop／dragend 都送不到，拖拽卡在半空。放開之後才換成
    * 最新的資料，中間錯過的變動一次補上。
    */
-  const frozen = useRef({ roots, bookmarks: vault.bookmarks, folders: vault.folders, layout: vault.layout });
+  const frozen = useRef({
+    roots,
+    groups: liveGroups,
+    bookmarks: vault.bookmarks,
+    folders: vault.folders,
+    layout: vault.layout,
+  });
   if (!dragging) {
-    frozen.current = { roots, bookmarks: vault.bookmarks, folders: vault.folders, layout: vault.layout };
+    frozen.current = {
+      roots,
+      groups: liveGroups,
+      bookmarks: vault.bookmarks,
+      folders: vault.folders,
+      layout: vault.layout,
+    };
   }
   const view = frozen.current;
   const viewRoots = view.roots;
 
   const index = useMemo(() => buildIndex(viewRoots ?? []), [viewRoots]);
+  const bookmarkMemberOf = new Map(
+    view.groups.flatMap((group) => group.members.map((member) => [member, group.id] as const)),
+  );
   const vaultStatus = vault.state?.status;
   const vaultUnlocked = vaultStatus === 'unlocked';
 
@@ -398,10 +494,24 @@ export function Gallery() {
         };
 
   const listKey = search === null ? (folderId ?? 'root') : `search:${trimmed}`;
+
+  /*
+   * 群組（＝ tag）把網格切成長短不一的列：群組標題自己一列、群組的卡片不跨到下一段。
+   * 「哪一格在哪一列」由 `gridModel` 算，虛擬滾動與方向鍵都照它走（`rows`）。
+   * 搜尋結果沒有群組（順序本身就沒有意義）。
+   */
+  const inFolderView = search === null && currentFolder !== undefined;
   const columns = useGridColumns(gridRef, size, GRID_GAP);
+  const bookmarkParts = arrange(
+    nodes,
+    inFolderView ? view.groups : [],
+    (id) => bookmarkMemberOf.get(id) ?? null,
+  );
+  const bookmarkModel = gridModel(bookmarkParts, columns);
   const gridRows = useVirtualRows({
-    count: nodes.length,
+    count: bookmarkModel.cells.length,
     columns,
+    rows: bookmarkModel.rows,
     estimate: cardEstimate(size),
     resetKey: `${listKey}/${String(size)}/${String(selecting)}/${String(columns)}`,
     ref: gridRef,
@@ -411,8 +521,9 @@ export function Gallery() {
       onLeave: upBookmarks,
       virtual: {
         start: gridRows.start,
-        count: nodes.length,
+        count: bookmarkModel.cells.length,
         columns,
+        rows: bookmarkModel.rows,
         scrollToIndex: gridRows.scrollToIndex,
       },
     },
@@ -420,9 +531,17 @@ export function Gallery() {
   );
 
   const vaultColumns = useGridColumns(vaultGridRef, size, GRID_GAP);
+  const vaultItems: VaultItem[] = vaultRows.map((row) => ({ id: vaultChildId(row), row }));
+  const vaultParts = arrange(
+    vaultItems,
+    vaultGroups(view.layout, vaultFolderId),
+    vaultGroupOf(view.layout),
+  );
+  const vaultModel = gridModel(vaultParts, vaultColumns);
   const vaultGrid = useVirtualRows({
-    count: vaultRows.length,
+    count: vaultModel.cells.length,
     columns: vaultColumns,
+    rows: vaultModel.rows,
     estimate: cardEstimate(size),
     resetKey: `${vaultFolderId ?? 'root'}/${String(size)}/${String(vaultSelecting)}/${String(vaultColumns)}`,
     ref: vaultGridRef,
@@ -432,8 +551,9 @@ export function Gallery() {
       onLeave: upVault,
       virtual: {
         start: vaultGrid.start,
-        count: vaultRows.length,
+        count: vaultModel.cells.length,
         columns: vaultColumns,
+        rows: vaultModel.rows,
         scrollToIndex: vaultGrid.scrollToIndex,
       },
     },
@@ -449,14 +569,37 @@ export function Gallery() {
    * 拖拽（兩個網格各一份）。
    *
    * 書籤這邊：搜尋結果的順序沒有意義、最上層是 Firefox 的永久資料夾，兩者都不能拖。
+   *
+   * 落點清單（`order`）是畫面上的格子，含群組標題（`group:<id>`）；送給背景頁的錨點一律
+   * 換成書籤 id —— 「放在某個群組標題前面」就是放在那個群組第一個成員的前面。
    */
-  const canDragBookmarks = search === null && currentFolder !== undefined;
-  const bookmarkOrder = nodes.map((node) => node.id);
-  const vaultOrder = vaultRows.map(vaultChildId);
+  const canDragBookmarks = inFolderView;
+  const bookmarkOrder = bookmarkModel.cells.map(cellId);
+  const bookmarkItems = flatIds(bookmarkParts);
+  const vaultOrder = vaultModel.cells.map(cellId);
+  const vaultItemOrder = flatIds(vaultParts);
+  const vaultMemberOf = memberMap(vaultParts);
   const vaultRowById = new Map(vaultRows.map((row) => [vaultChildId(row), row]));
 
   const reportFailure = (cause: unknown): void => {
     setNotice(cause instanceof Error ? cause.message : String(cause));
+  };
+
+  /** 書籤這邊的一連串請求做完再重讀；任一步失敗就停下並說出來 */
+  const applyBookmarks = (work: () => Promise<void>): void => {
+    void work().then(reload, (cause: unknown) => {
+      reportFailure(cause);
+      reload();
+    });
+  };
+
+  const reorderReport = async (ids: string[], parentId: string, beforeId: string | null): Promise<void> => {
+    const report = await request('bookmarks/reorder', { ids, parentId, beforeId });
+    if (report.failed > 0) {
+      setNotice(
+        t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
+      );
+    }
   };
 
   /** 拖拽、右鍵「往前／往後移」、快捷鍵共用。整批搬完就退出多選（與「移動到…」一致） */
@@ -464,14 +607,7 @@ export function Gallery() {
     if (ids.length > 1) {
       exitSelection();
     }
-    void request('bookmarks/reorder', { ids, parentId, beforeId }).then((report) => {
-      if (report.failed > 0) {
-        setNotice(
-          t('moved_bookmarks_with_failures', tn('unit_bookmarks', report.moved), tn('unit_failed', report.failed)),
-        );
-      }
-      reload();
-    }, reportFailure);
+    applyBookmarks(async () => reorderReport(ids, parentId, beforeId));
   };
 
   const moveVault = (ids: string[], target: string | null, beforeId: string | null): void => {
@@ -481,10 +617,17 @@ export function Gallery() {
     void vault.reorder(ids, target, beforeId);
   };
 
+  /** 放到某張卡片旁邊之後，要加入的群組：那張卡片所在的群組（散卡片 = 離開群組） */
+  const groupTarget = (groupId: string | null): GroupTarget =>
+    groupId === null ? { kind: 'none' } : { kind: 'id', groupId };
+
   const bookmarkDrag = useGridDrag({
     enabled: canDragBookmarks,
     order: bookmarkOrder,
     kindOf: (id) => {
+      if (id.startsWith(GROUP_PREFIX)) {
+        return 'group';
+      }
       const node = index.byId.get(id);
       return node === undefined ? undefined : node.kind === 'folder' ? 'folder' : 'bookmark';
     },
@@ -494,18 +637,75 @@ export function Gallery() {
       return node?.kind === 'link' ? { url: node.url, title: node.title } : null;
     },
     onDragChange: setDragging,
-    onReorder: (ids, beforeId) => {
-      if (currentFolder !== undefined) {
-        moveBookmarks(ids, currentFolder.id, beforeId);
+    onReorder: (ids, beforeId, targetId) => {
+      if (currentFolder === undefined) {
+        return;
       }
+      const parentId = currentFolder.id;
+      const before = resolveAnchor(bookmarkParts, beforeId);
+      const dragged = groupIdOf(ids[0] ?? '');
+      if (dragged !== null) {
+        applyBookmarks(async () => {
+          await request('groups/move', { fromFolderId: parentId, groupId: dragged, toFolderId: parentId, beforeId: before });
+        });
+        return;
+      }
+      const joining = targetId === null ? null : (groupIdOf(targetId) ?? bookmarkMemberOf.get(targetId) ?? null);
+      const regroup = ids.some((id) => (bookmarkMemberOf.get(id) ?? null) !== joining);
+      const stay = isNoop(bookmarkItems, ids, before);
+      if (stay && !regroup) {
+        return;
+      }
+      if (ids.length > 1) {
+        exitSelection();
+      }
+      applyBookmarks(async () => {
+        if (!stay) {
+          await reorderReport(ids, parentId, before);
+        }
+        if (regroup) {
+          // 位置已經是使用者放的，不要再搬（arrange: false）
+          await request('groups/assign', { folderId: parentId, ids, target: groupTarget(joining), arrange: false });
+        }
+      });
     },
     onInto: (ids, target) => {
       // 原生書籤的最上層只能放 Firefox 的永久資料夾，麵包屑的「全部」不接受拖放
-      if (target !== null) {
-        moveBookmarks(ids, target, null);
+      if (target === null || currentFolder === undefined) {
+        return;
       }
+      const parentId = currentFolder.id;
+      const dragged = groupIdOf(ids[0] ?? '');
+      const intoGroup = groupIdOf(target);
+      if (intoGroup !== null) {
+        if (dragged === null) {
+          applyBookmarks(async () => {
+            await request('groups/assign', { folderId: parentId, ids, target: groupTarget(intoGroup), arrange: true });
+          });
+        }
+        return;
+      }
+      if (dragged !== null) {
+        applyBookmarks(async () => {
+          await request('groups/move', { fromFolderId: parentId, groupId: dragged, toFolderId: target, beforeId: null });
+        });
+        return;
+      }
+      moveBookmarks(ids, target, null);
     },
     onMerge: (targetId, ids, x, y) => {
+      if (groupIdOf(ids[0] ?? '') !== null || currentFolder === undefined) {
+        return;
+      }
+      // 疊到已在群組裡的卡片 = 加入那個群組，不跳選單
+      const joining = bookmarkMemberOf.get(targetId);
+      if (joining !== undefined) {
+        const parentId = currentFolder.id;
+        applyBookmarks(async () => {
+          await request('groups/assign', { folderId: parentId, ids, target: groupTarget(joining), arrange: true });
+        });
+        return;
+      }
       setMerge({ space: 'bookmarks', targetId, ids, x, y });
     },
   });
@@ -513,18 +713,60 @@ export function Gallery() {
   const vaultDrag = useGridDrag({
     enabled: mode === 'vault',
     order: vaultOrder,
-    kindOf: (id) => vaultRowById.get(id)?.kind,
+    kindOf: (id) => (id.startsWith(GROUP_PREFIX) ? 'group' : vaultRowById.get(id)?.kind),
     selected: vaultSelecting ? vaultSelectedIds : NO_SELECTION,
     // 隱私書籤永遠不帶網址：拖到分頁列會在一般視窗打開、寫進瀏覽記錄
     linkOf: () => null,
     onDragChange: setDragging,
-    onReorder: (ids, beforeId) => {
-      moveVault(ids, vaultFolderId, beforeId);
+    onReorder: (ids, beforeId, targetId) => {
+      const before = resolveAnchor(vaultParts, beforeId);
+      const dragged = groupIdOf(ids[0] ?? '');
+      if (dragged !== null) {
+        void vault.groupMove(dragged, vaultFolderId, before);
+        return;
+      }
+      const joining = targetId === null ? null : (groupIdOf(targetId) ?? vaultMemberOf.get(targetId) ?? null);
+      const regroup = ids.some((id) => (vaultMemberOf.get(id) ?? null) !== joining);
+      const stay = isNoop(vaultItemOrder, ids, before);
+      if (stay && !regroup) {
+        return;
+      }
+      if (ids.length > 1) {
+        exitSelection();
+      }
+      void (async () => {
+        if (!stay) {
+          await vault.reorder(ids, vaultFolderId, before);
+        }
+        if (regroup) {
+          await vault.groupAssign(vaultFolderId, ids, groupTarget(joining), false);
+        }
+      })();
     },
     onInto: (ids, target) => {
+      const dragged = groupIdOf(ids[0] ?? '');
+      const intoGroup = target === null ? null : groupIdOf(target);
+      if (intoGroup !== null) {
+        if (dragged === null) {
+          void vault.groupAssign(vaultFolderId, ids, groupTarget(intoGroup), true);
+        }
+        return;
+      }
+      if (dragged !== null) {
+        void vault.groupMove(dragged, target, null);
+        return;
+      }
       moveVault(ids, target, null);
     },
     onMerge: (targetId, ids, x, y) => {
+      if (groupIdOf(ids[0] ?? '') !== null) {
+        return;
+      }
+      const joining = vaultMemberOf.get(targetId);
+      if (joining !== undefined) {
+        void vault.groupAssign(vaultFolderId, ids, groupTarget(joining), true);
+        return;
+      }
       setMerge({ space: 'vault', targetId, ids, x, y });
     },
   });
@@ -532,18 +774,42 @@ export function Gallery() {
   /**
    * 往前／往後挪一格（鍵盤與右鍵選單用，拖拽做得到的事鍵盤也要做得到）。
    * 回傳 null 代表這個方向已經到底、或這個畫面不能排序 —— 選單據此停用那一項。
+   *
+   * 群組標題（`group:<id>`）挪的是整個群組，跨過的是相鄰的一整段（另一張卡片或另一個群組）；
+   * 卡片挪的是書籤本身的順序（群組裡的卡片就在群組裡前後挪）。
    */
   const stepper = (space: Mode, id: string, delta: -1 | 1): (() => void) | null => {
-    const order = space === 'vault' ? vaultOrder : bookmarkOrder;
+    if (space === 'bookmarks' && (!canDragBookmarks || currentFolder === undefined)) {
+      return null;
+    }
+    const resolve = (anchor: string | null): string | null =>
+      space === 'vault' ? resolveAnchor(vaultParts, anchor) : resolveAnchor(bookmarkParts, anchor);
+    const group = groupIdOf(id);
+    const order =
+      group === null
+        ? space === 'vault'
+          ? vaultItemOrder
+          : bookmarkItems
+        : space === 'vault'
+          ? vaultParts.map(partId)
+          : bookmarkParts.map(partId);
     const at = order.indexOf(id);
-    if (at === -1 || (space === 'bookmarks' && (!canDragBookmarks || currentFolder === undefined))) {
+    if (at === -1 || (delta < 0 ? at === 0 : at === order.length - 1)) {
       return null;
     }
-    if (delta < 0 ? at === 0 : at === order.length - 1) {
-      return null;
-    }
-    const beforeId = delta < 0 ? (order[at - 1] ?? null) : (order[at + 2] ?? null);
+    const beforeId = resolve(delta < 0 ? (order[at - 1] ?? null) : (order[at + 2] ?? null));
     return () => {
+      if (group !== null) {
+        if (space === 'vault') {
+          void vault.groupMove(group, vaultFolderId, beforeId);
+        } else if (currentFolder !== undefined) {
+          const parentId = currentFolder.id;
+          applyBookmarks(async () => {
+            await request('groups/move', { fromFolderId: parentId, groupId: group, toFolderId: parentId, beforeId });
+          });
+        }
+        return;
+      }
       if (space === 'vault') {
         moveVault([id], vaultFolderId, beforeId);
       } else if (currentFolder !== undefined) {
@@ -675,6 +941,272 @@ export function Gallery() {
    * 抽成函式是因為虛擬滾動之後兩者必須在同一次 map 裡畫出來（切片的索引橫跨
    * 資料夾與書籤），把兩段 JSX 直接塞進一個三元運算會難以閱讀。
    */
+  const bookmarkCard = (node: BookmarkNode) =>
+    node.kind === 'folder' ? (
+      // 多選中點卡片是勾選（與書籤卡片一致），巡覽移到角落的箭頭。
+      // 兩個動作各有自己的目標：資料夾不能點進去就沒得跨資料夾挑選，
+      // 但「點資料夾卻只是進去、選不到它」也同樣不合直覺。
+      <div
+        key={node.id}
+        className={`card-wrap${selecting && selectedIds.has(node.id) ? ' card-wrap--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
+        {...bookmarkDrag.cardProps(node.id)}
+      >
+        <button
+          type="button"
+          className="card card--folder"
+          data-nav=""
+          {...(selecting
+            ? { role: 'checkbox', 'aria-checked': selectedIds.has(node.id) }
+            : {})}
+          onClick={() => {
+            if (selecting) {
+              toggleSelect(node.id);
+              return;
+            }
+            go({ mode: 'bookmarks', folderId: node.id });
+            setQuery('');
+          }}
+          {...contextMenuHandlers(({ x, y }) => {
+            setMenu({ node, x, y });
+          })}
+        >
+          <span className="card__folder-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
+            </svg>
+          </span>
+          <span className="card__title">{node.title || t('folder_untitled_folder')}</span>
+          <span className="card__meta">{tn('unit_bookmarks', countLinks(node.children))}</span>
+        </button>
+        {selecting ? (
+          <>
+            <span
+              className={`card__check${selectedIds.has(node.id) ? ' card__check--on' : ''}`}
+              aria-hidden="true"
+            >
+              {selectedIds.has(node.id) ? '✓' : ''}
+            </span>
+            <button
+              type="button"
+              className="card__enter"
+              title={t('row_open_folder')}
+              aria-label={t('row_open_folder_named', node.title || t('folder_untitled'))}
+              onClick={() => {
+                go({ mode: 'bookmarks', folderId: node.id });
+                setQuery('');
+              }}
+            >
+              ›
+            </button>
+          </>
+        ) : null}
+      </div>
+    ) : selecting ? (
+      // 多選中整張卡片是勾選觸發區。維持成 <a> 會讓「點擊等於開啟」
+      // 與「點擊等於勾選」衝突，所以換成 button。
+      <button
+        key={node.id}
+        type="button"
+        className={`card card--select${selectedIds.has(node.id) ? ' card--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
+        {...bookmarkDrag.cardProps(node.id)}
+        data-nav=""
+        role="checkbox"
+        aria-checked={selectedIds.has(node.id)}
+        title={node.url}
+        onClick={() => {
+          toggleSelect(node.id);
+        }}
+        // 多選中的書籤卡片原本沒有右鍵選單（資料夾與隱私空間那邊都有），
+        // 表現成「同一批卡片有些能按右鍵、有些不能」
+        {...contextMenuHandlers(({ x, y }) => {
+          setMenu({ node, x, y });
+        })}
+      >
+        <span className="card__thumb">
+          <Thumb url={node.url} hostname={hostnameOf(node.url)} />
+          <span
+            className={`card__check${selectedIds.has(node.id) ? ' card__check--on' : ''}`}
+            aria-hidden="true"
+          >
+            {selectedIds.has(node.id) ? '✓' : ''}
+          </span>
+        </span>
+        <span className="card__title">{node.title || hostnameOf(node.url)}</span>
+        <span className="card__meta">{hostnameOf(node.url)}</span>
+      </button>
+    ) : (
+      <a
+        key={node.id}
+        className={`card${bookmarkDrag.dropClass(node.id)}`}
+        {...bookmarkDrag.cardProps(node.id)}
+        data-nav=""
+        href={node.url}
+        title={node.url}
+        onClick={(event) => {
+          event.preventDefault();
+          open(node.url, event.ctrlKey || event.metaKey);
+        }}
+        {...contextMenuHandlers(({ x, y }) => {
+          setMenu({ node, x, y });
+        })}
+      >
+        <span className="card__thumb">
+          <Thumb url={node.url} hostname={hostnameOf(node.url)} />
+        </span>
+        <span className="card__title">{node.title || hostnameOf(node.url)}</span>
+        <span className="card__meta">{hostnameOf(node.url)}</span>
+      </a>
+    );
+
+  /** 群組標題 ⋯ 選單的動作，兩個空間各接各的訊息 */
+  const groupCall = (
+    space: Mode,
+    groupId: string,
+    action: { kind: 'update'; patch: { name?: string; color?: number; collapsed?: boolean } } | { kind: 'dissolve' } | { kind: 'to-folder' },
+  ): void => {
+    if (space === 'vault') {
+      if (action.kind === 'update') {
+        void vault.groupUpdate(groupId, action.patch);
+      } else if (action.kind === 'dissolve') {
+        void vault.groupDissolve(groupId);
+      } else {
+        void vault.groupToFolder(groupId);
+      }
+      return;
+    }
+    if (currentFolder === undefined) {
+      return;
+    }
+    const parentId = currentFolder.id;
+    applyBookmarks(async () => {
+      if (action.kind === 'update') {
+        await request('groups/update', { folderId: parentId, groupId, patch: action.patch });
+      } else if (action.kind === 'dissolve') {
+        await request('groups/dissolve', { folderId: parentId, groupId });
+      } else {
+        await request('groups/to-folder', { folderId: parentId, groupId });
+      }
+    });
+  };
+
+  /** 右鍵選單的「設定 tag…」「移出群組」「攤平成群組」 */
+  const bookmarkTagActions = (node: BookmarkNode) => {
+    const groupId = bookmarkMemberOf.get(node.id) ?? null;
+    const name = view.groups.find((group) => group.id === groupId)?.name ?? '';
+    return {
+      onSetTag: (x: number, y: number) => {
+        setTagPrompt({ space: 'bookmarks' as const, ids: [node.id], current: name, x, y });
+      },
+      onLeave:
+        groupId === null || currentFolder === undefined
+          ? null
+          : () => {
+              const parentId = currentFolder.id;
+              applyBookmarks(async () => {
+                await request('groups/assign', { folderId: parentId, ids: [node.id], target: { kind: 'none' }, arrange: false });
+              });
+            },
+      onFlatten:
+        node.kind !== 'folder'
+          ? undefined
+          : node.children.some((child) => child.kind === 'folder')
+            ? null
+            : () => {
+                applyBookmarks(async () => {
+                  await request('groups/flatten', { folderId: node.id });
+                });
+              },
+    };
+  };
+
+  const vaultTagActions = (target: VaultMenuTarget) => {
+    if (target.kind === 'folder') {
+      const folder = target.folder;
+      return {
+        onSetTag: () => undefined,
+        onLeave: null,
+        onFlatten: view.folders.some((candidate) => candidate.parentId === folder.id)
+          ? null
+          : () => {
+              void vault.groupFlatten(folder.id);
+            },
+      };
+    }
+    const id = target.record.id;
+    const groupId = vaultMemberOf.get(id) ?? null;
+    const name = vaultGroups(view.layout, vaultFolderId).find((group) => group.id === groupId)?.name ?? '';
+    return {
+      onSetTag: (x: number, y: number) => {
+        setTagPrompt({ space: 'vault' as const, ids: [id], current: name, x, y });
+      },
+      onLeave:
+        groupId === null
+          ? null
+          : () => {
+              void vault.groupAssign(vaultFolderId, [id], { kind: 'none' }, false);
+            },
+    };
+  };
+
+  /** 群組標題列與卡片的群組動作，兩個空間各接各的訊息 */
+  const groupActions = (space: Mode, group: GroupInfo) => ({
+    toggle: () => {
+      if (space === 'vault') {
+        void vault.groupUpdate(group.id, { collapsed: !group.collapsed });
+      } else if (currentFolder !== undefined) {
+        const parentId = currentFolder.id;
+        applyBookmarks(async () => {
+          await request('groups/update', { folderId: parentId, groupId: group.id, patch: { collapsed: !group.collapsed } });
+        });
+      }
+    },
+  });
+
+  /**
+   * 畫出虛擬滾動範圍內的格子。
+   *
+   * 每張卡片包一層 `display: contents` 的 `.cell`：版面上它不存在（卡片照樣是網格的直接
+   * 子元素），但它的 class 能決定卡片要不要從新的一列開始（`cell--row-start`）、要不要畫
+   * 群組的底色 —— 不必改動每一種卡片自己的樣式。
+   */
+  const gridCells = <T extends { id: string }>(
+    model: GridModel<T>,
+    win: { start: number; end: number },
+    space: Mode,
+    render: (item: T) => ReactNode,
+  ): ReactNode[] => {
+    const drag = space === 'vault' ? vaultDrag : bookmarkDrag;
+    return model.cells.slice(win.start, win.end).map((cell, offset) => {
+      const at = win.start + offset;
+      if (cell.kind === 'header') {
+        const id = `${GROUP_PREFIX}${cell.group.id}`;
+        return (
+          <GroupHeader
+            key={id}
+            group={cell.group}
+            count={cell.count}
+            dropClass={drag.dropClass(id)}
+            drag={drag.cardProps(id)}
+            onToggle={groupActions(space, cell.group).toggle}
+            onMenu={(x, y) => {
+              setGroupMenu({ space, group: cell.group, x, y });
+            }}
+          />
+        );
+      }
+      const rowStart = model.rows[model.rowOfCell[at] ?? -1]?.start === at;
+      const group = cell.group;
+      return (
+        <div
+          key={cell.item.id}
+          className={`cell${rowStart ? ' cell--row-start' : ''}${group === null ? '' : ` cell--grouped group-c${String(group.color)}`}`}
+        >
+          {render(cell.item)}
+        </div>
+      );
+    });
+  };
+
   const vaultFolderCard = (folder: PrivateFolder) => (
     // 多選中點卡片是勾選，巡覽移到角落的箭頭（與側邊欄同一套規則）
     <div
@@ -1068,11 +1600,9 @@ export function Gallery() {
             className="grid"
             style={{ ...gridStyle, paddingTop: vaultGrid.padTop, paddingBottom: vaultGrid.padBottom }}
           >
-            {vaultRows
-              .slice(vaultGrid.start, vaultGrid.end)
-              .map((row) =>
-                row.kind === 'folder' ? vaultFolderCard(row.folder) : vaultBookmarkCard(row.record),
-              )}
+            {gridCells(vaultModel, vaultGrid, 'vault', ({ row }) =>
+              row.kind === 'folder' ? vaultFolderCard(row.folder) : vaultBookmarkCard(row.record),
+            )}
           </div>
         )
       ) : roots === null ? (
@@ -1088,123 +1618,7 @@ export function Gallery() {
           // 墊高用 padding：網格用空 div 佔位還得跨滿整列，padding 沒有這個問題
           style={{ ...gridStyle, paddingTop: gridRows.padTop, paddingBottom: gridRows.padBottom }}
         >
-          {nodes.slice(gridRows.start, gridRows.end).map((node) =>
-            node.kind === 'folder' ? (
-              // 多選中點卡片是勾選（與書籤卡片一致），巡覽移到角落的箭頭。
-              // 兩個動作各有自己的目標：資料夾不能點進去就沒得跨資料夾挑選，
-              // 但「點資料夾卻只是進去、選不到它」也同樣不合直覺。
-              <div
-                key={node.id}
-                className={`card-wrap${selecting && selectedIds.has(node.id) ? ' card-wrap--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
-                {...bookmarkDrag.cardProps(node.id)}
-              >
-                <button
-                  type="button"
-                  className="card card--folder"
-                  data-nav=""
-                  {...(selecting
-                    ? { role: 'checkbox', 'aria-checked': selectedIds.has(node.id) }
-                    : {})}
-                  onClick={() => {
-                    if (selecting) {
-                      toggleSelect(node.id);
-                      return;
-                    }
-                    go({ mode: 'bookmarks', folderId: node.id });
-                    setQuery('');
-                  }}
-                  {...contextMenuHandlers(({ x, y }) => {
-                    setMenu({ node, x, y });
-                  })}
-                >
-                  <span className="card__folder-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6">
-                      <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
-                    </svg>
-                  </span>
-                  <span className="card__title">{node.title || t('folder_untitled_folder')}</span>
-                  <span className="card__meta">{tn('unit_bookmarks', countLinks(node.children))}</span>
-                </button>
-                {selecting ? (
-                  <>
-                    <span
-                      className={`card__check${selectedIds.has(node.id) ? ' card__check--on' : ''}`}
-                      aria-hidden="true"
-                    >
-                      {selectedIds.has(node.id) ? '✓' : ''}
-                    </span>
-                    <button
-                      type="button"
-                      className="card__enter"
-                      title={t('row_open_folder')}
-                      aria-label={t('row_open_folder_named', node.title || t('folder_untitled'))}
-                      onClick={() => {
-                        go({ mode: 'bookmarks', folderId: node.id });
-                        setQuery('');
-                      }}
-                    >
-                      ›
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            ) : selecting ? (
-              // 多選中整張卡片是勾選觸發區。維持成 <a> 會讓「點擊等於開啟」
-              // 與「點擊等於勾選」衝突，所以換成 button。
-              <button
-                key={node.id}
-                type="button"
-                className={`card card--select${selectedIds.has(node.id) ? ' card--selected' : ''}${bookmarkDrag.dropClass(node.id)}`}
-                {...bookmarkDrag.cardProps(node.id)}
-                data-nav=""
-                role="checkbox"
-                aria-checked={selectedIds.has(node.id)}
-                title={node.url}
-                onClick={() => {
-                  toggleSelect(node.id);
-                }}
-                // 多選中的書籤卡片原本沒有右鍵選單（資料夾與隱私空間那邊都有），
-                // 表現成「同一批卡片有些能按右鍵、有些不能」
-                {...contextMenuHandlers(({ x, y }) => {
-                  setMenu({ node, x, y });
-                })}
-              >
-                <span className="card__thumb">
-                  <Thumb url={node.url} hostname={hostnameOf(node.url)} />
-                  <span
-                    className={`card__check${selectedIds.has(node.id) ? ' card__check--on' : ''}`}
-                    aria-hidden="true"
-                  >
-                    {selectedIds.has(node.id) ? '✓' : ''}
-                  </span>
-                </span>
-                <span className="card__title">{node.title || hostnameOf(node.url)}</span>
-                <span className="card__meta">{hostnameOf(node.url)}</span>
-              </button>
-            ) : (
-              <a
-                key={node.id}
-                className={`card${bookmarkDrag.dropClass(node.id)}`}
-                {...bookmarkDrag.cardProps(node.id)}
-                data-nav=""
-                href={node.url}
-                title={node.url}
-                onClick={(event) => {
-                  event.preventDefault();
-                  open(node.url, event.ctrlKey || event.metaKey);
-                }}
-                {...contextMenuHandlers(({ x, y }) => {
-                  setMenu({ node, x, y });
-                })}
-              >
-                <span className="card__thumb">
-                  <Thumb url={node.url} hostname={hostnameOf(node.url)} />
-                </span>
-                <span className="card__title">{node.title || hostnameOf(node.url)}</span>
-                <span className="card__meta">{hostnameOf(node.url)}</span>
-              </a>
-            ),
-          )}
+          {gridCells(bookmarkModel, gridRows, 'bookmarks', bookmarkCard)}
         </div>
       )}
 
@@ -1229,6 +1643,7 @@ export function Gallery() {
               ? { earlier: stepper('bookmarks', menu.node.id, -1), later: stepper('bookmarks', menu.node.id, 1) }
               : undefined
           }
+          tag={canDragBookmarks ? bookmarkTagActions(menu.node) : undefined}
         />
       ) : null}
 
@@ -1398,6 +1813,67 @@ export function Gallery() {
         />
       ) : null}
 
+      {groupMenu !== null ? (
+        <GroupMenu
+          group={groupMenu.group}
+          x={groupMenu.x}
+          y={groupMenu.y}
+          reorder={{
+            earlier: stepper(groupMenu.space, `${GROUP_PREFIX}${groupMenu.group.id}`, -1),
+            later: stepper(groupMenu.space, `${GROUP_PREFIX}${groupMenu.group.id}`, 1),
+          }}
+          onClose={() => {
+            setGroupMenu(null);
+          }}
+          onRename={(name) => {
+            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'update', patch: { name } });
+          }}
+          onColor={(color) => {
+            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'update', patch: { color } });
+          }}
+          onToggle={() => {
+            groupCall(groupMenu.space, groupMenu.group.id, {
+              kind: 'update',
+              patch: { collapsed: !groupMenu.group.collapsed },
+            });
+          }}
+          onDissolve={() => {
+            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'dissolve' });
+          }}
+          onToFolder={() => {
+            groupCall(groupMenu.space, groupMenu.group.id, { kind: 'to-folder' });
+          }}
+        />
+      ) : null}
+
+      {tagPrompt !== null ? (
+        <TagPrompt
+          x={tagPrompt.x}
+          y={tagPrompt.y}
+          current={tagPrompt.current}
+          names={(tagPrompt.space === 'vault' ? vaultGroups(view.layout, vaultFolderId) : view.groups)
+            .map((group) => group.name)
+            .filter((name) => name !== '')}
+          onClose={() => {
+            setTagPrompt(null);
+          }}
+          onSubmit={(name) => {
+            const { space, ids } = tagPrompt;
+            const target: GroupTarget = { kind: 'name', name };
+            if (space === 'vault') {
+              void vault.groupAssign(vaultFolderId, ids, target, true);
+              return;
+            }
+            if (currentFolder !== undefined) {
+              const parentId = currentFolder.id;
+              applyBookmarks(async () => {
+                await request('groups/assign', { folderId: parentId, ids, target, arrange: true });
+              });
+            }
+          }}
+        />
+      ) : null}
+
       {merge !== null ? (
         <MergeMenu
           x={merge.x}
@@ -1405,6 +1881,31 @@ export function Gallery() {
           onClose={() => {
             setMerge(null);
           }}
+          onCreateGroup={
+            // 群組是「一段書籤」：拖的或被疊上去的是資料夾時只能建資料夾
+            [merge.targetId, ...merge.ids].every((id) =>
+              merge.space === 'vault' ? vaultRowById.get(id)?.kind === 'bookmark' : index.byId.get(id)?.kind === 'link',
+            )
+              ? () => {
+                  const { space, targetId, ids } = merge;
+                  const members = [targetId, ...ids.filter((id) => id !== targetId)];
+                  const target: GroupTarget = { kind: 'new', name: '' };
+                  if (ids.length > 1) {
+                    exitSelection();
+                  }
+                  if (space === 'vault') {
+                    void vault.groupAssign(vaultFolderId, members, target, true);
+                    return;
+                  }
+                  if (currentFolder !== undefined) {
+                    const parentId = currentFolder.id;
+                    applyBookmarks(async () => {
+                      await request('groups/assign', { folderId: parentId, ids: members, target, arrange: true });
+                    });
+                  }
+                }
+              : undefined
+          }
           onCreateFolder={(name) => {
             const { space, targetId, ids } = merge;
             if (ids.length > 1) {
@@ -1461,6 +1962,7 @@ export function Gallery() {
             const id = vaultMenu.kind === 'bookmark' ? vaultMenu.record.id : vaultMenu.folder.id;
             return { earlier: stepper('vault', id, -1), later: stepper('vault', id, 1) };
           })()}
+          tag={vaultTagActions(vaultMenu)}
         />
       ) : null}
 
