@@ -173,7 +173,7 @@ Vault layout and groups are three sections of the encrypted layout document:
   (see [interface.md](interface.md#layout)); `columns: 0` is the tombstone for "back to
   automatic". There are no gaps, so the order is just the `order` section, which keeps being
   written in display order (a phase-2 device sees the same order).
-- `groups` — `{ id: { folderId, name, color, updatedAt, deleted? } }` (older entries may
+- `groups` — `{ id: { folderId, name, color, pinned?, updatedAt, deleted? } }` (`pinned` = colour picked by the user) (older entries may
   still carry `collapsed`; it is ignored). Groups that lose their last member get a
   tombstone rather than being removed, so an older copy elsewhere cannot bring them back.
 - `groupOf` — `{ recordId: { groupId | null, updatedAt } }`. Membership only counts when

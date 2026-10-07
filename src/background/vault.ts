@@ -1709,8 +1709,13 @@ function withBoard(
   out = withFolderOrder(out, folderId, readingOrder(next.grid), new Set([...live, ...readingOrder(next.grid)]), now);
   for (const group of next.groups) {
     const old = before.groups.find((item) => item.id === group.id);
-    if (old === undefined || old.name !== group.name || old.color !== group.color) {
-      out = withGroup(out, group.id, { folderId, name: group.name, color: group.color }, now);
+    if (old === undefined || old.name !== group.name || old.color !== group.color || old.pinned !== group.pinned) {
+      out = withGroup(
+        out,
+        group.id,
+        { folderId, name: group.name, color: group.color, ...(group.pinned === true ? { pinned: true as const } : {}) },
+        now,
+      );
     }
   }
   for (const group of before.groups) {
@@ -1865,7 +1870,12 @@ export async function moveVaultGroup(groupId: string, toFolderId: string | null,
     const target = vaultBoard(toFolderId, columns, out);
     const same = target.board.groups.find((item) => group.name !== '' && sameName(item.name, group.name));
     if (same === undefined) {
-      out = withGroup(out, groupId, { folderId: toFolderId, name: group.name, color: group.color }, now);
+      out = withGroup(
+        out,
+        groupId,
+        { folderId: toFolderId, name: group.name, color: group.color, ...(group.pinned === true ? { pinned: true as const } : {}) },
+        now,
+      );
     } else {
       out = withGroup(out, groupId, { folderId: entry.folderId, name: group.name, color: group.color, deleted: true }, now);
     }

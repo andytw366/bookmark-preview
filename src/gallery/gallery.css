@@ -412,6 +412,14 @@
 .e-r::before { border-right-width: 2px; }
 .e-b::before { border-bottom-width: 2px; }
 .e-l::before { border-left-width: 2px; }
+/*
+ * 緊貼著另一個群組的那一邊往內縮（`n-t/r/b/l`）：兩邊都畫在間距正中間的話，兩條線黏成一條粗線，
+ * 看不出是兩個群組。各縮 4px，中間留 8px 的空隙。
+ */
+.n-t::before { top: -4px; }
+.n-r::before { right: -4px; }
+.n-b::before { bottom: -4px; }
+.n-l::before { left: -4px; }
 .e-t.e-l::before { border-top-left-radius: 10px; }
 .e-t.e-r::before { border-top-right-radius: 10px; }
 .e-b.e-l::before { border-bottom-left-radius: 10px; }

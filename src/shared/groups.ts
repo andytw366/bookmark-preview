@@ -14,6 +14,11 @@ export interface GroupInfo {
   name: string;
   /** `GROUP_COLORS` 的索引 */
   color: number;
+  /**
+   * 顏色是使用者自己在選單裡挑的。沒挑過的群組在畫面上會自動換色，避免和相鄰的群組同色
+   * （`displayColors`）；挑過的照使用者的意思，不自動換。
+   */
+  pinned?: boolean;
 }
 
 /** 群組框線的顏色。只存索引：顏色本身由樣式決定，深色主題可以換一組 */

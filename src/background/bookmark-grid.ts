@@ -140,7 +140,12 @@ async function load(folderId: string, autoColumns: number): Promise<Loaded> {
     fixed: columns > 0,
     children: ids,
     autoColumns,
-    groups: (doc?.groups ?? []).map(({ id, name, color }) => ({ id, name, color })),
+    groups: (doc?.groups ?? []).map(({ id, name, color, pinned }) => ({
+      id,
+      name,
+      color,
+      ...(pinned === true ? { pinned } : {}),
+    })),
     groupOf: (id) => groupOf.get(id) ?? null,
   });
   return { doc, board, links: new Set(children.filter((node) => node.url !== undefined).map((node) => node.id)) };

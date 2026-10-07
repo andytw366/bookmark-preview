@@ -64,6 +64,8 @@ export interface VaultGroupEntry extends LayoutEntry {
   folderId: string | null;
   name: string;
   color: number;
+  /** 顏色是使用者挑的（見 `GroupInfo.pinned`） */
+  pinned?: true;
   deleted?: true;
 }
 
@@ -321,7 +323,12 @@ function groupEntries(layout: VaultLayout): [string, VaultGroupEntry][] {
 export function vaultGroups(layout: VaultLayout, folderId: string | null): GroupInfo[] {
   return groupEntries(layout)
     .filter(([, entry]) => entry.folderId === folderId)
-    .map(([id, entry]) => ({ id, name: entry.name, color: entry.color }));
+    .map(([id, entry]) => ({
+      id,
+      name: entry.name,
+      color: entry.color,
+      ...(entry.pinned === true ? { pinned: true } : {}),
+    }));
 }
 
 export function vaultGroupEntry(layout: VaultLayout, groupId: string): VaultGroupEntry | null {

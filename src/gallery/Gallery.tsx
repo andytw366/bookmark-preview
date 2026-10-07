@@ -19,6 +19,7 @@ import {
 } from '@/shared/vault-layout';
 import {
   buildBoard,
+  displayColors,
   labelCell,
   labels,
   layoutGrid,
@@ -28,7 +29,7 @@ import {
   type GridOp,
 } from '@/shared/board';
 import { MAX_COLUMNS, MIN_COLUMNS, navCell, outlineEdges, stepCell, type Direction, type Grid } from '@/shared/grid';
-import type { GroupInfo } from '@/shared/groups';
+import { GROUP_COLORS, type GroupInfo } from '@/shared/groups';
 import { hostnameOf } from '@/shared/url';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
 import { Breadcrumb } from '../sidebar/components/Breadcrumb';
@@ -491,7 +492,7 @@ export function Gallery() {
     fixed: inFolderView && (view.grid?.columns ?? 0) > 0,
     children: nodes.map((node) => node.id),
     autoColumns: columns,
-    groups: inFolderView ? (view.grid?.groups ?? []).map(({ id, name, color }) => ({ id, name, color })) : [],
+    groups: inFolderView ? (view.grid?.groups ?? []).map(({ members: _members, ...group }) => group) : [],
     groupOf: (id) => bookmarkGroupOf.get(id) ?? null,
   });
   // 版面還在讀：先不畫，免得先畫一次沒有群組、欄數不對的再跳一下
@@ -1144,9 +1145,19 @@ export function Gallery() {
   ): ReactNode[] => {
     const drag = space === 'vault' ? vaultDrag : bookmarkDrag;
     const shown = shownOf(space);
-    const edges = outlineEdges(shown, (id) => board.memberOf.get(id) ?? null);
-    const groupById = new Map(board.groups.map((group) => [group.id, group]));
+    const groupOf = (id: string | undefined): string | null => (id === undefined ? null : (board.memberOf.get(id) ?? null));
+    const edges = outlineEdges(shown, groupOf);
+    // 相鄰的群組不同色（使用者挑過的不動），標籤與選單也用這個顏色
+    const colors = displayColors(board, shown, GROUP_COLORS);
+    const groupById = new Map(
+      board.groups.map((group) => [group.id, { ...group, color: colors.get(group.id) ?? group.color }]),
+    );
     const tags = labels(board, shown);
+    /** 這一邊緊貼著**另一個**群組：框線往內縮，兩個群組之間才看得出分界 */
+    const facesOther = (index: number, group: string): boolean => {
+      const other = groupOf(shown.cells[index]);
+      return other !== null && other !== group;
+    };
     const out: ReactNode[] = [];
     for (let at = win.start; at < win.end; at += 1) {
       const id = shown.cells[at];
@@ -1156,11 +1167,17 @@ export function Gallery() {
       }
       const edge = edges.get(at);
       const group = groupById.get(board.memberOf.get(id) ?? '');
+      const col = at % shown.columns;
+      const near =
+        group === undefined
+          ? ''
+          : `${facesOther(at - shown.columns, group.id) ? ' n-t' : ''}${col < shown.columns - 1 && facesOther(at + 1, group.id) ? ' n-r' : ''}${facesOther(at + shown.columns, group.id) ? ' n-b' : ''}${col > 0 && facesOther(at - 1, group.id) ? ' n-l' : ''}`;
       const outline =
         edge === undefined || group === undefined
           ? ''
-          : ` cell--g group-c${String(group.color)}${edge.top ? ' e-t' : ''}${edge.right ? ' e-r' : ''}${edge.bottom ? ' e-b' : ''}${edge.left ? ' e-l' : ''}`;
-      const tag = tags.get(at);
+          : ` cell--g group-c${String(group.color)}${edge.top ? ' e-t' : ''}${edge.right ? ' e-r' : ''}${edge.bottom ? ' e-b' : ''}${edge.left ? ' e-l' : ''}${near}`;
+      const tagged = tags.get(at);
+      const tag = tagged === undefined ? undefined : groupById.get(tagged.id);
       out.push(
         <div key={id} className={`cell${outline}${drag.dropClass(at)}`} data-cell={at}>
           {render(id)}

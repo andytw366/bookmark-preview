@@ -218,7 +218,14 @@ the part above), so the group never splits at a row end. Later cards flow into t
 cells around it. Order and screen position therefore differ; drops are converted back
 (`orderIndexAt`), and arrow keys / `Ctrl+Shift+arrow` follow what is on screen.
 Each cell draws its own part of the outline (`outlineEdges`: a side is drawn when the
-neighbour is not in the same group), extending 8px into the gap so neighbours join.
+neighbour is not in the same group), extending 8px into the gap so neighbours join; a side
+that touches **another** group pulls back to 4px (`n-t/r/b/l`), leaving a visible gap
+between the two outlines.
+
+**Colours**: groups that touch never show the same colour (`displayColors`). A group whose
+colour you picked in its menu keeps it (`pinned`); the others are shown in a colour their
+neighbours do not use. Only the display changes — the stored colour comes back once the
+neighbour moves away.
 
 **Bookmarks** keep one document per folder under `grid:<folder guid>` in `storage.local`
 (`{ v, columns, groups: [{ id, name, color, members }], updatedAt, deviceId }`, `columns: 0`

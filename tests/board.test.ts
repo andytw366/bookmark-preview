@@ -244,3 +244,42 @@ describe('畫面的擺法：群組永遠是上下接著的一整塊', () => {
     expect(order(run(b, { kind: 'nudge', id: 'b', direction: 'down' }))).toBe('acdefb');
   });
 });
+
+describe('相鄰的群組不同色', () => {
+  const make = (pinnedH: boolean) =>
+    buildBoard({
+      stored: { columns: 4, cells: ['a', 'b', 'c', 'd', 'e'] },
+      fixed: true,
+      children: ['a', 'b', 'c', 'd', 'e'],
+      autoColumns: 4,
+      groups: [
+        { id: 'G', name: 'G', color: 0 },
+        { id: 'H', name: 'H', color: 0, ...(pinnedH ? { pinned: true } : {}) },
+        { id: 'K', name: 'K', color: 0 },
+      ],
+      groupOf: (id) => ({ a: 'G', b: 'G', c: 'H', e: 'K' })[id] ?? null,
+    });
+
+  it('撞色的換成鄰居沒用到的；不相鄰的照原本的顏色', async () => {
+    const { displayColors } = await import('@/shared/board');
+    const b = make(false);
+    const colors = displayColors(b, layoutGrid(b), 6);
+    expect(colors.get('G')).toBe(0);
+    expect(colors.get('H')).not.toBe(0);
+    // K 在下一列第 0 欄，正上方是 G 的 a → 也要換
+    expect(colors.get('K')).not.toBe(0);
+  });
+
+  it('使用者挑過的顏色不動，換的是另一邊', async () => {
+    const { displayColors } = await import('@/shared/board');
+    const b = make(true);
+    const colors = displayColors(b, layoutGrid(b), 6);
+    expect(colors.get('H')).toBe(0);
+    expect(colors.get('G')).not.toBe(0);
+  });
+
+  it('在選單挑顏色 = 釘住', () => {
+    const next = run(board('ab', { a: 'G' }), { kind: 'group-update', groupId: 'G', color: 3 });
+    expect(next.groups[0]).toMatchObject({ color: 3, pinned: true });
+  });
+});

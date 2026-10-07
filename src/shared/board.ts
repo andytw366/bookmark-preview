@@ -385,6 +385,7 @@ export function applyOp(input: Board, op: GridOp, ctx: OpContext): Board {
       }
       if (op.color !== undefined) {
         group.color = op.color;
+        group.pinned = true;
       }
       break;
     }
@@ -578,4 +579,63 @@ export function orderIndexAt(board: Board, shown: Grid, cell: number, aimed: str
   }
   const next = shown.cells.slice(cell).find((id) => id !== '');
   return next === undefined ? cells.length : cells.indexOf(next);
+}
+
+/**
+ * 畫面上每個群組用的顏色：相鄰（上下左右碰在一起）的群組不要同色。
+ *
+ * 使用者挑過顏色的（`pinned`）照挑的；其餘照順序一個一個看，自己的顏色和已經決定的鄰居撞色時，
+ * 換成鄰居沒用到、而且這個資料夾裡用得最少的那個。只影響畫面，存下來的顏色不動 ——
+ * 鄰居搬走之後就變回原本的顏色。
+ */
+export function displayColors(board: Board, shown: Grid, colors: number): Map<string, number> {
+  const groupAt = (index: number): string | undefined => board.memberOf.get(shown.cells[index] ?? '');
+  const neighbours = new Map<string, Set<string>>();
+  shown.cells.forEach((id, index) => {
+    const group = board.memberOf.get(id);
+    if (group === undefined) {
+      return;
+    }
+    const col = index % shown.columns;
+    const around = [
+      groupAt(index - shown.columns),
+      groupAt(index + shown.columns),
+      col > 0 ? groupAt(index - 1) : undefined,
+      col < shown.columns - 1 ? groupAt(index + 1) : undefined,
+    ];
+    for (const other of around) {
+      if (other !== undefined && other !== group) {
+        neighbours.set(group, (neighbours.get(group) ?? new Set()).add(other));
+      }
+    }
+  });
+  const out = new Map<string, number>();
+  for (const group of board.groups) {
+    if (group.pinned === true) {
+      out.set(group.id, group.color);
+    }
+  }
+  const used = new Array<number>(colors).fill(0);
+  for (const group of board.groups) {
+    used[((group.color % colors) + colors) % colors] = (used[((group.color % colors) + colors) % colors] ?? 0) + 1;
+  }
+  const order = [...board.groups].sort(
+    (a, b) => shown.cells.findIndex((id) => board.memberOf.get(id) === a.id) - shown.cells.findIndex((id) => board.memberOf.get(id) === b.id),
+  );
+  for (const group of order) {
+    if (out.has(group.id)) {
+      continue;
+    }
+    const taken = new Set([...(neighbours.get(group.id) ?? [])].flatMap((other) => {
+      const color = out.get(other) ?? board.groups.find((item) => item.id === other && item.pinned === true)?.color;
+      return color === undefined ? [] : [color];
+    }));
+    let color = group.color;
+    if (taken.has(color)) {
+      const free = Array.from({ length: colors }, (_, index) => index).filter((index) => !taken.has(index));
+      color = free.reduce((best, index) => ((used[index] ?? 0) < (used[best] ?? 0) ? index : best), free[0] ?? color);
+    }
+    out.set(group.id, color);
+  }
+  return out;
 }
