@@ -217,13 +217,15 @@ its row and the remaining members continue on the next row **directly underneath
 the part above), so the group never splits at a row end. Later cards flow into the free
 cells around it. Order and screen position therefore differ; drops are converted back
 (`orderIndexAt`), and arrow keys / `Ctrl+Shift+arrow` follow what is on screen.
-Each cell draws its own part of the outline (`outlineEdges`: a side is drawn when the
-neighbour is not in the same group). Outlined sides extend only 4px into the 16px gap, so
-two touching groups keep an 8px space between their frames; joining sides extend 8px so
-neighbours meet. Inner (concave) corners need two extra fixes in `gallery.css`: joining
-sides next to an outlined side extend to 14px so the two lines meet, and the cell on the
-other side of the corner has that corner clipped (`k-tl/tr/br/bl`) so its tint does not
-poke out of the frame. The tint is opaque so the overlaps don't show as darker stripes.
+**Outline**: each group is drawn as **one SVG path** in a layer under the cards
+(`GroupOutlines`). It measures the rendered member cells, grows each by 4px, bridges the
+gaps between neighbouring members (and the cross-shaped gap inside a 2×2 block), takes the
+union and traces its boundary, then rounds every corner (`src/shared/outline.ts`). Two
+touching groups therefore keep an 8px space between their frames, and inner corners of
+L-shapes and staircases are as clean as outer ones. An earlier version let every cell draw
+its own piece of the frame; corners then had to be patched case by case and some never
+lined up. Only rendered rows are measured — the part of a group outside the virtual
+window is off screen anyway. A `ResizeObserver` re-measures when card heights change.
 
 **Colours**: groups that touch never show the same colour (`displayColors`). A group whose
 colour you picked in its menu keeps it (`pinned`); the others are shown in a colour their

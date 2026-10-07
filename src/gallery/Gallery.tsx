@@ -28,7 +28,7 @@ import {
   type Board,
   type GridOp,
 } from '@/shared/board';
-import { MAX_COLUMNS, MIN_COLUMNS, navCell, outlineEdges, stepCell, type Direction, type Grid } from '@/shared/grid';
+import { MAX_COLUMNS, MIN_COLUMNS, navCell, stepCell, type Direction, type Grid } from '@/shared/grid';
 import { GROUP_COLORS, type GroupInfo } from '@/shared/groups';
 import { hostnameOf } from '@/shared/url';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
@@ -65,6 +65,7 @@ import { buildIndex, countLinks, pathTo, searchLinks } from '../sidebar/lib/tree
 import { vaultPathTo } from '../sidebar/lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
 import { useGridDrag } from './useGridDrag';
+import { GroupOutlines } from './GroupOutlines';
 import { GroupTag } from './GroupTag';
 import { GroupMenu } from './GroupMenu';
 import { TagPrompt } from '../sidebar/components/TagItems';
@@ -611,6 +612,9 @@ export function Gallery() {
 
   const boardOf = (space: Mode): Board => (space === 'vault' ? vaultBoard : bookmarkBoard);
   const shownOf = (space: Mode): Grid => (space === 'vault' ? vaultShown : bookmarkShown);
+  const bookmarkColors = displayColors(bookmarkBoard, bookmarkShown, GROUP_COLORS);
+  const vaultColors = displayColors(vaultBoard, vaultShown, GROUP_COLORS);
+  const colorsOf = (space: Mode): ReadonlyMap<string, number> => (space === 'vault' ? vaultColors : bookmarkColors);
 
   /** 一個版面操作。`columns` 是畫面現在的欄數：還沒定下來的資料夾就用它定下來 */
   const gridOp = (space: Mode, op: GridOp): void => {
@@ -1134,8 +1138,8 @@ export function Gallery() {
   /**
    * 畫出虛擬滾動範圍內的格子。
    *
-   * 每一格是一個 `.cell`（`data-cell` = 格子索引，拖拽與方向鍵都認它）。群組的框線畫在格子上
-   * （`cell--g` + 要畫的那幾邊 `e-t/r/b/l`，見 `outlineEdges`），名稱標籤放在第一個成員那一格。
+   * 每一格是一個 `.cell`（`data-cell` = 畫面上的格子索引，拖拽與方向鍵都認它）。群組的框線不畫在格子上，
+   * 是墊在底下的一層 SVG（`GroupOutlines`）；名稱標籤放在第一個成員那一格。
    */
   const gridCells = (
     space: Mode,
@@ -1145,10 +1149,8 @@ export function Gallery() {
   ): ReactNode[] => {
     const drag = space === 'vault' ? vaultDrag : bookmarkDrag;
     const shown = shownOf(space);
-    const groupOf = (id: string | undefined): string | null => (id === undefined ? null : (board.memberOf.get(id) ?? null));
-    const edges = outlineEdges(shown, groupOf);
     // 相鄰的群組不同色（使用者挑過的不動），標籤與選單也用這個顏色
-    const colors = displayColors(board, shown, GROUP_COLORS);
+    const colors = colorsOf(space);
     const groupById = new Map(
       board.groups.map((group) => [group.id, { ...group, color: colors.get(group.id) ?? group.color }]),
     );
@@ -1160,29 +1162,10 @@ export function Gallery() {
         out.push(<div key={`slot:${String(at)}`} className={`cell cell--empty${drag.dropClass(at)}`} data-cell={at} />);
         continue;
       }
-      const edge = edges.get(at);
-      const group = groupById.get(board.memberOf.get(id) ?? '');
-      // 內角：兩邊都連著同組、斜對角卻不是 —— 那個角的底色要切掉（見 gallery.css 的 k-*）
-      const col = at % shown.columns;
-      const same = (index: number, ok: boolean): boolean =>
-        ok && group !== undefined && groupOf(shown.cells[index]) === group.id;
-      const up = same(at - shown.columns, true);
-      const down = same(at + shown.columns, true);
-      const left = same(at - 1, col > 0);
-      const right = same(at + 1, col < shown.columns - 1);
-      const corners =
-        (up && left && !same(at - shown.columns - 1, col > 0) ? ' k-tl' : '') +
-        (up && right && !same(at - shown.columns + 1, col < shown.columns - 1) ? ' k-tr' : '') +
-        (down && right && !same(at + shown.columns + 1, col < shown.columns - 1) ? ' k-br' : '') +
-        (down && left && !same(at + shown.columns - 1, col > 0) ? ' k-bl' : '');
-      const outline =
-        edge === undefined || group === undefined
-          ? ''
-          : ` cell--g group-c${String(group.color)}${edge.top ? ' e-t' : ''}${edge.right ? ' e-r' : ''}${edge.bottom ? ' e-b' : ''}${edge.left ? ' e-l' : ''}${corners}`;
       const tagged = tags.get(at);
       const tag = tagged === undefined ? undefined : groupById.get(tagged.id);
       out.push(
-        <div key={id} className={`cell${outline}${drag.dropClass(at)}`} data-cell={at}>
+        <div key={id} className={`cell${drag.dropClass(at)}`} data-cell={at}>
           {render(id)}
           {tag !== undefined ? (
             <GroupTag
@@ -1640,6 +1623,7 @@ export function Gallery() {
               className={gridClass(vaultBoard)}
               style={{ ...gridStyleFor(vaultBoard), paddingTop: vaultGrid.padTop, paddingBottom: vaultGrid.padBottom }}
             >
+              <GroupOutlines gridRef={vaultGridRef} board={vaultBoard} shown={vaultShown} colors={vaultColors} />
               {gridCells('vault', vaultBoard, vaultGrid, (id) => {
                 const row = vaultRowById.get(id);
                 return row === undefined
@@ -1666,6 +1650,7 @@ export function Gallery() {
               // 墊高用 padding：網格用空 div 佔位還得跨滿整列，padding 沒有這個問題
               style={{ ...gridStyleFor(bookmarkBoard), paddingTop: gridRows.padTop, paddingBottom: gridRows.padBottom }}
             >
+              <GroupOutlines gridRef={gridRef} board={bookmarkBoard} shown={bookmarkShown} colors={bookmarkColors} />
               {gridCells('bookmarks', bookmarkBoard, gridRows, (id) => {
                 const node = index.byId.get(id);
                 return node === undefined ? null : bookmarkCard(node);

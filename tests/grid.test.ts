@@ -5,7 +5,6 @@ import {
   insertAt,
   navCell,
   normalize,
-  outlineEdges,
   placeAuto,
   setColumns,
   stepCell,
@@ -44,20 +43,6 @@ describe('normalize / placeAuto', () => {
 
   it('沒有位置的接在最後', () => {
     expect(s(placeAuto(g('ba'), ['a', 'b', 'c']))).toBe('bac');
-  });
-});
-
-describe('框線', () => {
-  it('階梯形：鄰格不是同一組就畫那一邊', () => {
-    // 3 欄：a G H / I J b
-    const grid = g('aGHIJb', 3);
-    const groupOf = (id: string) => ('GHIJ'.includes(id) ? 'g' : null);
-    const edges = outlineEdges(grid, groupOf);
-    expect(edges.get(1)).toEqual({ top: true, right: false, bottom: false, left: true });
-    expect(edges.get(2)).toEqual({ top: true, right: true, bottom: true, left: false });
-    expect(edges.get(3)).toEqual({ top: true, right: false, bottom: true, left: true });
-    expect(edges.get(4)).toEqual({ top: false, right: true, bottom: true, left: false });
-    expect(edges.has(0)).toBe(false);
   });
 });
 

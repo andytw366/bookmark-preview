@@ -365,8 +365,6 @@
   position: relative;
   display: flex;
   min-width: 0;
-  /* 群組框線的 z-index: -1 要壓在卡片底下、又不能跑到整頁背景後面 */
-  isolation: isolate;
 }
 
 .cell > .card,
@@ -394,84 +392,39 @@
 .group-c5 { --group-color: #1fa3b8; }
 
 /*
- * 群組的框：每一格各畫自己的那一塊（連到同組鄰格的那幾邊往外擴 8px = 網格間距的一半，剛好接上），
- * 只在「鄰格不是同一組」的那幾邊畫線（`e-t/r/b/l`，`outlineEdges` 算的）；
- * 兩邊都有線的角是凸角，畫圓角。群組換行之後是階梯形，也一樣接得起來，不必包一層容器。
+ * 群組的框：每個群組一條路徑，墊在卡片底下的一層 SVG 裡（`GroupOutlines`，幾何在 `shared/outline.ts`）。
+ * 網格是它的定位基準；格子疊在它上面。
  */
-.cell--g::before {
+.grid {
+  position: relative;
+  isolation: isolate;
+}
+
+.cell {
+  z-index: 1;
+}
+
+.group-outlines {
   position: absolute;
-  inset: -8px;
-  z-index: -1;
-  /* 不透明：連接邊會互相重疊幾 px（見下面的轉角），半透明的話重疊處會深一條 */
-  background: color-mix(in srgb, var(--group-color) 8%, var(--bg));
-  border: 0 solid var(--group-color);
-  content: '';
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   pointer-events: none;
 }
 
-.e-t::before { border-top-width: 2px; }
-.e-r::before { border-right-width: 2px; }
-.e-b::before { border-bottom-width: 2px; }
-.e-l::before { border-left-width: 2px; }
-/*
- * 畫線的那幾邊只往外擴 4px（間距的四分之一）：兩個群組相鄰時中間留 8px 的空隙，不會黏成一條粗線。
- * 連到同一組鄰格的那幾邊才擴滿 8px，和鄰格接起來。
- */
-.e-t::before { top: -4px; }
-.e-r::before { right: -4px; }
-.e-b::before { bottom: -4px; }
-.e-l::before { left: -4px; }
-
-/*
- * 凹進去的轉角（L 形的內角）。畫線的邊只擴 4px、連接的邊擴 8px，兩條線會各短一截接不上：
- *
- * 1. 「旁邊有畫線」的連接邊多伸 6px（-14px = 再多一條線寬），讓兩條線在轉角正好接上；
- *    重疊的部分在卡片之間的間距裡，底色不透明所以不會深一條。
- * 2. 兩邊都連著、但斜對角不是同組的那一格（內角的另一側），它的底色會凸出到框外 4×4px：
- *    `k-tl/tr/br/bl` 把那個角切掉。
- */
-.cell--g:not(.e-t):is(.e-l, .e-r)::before { top: -14px; }
-.cell--g:not(.e-b):is(.e-l, .e-r)::before { bottom: -14px; }
-.cell--g:not(.e-l):is(.e-t, .e-b)::before { left: -14px; }
-.cell--g:not(.e-r):is(.e-t, .e-b)::before { right: -14px; }
-
-.cell--g {
-  --k-tl: 0px;
-  --k-tr: 0px;
-  --k-br: 0px;
-  --k-bl: 0px;
+.group-outline {
+  fill: color-mix(in srgb, var(--group-color) 8%, transparent);
+  stroke: var(--group-color);
+  stroke-width: 2px;
 }
-
-.k-tl { --k-tl: 4px; }
-.k-tr { --k-tr: 4px; }
-.k-br { --k-br: 4px; }
-.k-bl { --k-bl: 4px; }
-
-.cell--g:is(.k-tl, .k-tr, .k-br, .k-bl)::before {
-  clip-path: polygon(
-    var(--k-tl) 0,
-    calc(100% - var(--k-tr)) 0,
-    calc(100% - var(--k-tr)) var(--k-tr),
-    100% var(--k-tr),
-    100% calc(100% - var(--k-br)),
-    calc(100% - var(--k-br)) calc(100% - var(--k-br)),
-    calc(100% - var(--k-br)) 100%,
-    var(--k-bl) 100%,
-    var(--k-bl) calc(100% - var(--k-bl)),
-    0 calc(100% - var(--k-bl)),
-    0 var(--k-tl),
-    var(--k-tl) var(--k-tl)
-  );
-}
-.e-t.e-l::before { border-top-left-radius: 10px; }
-.e-t.e-r::before { border-top-right-radius: 10px; }
-.e-b.e-l::before { border-bottom-left-radius: 10px; }
-.e-b.e-r::before { border-bottom-right-radius: 10px; }
 
 /* 群組名稱：貼在框左上角的小色塊，壓在框線上。點它開選單、拖它整組搬 */
 .group-tag {
   position: absolute;
-  top: -18px;
+  top: -13px;
   left: 0;
   z-index: 2;
   max-width: calc(100% - 8px);
@@ -495,7 +448,7 @@
   width: 22px;
   height: 14px;
   padding: 0;
-  top: -15px;
+  top: -11px;
 }
 
 .group-tag:focus-visible {

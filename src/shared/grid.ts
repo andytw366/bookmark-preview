@@ -119,39 +119,6 @@ export function stepCell(grid: Grid, index: number, direction: Direction): numbe
   return next === null || next < 0 || next >= grid.cells.length ? null : next;
 }
 
-export interface Edges {
-  top: boolean;
-  right: boolean;
-  bottom: boolean;
-  left: boolean;
-}
-
-/**
- * 每一格的上下左右哪幾邊要畫框：鄰格不是同一個群組（或沒有鄰格）就畫。
- * 回傳只含屬於群組的格子。群組是連續的一段，所以畫出來是一塊階梯形。
- */
-export function outlineEdges(grid: Grid, groupOf: (id: string) => string | null): Map<number, Edges> {
-  const groupAt = (index: number): string | null => {
-    const id = grid.cells[index];
-    return id === undefined ? null : groupOf(id);
-  };
-  const out = new Map<number, Edges>();
-  grid.cells.forEach((id, index) => {
-    const group = groupOf(id);
-    if (group === null) {
-      return;
-    }
-    const col = colOf(grid, index);
-    out.set(index, {
-      top: index - grid.columns < 0 || groupAt(index - grid.columns) !== group,
-      right: col === grid.columns - 1 || groupAt(index + 1) !== group,
-      bottom: groupAt(index + grid.columns) !== group,
-      left: col === 0 || groupAt(index - 1) !== group,
-    });
-  });
-  return out;
-}
-
 /** 改欄數：順序不變，只是換行的位置變了 */
 export function setColumns(grid: Grid, columns: number): Grid {
   return { columns: clampColumns(columns), cells: grid.cells };
