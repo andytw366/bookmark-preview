@@ -89,7 +89,7 @@ and an older version rebuilding records field by field would strip anything it d
 know — after which the two devices' fingerprints never agree and they overwrite each other
 every two seconds. Old versions simply never touch the layout keys.
 
-From phase 3 the layout also carries vault grids and groups (`grid`, `groups`, `groupOf`);
+From phase 3 the layout also carries vault column counts and groups (`grid`, `groups`, `groupOf`);
 they sync and back up the same way.
 
 Both documents share the 100 KB quota, so each upload checks that it fits **together with
@@ -105,10 +105,11 @@ rather than dropped.
 
 ### Bookmark layout and groups sync too (on by default)
 
-The native bookmarks' grids and groups (`grid:<folder guid>`, see
-[interface.md](interface.md#groups-tags)) are copied to `storage.sync` under the same keys.
-They are plain bookmark data, so this is **on by default** (Options → *Bookmark layout and
-groups*); turning it off removes the cloud copies and keeps the local ones.
+The native bookmarks' groups and pinned column counts (`grid:<folder guid>`, see
+[interface.md](interface.md#groups-tags)) are copied to `storage.sync` under the same keys
+(the order itself is Firefox's bookmark order and syncs with the bookmarks). They are plain
+bookmark data, so this is **on by default** (Options → *Bookmark layout and groups*);
+turning it off removes the cloud copies and keeps the local ones.
 
 - Each folder is one item; the newer document wins (`updatedAt`, then `deviceId`). Firefox
   Sync keeps bookmark GUIDs identical across devices, which is what makes this work.
@@ -117,7 +118,7 @@ groups*); turning it off removes the cloud copies and keeps the local ones.
   entirely (cloud copies removed) and the options page lists the largest folders — the space
   stays with the vault.
 - Remote removals never delete local documents (stopping because of the budget would
-  otherwise wipe other devices); "back to automatic" is a `columns: 0` tombstone instead.
+  otherwise wipe other devices).
 
 Not verified with two real devices (a single profile cannot be two devices): checked that
 the `grid:*` items in `storage-sync-v2.sqlite` are correct and that turning the option off

@@ -1,5 +1,4 @@
 import type { GroupInfo } from './groups';
-import { decodeCells, type Grid } from './grid';
 import { textDigest } from './vault-merge';
 
 /**
@@ -87,17 +86,16 @@ function isGroupEntry(entry: LayoutEntry): entry is VaultGroupEntry {
 }
 
 /**
- * `grid` 區段（第 3 期改版）：一個資料夾一筆固定格子，鍵與 `order` 相同。
- * `columns: 0` 是墓碑 = 恢復成自動排列（刪掉那一筆的話，另一台裝置的舊格子會在合併時回來）。
- * `order` 區段照樣寫（= 格子的閱讀順序），第 2 期的裝置才看得到合理的順序。
+ * `grid` 區段：一個資料夾一筆，鍵與 `order` 相同，只記**使用者定下來的欄數**
+ * （`columns: 0` = 恢復成自動排列的墓碑；刪掉那一筆的話另一台裝置的舊值會在合併時回來）。
+ * 卡片緊密排列、不留空格，所以順序就是 `order` 區段，不另外存。
  */
 export interface FolderGridEntry extends LayoutEntry {
   columns: number;
-  cells: string[];
 }
 
 function isGridEntry(entry: LayoutEntry): entry is FolderGridEntry {
-  return typeof entry.columns === 'number' && decodeCells(entry.cells) !== null;
+  return typeof entry.columns === 'number';
 }
 
 function isGroupOf(entry: LayoutEntry): entry is GroupOfEntry {
@@ -365,26 +363,22 @@ export function withGroupOf(
   return next;
 }
 
-// ── 固定格子 ─────────────────────────────────────────────────────────
+// ── 欄數 ─────────────────────────────────────────────────────────────
 
-/** 這個資料夾定下來的格子；還沒定下來（或恢復成自動排列）是 null */
-export function folderGrid(layout: VaultLayout, folderId: string | null): Grid | null {
+/** 使用者定下來的欄數；還沒定（或恢復成自動排列）是 null */
+export function folderColumns(layout: VaultLayout, folderId: string | null): number | null {
   const entry = layout.sections.grid?.[folderKey(folderId)];
-  if (entry === undefined || !isGridEntry(entry) || entry.columns <= 0) {
-    return null;
-  }
-  return { columns: entry.columns, cells: decodeCells(entry.cells) ?? [] };
+  return entry !== undefined && isGridEntry(entry) && entry.columns > 0 ? entry.columns : null;
 }
 
-/** `grid` null = 恢復自動排列（寫墓碑） */
-export function withFolderGrid(
+/** `columns` null = 恢復自動排列（寫墓碑） */
+export function withFolderColumns(
   layout: VaultLayout,
   folderId: string | null,
-  grid: Grid | null,
+  columns: number | null,
   now: number = Date.now(),
 ): VaultLayout {
   const next = sanitizeLayout(layout);
-  (next.sections.grid ??= {})[folderKey(folderId)] =
-    grid === null ? { columns: 0, cells: [], updatedAt: now } : { columns: grid.columns, cells: [...grid.cells], updatedAt: now };
+  (next.sections.grid ??= {})[folderKey(folderId)] = { columns: columns ?? 0, updatedAt: now };
   return next;
 }

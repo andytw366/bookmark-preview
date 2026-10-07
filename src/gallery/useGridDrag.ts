@@ -2,17 +2,19 @@ import { useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'r
 import { dropIntent, type DropTarget } from '../sidebar/lib/drop-intent';
 
 /**
- * 全頁瀏覽網格的拖拽（第 3 期改版：固定格子）。
+ * 全頁瀏覽網格的拖拽（第 3 期改版：緊密排列）。
  *
  * 兩個網格（書籤、隱私空間）各掛一份，差別只在 `space` 的回呼與「能不能帶網址」。
  *
  * | 落在 | 拖卡片 | 拖群組標籤 |
  * |---|---|---|
- * | 空格 | 放進那一格 | 整組平移，標籤落在這一格（目標全空才行） |
- * | 卡片左右邊緣（約 30%） | 插入，後面的往後擠 | 同上 |
- * | 書籤卡片中央（停一下） | 合併選單 | 同上 |
+ * | 卡片左右邊緣（約 30%） | 插入，後面的讓位 | 整組插在那裡 |
+ * | 書籤卡片中央（停一下） | 合併選單（對準的是群組成員就直接加入） | 依游標在左半或右半插在前／後 |
  * | 資料夾卡片中央 | 移進資料夾 | 整組搬進資料夾 |
+ * | 最後面的空位 | 放到最後 | 整組放到最後 |
  * | 麵包屑 | 移到那一層 | 整組搬到那一層 |
+ *
+ * 對準的卡片是群組成員（游標在框裡）時加入那個群組，由 `board.ts` 判斷。
  *
  * 幾個不顯眼但必要的決定：
  *
@@ -42,27 +44,25 @@ const SCROLL_EDGE = 70;
 export type DropHint =
   | { cell: number; kind: 'before' | 'after' | 'into' | 'slot' }
   | { cell: number; kind: 'merge'; armed: boolean }
-  | { cell: number; kind: 'shape'; cells: number[]; ok: boolean }
   | { kind: 'crumb'; folderId: string | null };
 
 export interface DragSpace {
   /** 這個畫面能不能拖（搜尋結果、Firefox 的永久資料夾那一層都不能） */
   enabled: boolean;
-  /** 格子：第 i 格是哪個 id（`''` = 空格），含虛擬滾動沒畫出來的 */
+  /** 格子：第 i 格是哪個 id（含虛擬滾動沒畫出來的）。最後面那個空位的索引 = 長度 */
   cells: readonly string[];
   kindOf: (id: string) => DropTarget | undefined;
   /** 多選中拖已勾選的卡片 = 整批 */
   selected: ReadonlySet<string>;
   /** 書籤卡片拖到分頁列要能打開；隱私空間永遠回 null */
   linkOf: (id: string) => { url: string; title: string } | null;
-  /** 放在第 `at` 格（有卡片就往後擠）。`aimed` 是對準的那張卡片，空格是 null */
+  /** 插在第 `at` 個位置（後面的讓位）。`aimed` 是對準的那張卡片，最後面的空位是 null */
   onPlace: (ids: string[], at: number, aimed: string | null) => void;
   /** 移進資料夾或麵包屑的某一層（null = 最上層） */
   onInto: (ids: string[], folderId: string | null) => void;
   onMerge: (targetId: string, ids: string[], x: number, y: number) => void;
-  /** 拖標籤：整組平移之後佔哪幾格、放不放得下 */
-  shapeAt: (groupId: string, at: number) => { cells: number[]; ok: boolean };
-  onShape: (groupId: string, at: number) => void;
+  /** 拖標籤：整組插在第 `at` 個位置 */
+  onMoveGroup: (groupId: string, at: number) => void;
   onGroupInto: (groupId: string, folderId: string | null) => void;
   /** 開始／結束拖拽。呼叫端要在拖拽期間凍結資料（理由見 Gallery 的 `frozen`） */
   onDragChange: (dragging: boolean) => void;
@@ -199,15 +199,19 @@ export function useGridDrag(space: DragSpace) {
         ? null
         : dropIntent(card.getBoundingClientRect(), event.clientX, event.clientY, kind);
 
-    if (drag.kind === 'group') {
-      if (intent?.kind === 'into') {
-        return { cell, kind: 'into' };
-      }
-      const target = current.shapeAt(drag.groupId, cell);
-      return { cell, kind: 'shape', cells: target.cells, ok: target.ok };
-    }
     if (id === '') {
       return { cell, kind: 'slot' };
+    }
+    if (drag.kind === 'group') {
+      if (intent === null || intent.kind === 'into') {
+        return intent === null ? null : { cell, kind: 'into' };
+      }
+      // 群組不能「合併」：書籤卡片中央照游標在左半或右半算前後
+      if (intent.kind === 'merge' && card !== null) {
+        const box = card.getBoundingClientRect();
+        return { cell, kind: event.clientX < box.left + box.width / 2 ? 'before' : 'after' };
+      }
+      return { cell, kind: intent.kind === 'merge' ? 'before' : intent.kind };
     }
     if (drag.ids.includes(id) || intent === null) {
       return null;
@@ -236,7 +240,7 @@ export function useGridDrag(space: DragSpace) {
         event.dataTransfer.dropEffect = hintRef.current === null ? 'none' : 'move';
         return;
       }
-      event.dataTransfer.dropEffect = next === null || (next.kind === 'shape' && !next.ok) ? 'none' : 'move';
+      event.dataTransfer.dropEffect = next === null ? 'none' : 'move';
       if (next?.kind !== 'merge') {
         dwellRef.current = null;
       }
@@ -258,16 +262,14 @@ export function useGridDrag(space: DragSpace) {
       if (drag.kind === 'group') {
         if (shown.kind === 'into' && id !== '') {
           current.onGroupInto(drag.groupId, id);
-        } else if (shown.kind === 'shape' && shown.ok) {
-          current.onShape(drag.groupId, shown.cell);
+        } else if (shown.kind !== 'merge') {
+          current.onMoveGroup(drag.groupId, shown.kind === 'after' ? shown.cell + 1 : shown.cell);
         }
         return;
       }
       switch (shown.kind) {
         case 'slot':
-          if (!(drag.ids.length === 1 && id === drag.ids[0])) {
-            current.onPlace(drag.ids, shown.cell, null);
-          }
+          current.onPlace(drag.ids, shown.cell, null);
           return;
         case 'before':
           current.onPlace(drag.ids, shown.cell, id);
@@ -282,8 +284,6 @@ export function useGridDrag(space: DragSpace) {
           if (shown.armed) {
             current.onMerge(id, drag.ids, event.clientX, event.clientY);
           }
-          return;
-        case 'shape':
           return;
       }
     },
@@ -328,13 +328,10 @@ export function useGridDrag(space: DragSpace) {
           },
         };
 
-  /** 格子要加的 class：插入線、移入的外框、合併的亮框、整組平移的目標 */
+  /** 格子要加的 class：插入線、移入的外框、合併的亮框 */
   const dropClass = (cell: number): string => {
     if (hint === null || hint.kind === 'crumb') {
       return '';
-    }
-    if (hint.kind === 'shape') {
-      return hint.cells.includes(cell) ? (hint.ok ? ' drop--shape' : ' drop--blocked') : '';
     }
     if (hint.cell !== cell) {
       return '';

@@ -291,8 +291,7 @@
  *
  * 插入線畫在卡片外側、網格間距（16px）的正中間，看起來是「插在兩張之間」而不是
  * 「貼在這一張上」。移入資料夾與合併用外框：前者是實線（放開就搬進去），後者要停留
- * 一下才出現（`MERGE_DWELL_MS`），一路滑過去的卡片不會每張都亮。拖群組的標籤時，
- * 整組平移之後會佔的格子亮起來；放不下就是紅色。
+ * 一下才出現（`MERGE_DWELL_MS`），一路滑過去的卡片不會每張都亮。
  */
 .drop--before::after,
 .drop--after::after {
@@ -325,23 +324,12 @@
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.drop--slot::after,
-.drop--shape::after,
-.drop--blocked::after {
+.drop--slot::after {
   position: absolute;
   inset: 0;
   border: 2px dashed var(--accent);
   border-radius: 8px;
   content: '';
-}
-
-.drop--shape::after {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-.drop--blocked::after {
-  border-color: #d64545;
-  background: color-mix(in srgb, #d64545 10%, transparent);
 }
 
 .crumbs__item--drop {
@@ -350,19 +338,20 @@
 }
 
 /*
- * 格子（第 3 期改版）。
+ * 格子（第 3 期改版：緊密排列）。
  *
- * 每一格是一個 `.cell`（`data-cell` = 格子索引），裝著卡片或什麼都沒有（空格）。
- * 還沒定下來的資料夾照舊用 auto-fill 自動換行；定下來的（`.grid--fixed`）是固定欄數、
- * 卡片維持「小／中／大」的寬度，視窗太窄時外層 `.grid-scroll` 橫向捲動。
+ * 每一格是一個 `.cell`（`data-cell` = 順序上的第幾個），裝著一張卡片；最後多一個空位當
+ * 「放到最後」的落點。欄數跟著視窗時照舊用 auto-fill；使用者定了欄數（`.grid--fixed`）
+ * 就固定、卡片維持「小／中／大」的寬度，視窗太窄時外層 `.grid-scroll` 橫向捲動。
  *
  * `.grid-scroll` 的 `overflow-y` 必須是 hidden 而不是 auto：虛擬滾動往上找「會捲的那一層」
  * 時只認 auto／scroll，認錯了就會把它當成捲動容器。內距是留給群組的框線與標籤的
  * （它們畫在格子外面 8px，會被 overflow 切掉）。
  */
 .grid-scroll {
-  margin: -14px -10px 0;
-  padding: 14px 10px 4px;
+  /* 上方不抵銷內距：群組標籤會凸出格子上緣，不能壓到麵包屑的按鈕 */
+  margin: 0 -10px;
+  padding: 14px 10px 12px;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -386,10 +375,10 @@
   min-width: 0;
 }
 
-/* 空格：平常淡到幾乎看不見，拖拽時才看得出可以放哪裡 */
+/* 最後面的空位：平常看不見，拖拽時才畫出來 */
 .cell--empty {
   min-height: calc(var(--card-min, 200px) * 0.5);
-  border: 1px dashed color-mix(in srgb, var(--border) 25%, transparent);
+  border: 1px dashed transparent;
   border-radius: 8px;
 }
 
@@ -407,7 +396,7 @@
 /*
  * 群組的框：每一格各畫自己的那一塊（往外擴 8px = 網格間距的一半，相鄰的同組格子剛好接上），
  * 只在「鄰格不是同一組」的那幾邊畫線（`e-t/r/b/l`，`outlineEdges` 算的）；
- * 兩邊都有線的角是凸角，畫圓角。形狀不規則也一樣接得起來，不必包一層容器。
+ * 兩邊都有線的角是凸角，畫圓角。群組換行之後是階梯形，也一樣接得起來，不必包一層容器。
  */
 .cell--g::before {
   position: absolute;
@@ -450,9 +439,12 @@
   cursor: grab;
 }
 
+/* 沒名字的群組：只有一個小色塊（還是能點、能拖） */
 .group-tag--untitled {
-  font-style: italic;
-  font-weight: 400;
+  width: 22px;
+  height: 14px;
+  padding: 0;
+  top: -15px;
 }
 
 .group-tag:focus-visible {

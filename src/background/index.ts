@@ -10,12 +10,11 @@ import {
   getBookmarkGrid,
   gridSyncStatus,
   groupToFolder,
-  mergeIntoFolder as mergeBookmarksIntoFolder,
   moveGroup,
   reconcileGridSync,
   startGridWatcher,
 } from './bookmark-grid';
-import { reorderBookmarks } from './bookmark-order';
+import { mergeIntoNewFolder as mergeBookmarksIntoFolder, reorderBookmarks } from './bookmark-order';
 import { collectFolderChoices, collectRoots } from './bookmark-tree';
 import { startBookmarkWatcher } from './bookmark-watcher';
 import { startCapturePipeline, startPermissionWatcher } from './capture';

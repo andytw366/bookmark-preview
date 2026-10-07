@@ -10,15 +10,15 @@ import {
 import { request } from '@/shared/messages';
 import type { BookmarkNode, PrivateBookmark, PrivateFolder } from '@/shared/types';
 import {
-  folderGrid,
+  folderColumns,
   vaultChildId,
   vaultChildren,
   vaultGroupOf,
   vaultGroups,
   type VaultChild,
 } from '@/shared/vault-layout';
-import { buildBoard, labelCell, labels, shapeTarget, type Board, type GridOp } from '@/shared/board';
-import { EMPTY, MAX_COLUMNS, MIN_COLUMNS, navCell, outlineEdges, rowCount, stepCell, type Direction } from '@/shared/grid';
+import { buildBoard, labelCell, labels, membersInOrder, type Board, type GridOp } from '@/shared/board';
+import { MAX_COLUMNS, MIN_COLUMNS, navCell, outlineEdges, stepCell, type Direction } from '@/shared/grid';
 import type { GroupInfo } from '@/shared/groups';
 import { hostnameOf } from '@/shared/url';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
@@ -463,11 +463,11 @@ export function Gallery() {
   const listKey = search === null ? (folderId ?? 'root') : `search:${trimmed}`;
 
   /*
-   * 固定格子（第 3 期改版）。每個資料夾的版面是一個 `Board`（`shared/board.ts`）：
-   * 定下來的照存下來的格子，還沒定下來的照順序、用畫面的欄數自動換行。
-   * 搜尋結果與最上層（Firefox 的永久資料夾）沒有版面可言，只是照順序排。
+   * 版面（第 3 期改版）。每個資料夾的版面是一個 `Board`（`shared/board.ts`）：卡片緊密排列，
+   * 欄數跟著視窗，除非使用者按 − / + 定下來。群組是順序上連續的一段，畫成框。
+   * 搜尋結果與最上層（Firefox 的永久資料夾）沒有群組，只是照順序排。
    *
-   * 能拖的畫面在最後一列之後多畫一整列空格，當作「放到最後」的落點。
+   * 能拖的畫面在最後一張之後多畫一個空位，當作「放到最後」的落點。
    */
   const inFolderView = search === null && currentFolder !== undefined;
   const columns = useGridColumns(gridScrollRef, size, GRID_GAP);
@@ -475,18 +475,20 @@ export function Gallery() {
     (view.grid ?? null)?.groups.flatMap((group) => group.members.map((member) => [member, group.id] as const)) ?? [],
   );
   const bookmarkBoard: Board = buildBoard({
-    stored: inFolderView && view.grid != null ? { columns: view.grid.columns, cells: view.grid.cells } : null,
+    stored:
+      inFolderView && view.grid != null && view.grid.columns > 0
+        ? { columns: view.grid.columns, cells: nodes.map((node) => node.id) }
+        : null,
+    fixed: inFolderView && (view.grid?.columns ?? 0) > 0,
     children: nodes.map((node) => node.id),
     autoColumns: columns,
     groups: inFolderView ? (view.grid?.groups ?? []).map(({ id, name, color }) => ({ id, name, color })) : [],
     groupOf: (id) => bookmarkGroupOf.get(id) ?? null,
   });
-  // 格子還在讀：先不畫，免得先以自動換行畫一次再跳成固定格子
+  // 版面還在讀：先不畫，免得先畫一次沒有群組、欄數不對的再跳一下
   const bookmarkGridLoading = inFolderView && view.grid === undefined;
   const bookmarkCols = bookmarkBoard.grid.columns;
-  const bookmarkCellCount = inFolderView
-    ? (rowCount(bookmarkBoard.grid) + 1) * bookmarkCols
-    : bookmarkBoard.grid.cells.length;
+  const bookmarkCellCount = bookmarkBoard.grid.cells.length + (inFolderView ? 1 : 0);
   const gridRows = useVirtualRows({
     count: bookmarkCellCount,
     columns: bookmarkCols,
@@ -511,14 +513,18 @@ export function Gallery() {
 
   const vaultColumns = useGridColumns(vaultScrollRef, size, GRID_GAP);
   const vaultBoard: Board = buildBoard({
-    stored: folderGrid(view.layout, vaultFolderId),
+    stored: (() => {
+      const fixed = folderColumns(view.layout, vaultFolderId);
+      return fixed === null ? null : { columns: fixed, cells: vaultRows.map(vaultChildId) };
+    })(),
+    fixed: folderColumns(view.layout, vaultFolderId) !== null,
     children: vaultRows.map(vaultChildId),
     autoColumns: vaultColumns,
     groups: vaultGroups(view.layout, vaultFolderId),
     groupOf: vaultGroupOf(view.layout),
   });
   const vaultCols = vaultBoard.grid.columns;
-  const vaultCellCount = (rowCount(vaultBoard.grid) + 1) * vaultCols;
+  const vaultCellCount = vaultBoard.grid.cells.length + 1;
   const vaultGrid = useVirtualRows({
     count: vaultCellCount,
     columns: vaultCols,
@@ -625,16 +631,15 @@ export function Gallery() {
         gridOp(space, {
           kind: 'place',
           ids,
-          at: stepCell(board.grid, at, 'right') ?? at + board.grid.columns,
+          at: at + 1,
           aimed: targetId,
         });
         return;
       }
       setMerge({ space, targetId, ids, x, y });
     },
-    shapeAt: (groupId: string, at: number) => shapeTarget(boardOf(space), groupId, at),
-    onShape: (groupId: string, at: number) => {
-      gridOp(space, { kind: 'shift-group', groupId, at });
+    onMoveGroup: (groupId: string, at: number) => {
+      gridOp(space, { kind: 'move-group', groupId, at });
     },
   });
 
@@ -731,11 +736,15 @@ export function Gallery() {
     };
   };
 
-  /** 標籤上：整組挪一格（目標要全空，否則背景頁會拒絕並說明） */
+  /** 標籤上：整段往前／往後挪（跨過一張、或跨過整個相鄰的群組），上下是跨一列 */
   const groupNudger = (space: Mode, groupId: string, direction: Direction): (() => void) | null => {
     const board = boardOf(space);
     const at = labelCell(board, groupId);
-    if (at === -1 || stepCell(board.grid, at, direction) === null) {
+    const members = membersInOrder(board, groupId);
+    const last = at + members.length - 1;
+    const blocked =
+      direction === 'left' || direction === 'up' ? at <= 0 : last >= board.grid.cells.length - 1;
+    if (at === -1 || blocked) {
       return null;
     }
     return () => {
@@ -822,7 +831,7 @@ export function Gallery() {
    */
   const frameAction = (space: Mode, picked: ReadonlySet<string>): SelectionAction => {
     const board = boardOf(space);
-    const ids = board.grid.cells.filter((id) => id !== EMPTY && picked.has(id));
+    const ids = board.grid.cells.filter((id) => picked.has(id));
     return {
       label: t('grid_frame'),
       title: t('grid_frame_hint'),
@@ -1122,8 +1131,8 @@ export function Gallery() {
     const tags = labels(board);
     const out: ReactNode[] = [];
     for (let at = win.start; at < win.end; at += 1) {
-      const id = board.grid.cells[at] ?? EMPTY;
-      if (id === EMPTY) {
+      const id = board.grid.cells[at];
+      if (id === undefined) {
         out.push(<div key={`slot:${String(at)}`} className={`cell cell--empty${drag.dropClass(at)}`} data-cell={at} />);
         continue;
       }
@@ -1410,8 +1419,8 @@ export function Gallery() {
           </button>
         ) : null}
 
-        {layoutBoard?.fixed === true ? (
-          // 只在定下來的資料夾出現：還沒定下來的欄數跟著視窗走，沒有東西可調
+        {layoutBoard !== null ? (
+          // 欄數：平常跟著視窗（自動）；按 − / + 就定下來，「恢復自動排列」放開
           <div className="grid-cols" role="group" aria-label={t('grid_columns')}>
             <button
               type="button"
@@ -1425,7 +1434,11 @@ export function Gallery() {
             >
               −
             </button>
-            <span className="grid-cols__value">{t('grid_columns_n', String(layoutBoard.grid.columns))}</span>
+            <span className="grid-cols__value">
+              {layoutBoard.fixed
+                ? t('grid_columns_n', String(layoutBoard.grid.columns))
+                : t('grid_columns_auto', String(layoutBoard.grid.columns))}
+            </span>
             <button
               type="button"
               className="toolbar__action toolbar__action--icon"
@@ -1438,8 +1451,7 @@ export function Gallery() {
             >
               +
             </button>
-            {/* 有群組時不提供：自動換行做不出不規則的形狀 */}
-            {layoutBoard.memberOf.size === 0 ? (
+            {layoutBoard.fixed ? (
               <button
                 type="button"
                 className="toolbar__action"

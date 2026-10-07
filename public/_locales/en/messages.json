@@ -837,13 +837,13 @@
     "message": "Move left"
   },
   "row_move_earlier_hint": {
-    "message": "Move one cell left, swapping with any card there (Ctrl+Shift+arrow keys move in all four directions)"
+    "message": "Move one cell left, swapping with the card there (Ctrl+Shift+arrow keys move in all four directions)"
   },
   "row_move_later": {
     "message": "Move right"
   },
   "row_move_later_hint": {
-    "message": "Move one cell right, swapping with any card there (Ctrl+Shift+arrow keys move in all four directions)"
+    "message": "Move one cell right, swapping with the card there (Ctrl+Shift+arrow keys move in all four directions)"
   },
   "row_open_in_gallery": {
     "message": "Open in full page"
@@ -1818,23 +1818,14 @@
   "group_links_only": {
     "message": "Only bookmarks can go into a group, not folders"
   },
-  "grid_shape_blocked": {
-    "message": "The whole group doesn't fit there: the target cells must be empty (and inside the columns)"
-  },
-  "grid_auto_has_groups": {
-    "message": "This folder has groups, so it can't go back to automatic layout — wrapping can't keep irregular shapes. Dissolve the groups first."
-  },
-  "grid_frame_disconnected": {
-    "message": "The selected bookmarks must touch each other (up, down, left or right) to be framed as one group"
-  },
   "group_tag_hint": {
-    "message": "Click for options; drag to move the whole group (Ctrl+Shift+arrow keys move it one cell)"
+    "message": "Click for options; drag to move the whole group — other cards make room (Ctrl+Shift+arrow keys move it one step)"
   },
   "grid_frame": {
     "message": "Frame as group"
   },
   "grid_frame_hint": {
-    "message": "Frame the selected bookmarks as one untitled group (they must touch each other)"
+    "message": "Gather the selected bookmarks and frame them as one untitled group"
   },
   "grid_columns": {
     "message": "Columns"
@@ -1857,13 +1848,13 @@
     "message": "Automatic layout"
   },
   "grid_auto_hint": {
-    "message": "Stop pinning columns and positions; wrap with the window width again"
+    "message": "Stop pinning the column count; wrap with the window width again (groups wrap along, they don't break up)"
   },
   "options_grid_sync_title": {
     "message": "Bookmark layout and groups"
   },
   "options_grid_sync_hint": {
-    "message": "Positions and groups (tags) you arrange in the full-page view sync to your other devices through Firefox. They always use 20 KB of the sync space; the rest is left for the private space."
+    "message": "Groups (tags) and pinned column counts from the full-page view sync to your other devices through Firefox (the order already syncs with the bookmarks). They always use 20 KB of the sync space; the rest is left for the private space."
   },
   "options_grid_sync_checkbox": {
     "message": "Sync bookmark layout and groups"
@@ -1912,6 +1903,14 @@
       },
       "bytes": {
         "content": "$2"
+      }
+    }
+  },
+  "grid_columns_auto": {
+    "message": "Auto ($N$ columns)",
+    "placeholders": {
+      "n": {
+        "content": "$1"
       }
     }
   }

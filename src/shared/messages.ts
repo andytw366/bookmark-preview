@@ -156,10 +156,9 @@ export interface StoredGroup extends GroupInfo {
   members: string[];
 }
 
-/** 原生書籤一個資料夾的固定格子（`grid:<資料夾>`）。沒有這份 = 還沒定下來（自動換行） */
+/** 原生書籤一個資料夾的版面（`grid:<資料夾>`）：欄數（0 = 跟著視窗）與群組。順序就是原生順序 */
 export interface BookmarkGrid {
   columns: number;
-  cells: string[];
   groups: StoredGroup[];
 }
 
@@ -203,14 +202,14 @@ export type Protocol = {
   'grid/get': { request: { folderId: string }; response: BookmarkGrid | null };
   /**
    * 一個版面操作（見 `shared/board.ts` 的 `GridOp`）。`columns` 是畫面現在的欄數：
-   * 還沒定下來的資料夾第一次被操作時，用它把當下的排列寫成格子。
+   * 自動排列的資料夾用它換算「上下」的位置，按 − / + 時也從它開始算。
    */
   'grid/apply': { request: { folderId: string; columns: number; op: GridOp }; response: void };
   'grid/sync-status': { request: void; response: GridSyncStatus };
   'groups/to-folder': { request: { folderId: string; groupId: string; columns: number }; response: { id: string } };
-  /** 子資料夾攤平成上層的一個同名群組，放在子資料夾原本那一格 */
+  /** 子資料夾攤平成上層的一個同名群組，放在子資料夾原本的位置 */
   'groups/flatten': { request: { folderId: string; columns: number }; response: void };
-  /** 拖群組的標籤到資料夾：整組照原形狀搬到那邊最後一列之後 */
+  /** 拖群組的標籤到資料夾：整組照順序接在那邊最後 */
   'groups/move': {
     request: { fromFolderId: string; groupId: string; toFolderId: string; columns: number };
     response: void;

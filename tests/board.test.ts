@@ -1,34 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { applyOp, buildBoard, labels, membersInOrder, type Board, type GridOp } from '@/shared/board';
-import type { Grid } from '@/shared/grid';
+import { applyOp, buildBoard, insertItems, labels, membersInOrder, type Board, type GridOp } from '@/shared/board';
 
 /**
- * 版面操作（相鄰就加入、斷開只留標籤那塊、擠動不改別人的群組…）。
- * 格子用字串畫：一個字元一張卡片，`.` 是空格；大寫字母是資料夾（不能進群組）。
+ * 版面操作。順序用字串表示：一個字元一張卡片，大寫是資料夾（不能進群組）。
+ * 群組用 `{ a: 'G' }` 表示 a 在群組 G。
  */
-const g = (...rows: string[]): Grid => ({
-  columns: rows[0]?.length ?? 1,
-  cells: rows.join('').split('').map((c) => (c === '.' ? '' : c)),
-});
-
-const draw = (board: Board): string[] => {
-  const out: string[] = [];
-  const { columns, cells } = board.grid;
-  for (let i = 0; i < cells.length; i += columns) {
-    out.push(Array.from({ length: columns }, (_, c) => cells[i + c] || '.').join(''));
-  }
-  const last = out.length - 1;
-  if (last >= 0) {
-    out[last] = (out[last] ?? '').replace(/\.+$/, '');
-  }
-  return out;
-};
-
-const board = (grid: Grid, groups: Record<string, string> = {}): Board =>
+const board = (cells: string, groups: Record<string, string> = {}, columns = 4): Board =>
   buildBoard({
-    stored: grid,
-    children: grid.cells.filter((id) => id !== ''),
-    autoColumns: grid.columns,
+    stored: { columns, cells: cells.split('') },
+    fixed: true,
+    children: cells.split(''),
+    autoColumns: columns,
     groups: [...new Set(Object.values(groups))].map((id, color) => ({ id, name: id, color })),
     groupOf: (id) => groups[id] ?? null,
   });
@@ -39,160 +21,158 @@ const ctx = {
   newId: () => `n${String((counter += 1))}`,
 };
 const run = (b: Board, op: GridOp) => applyOp(b, op, ctx);
+const order = (b: Board) => b.grid.cells.join('');
 const groupOf = (b: Board, id: string) => b.memberOf.get(id) ?? null;
 
 describe('拖拽放開', () => {
-  it('放在群組旁邊 = 加入', () => {
-    const next = run(board(g('ab.x'), { a: 'G', b: 'G' }), { kind: 'place', ids: ['x'], at: 2, aimed: null });
-    expect(draw(next)).toEqual(['abx']);
+  it('放在群組旁邊（對準的不是成員）不加入', () => {
+    const next = run(board('abcx', { b: 'G', c: 'G' }), { kind: 'place', ids: ['x'], at: 0, aimed: 'a' });
+    expect(order(next)).toBe('xabc');
+    expect(groupOf(next, 'x')).toBeNull();
+  });
+
+  it('對準成員（放進框裡）就加入，插在那裡', () => {
+    const next = run(board('abcx', { b: 'G', c: 'G' }), { kind: 'place', ids: ['x'], at: 2, aimed: 'c' });
+    expect(order(next)).toBe('abxc');
     expect(groupOf(next, 'x')).toBe('G');
   });
 
-  it('拖到不相鄰的地方 = 離開', () => {
-    const next = run(board(g('abc.', '....', 'z'), { a: 'G', b: 'G', c: 'G' }), {
-      kind: 'place',
-      ids: ['c'],
-      at: 9,
-      aimed: null,
-    });
-    expect(groupOf(next, 'c')).toBeNull();
-    expect(groupOf(next, 'a')).toBe('G');
+  it('插在最後一個成員後面、游標還在成員上：加入', () => {
+    const next = run(board('bcax', { b: 'G', c: 'G' }), { kind: 'place', ids: ['x'], at: 2, aimed: 'c' });
+    expect(order(next)).toBe('bcxa');
+    expect(groupOf(next, 'x')).toBe('G');
   });
 
-  it('被拖的卡片原本的群組斷成兩塊：沒有標籤的那塊離開', () => {
-    // G = a b c 一列，拖走中間的 b → a 與 c 不相連，c 那塊沒有標籤
-    const next = run(board(g('abc.', '....', 'z'), { a: 'G', b: 'G', c: 'G' }), {
-      kind: 'place',
-      ids: ['b'],
-      at: 9,
-      aimed: null,
-    });
-    expect(groupOf(next, 'a')).toBe('G');
+  it('成員拖到框外 = 離開，群組還是連續的一段', () => {
+    const next = run(board('bcda', { b: 'G', c: 'G', d: 'G' }), { kind: 'place', ids: ['c'], at: 4, aimed: null });
+    expect(order(next)).toBe('bdac');
     expect(groupOf(next, 'c')).toBeNull();
   });
 
-  it('擠動不改別人的群組，即使被擠成兩塊', () => {
-    // H = d e；把 x 插在 d 前面：d e 都往後擠一格 → 擠到下一列也還是 H
-    const before = board(g('xcde', 'f...'), { d: 'H', e: 'H' });
-    const next = run(before, { kind: 'place', ids: ['x'], at: 2, aimed: 'd' });
-    expect(draw(next)).toEqual(['.cxd', 'ef']);
-    expect(groupOf(next, 'd')).toBe('H');
-    const pushed = run(board(g('abcd', 'e...'), { c: 'H', d: 'H' }), { kind: 'place', ids: ['e'], at: 0, aimed: 'a' });
-    expect(draw(pushed)).toEqual(['eabc', 'd']);
-    expect(groupOf(pushed, 'd')).toBe('H');
-    expect(groupOf(pushed, 'c')).toBe('H');
+  it('散卡片不能插進別人的群組中間：推到頭或尾（近的那邊）', () => {
+    // 對準的是群組外的卡片，但落點在 G 中間 —— 用不在群組的 aimed 模擬鍵盤以外的情況
+    const b = board('xbcde', { b: 'G', c: 'G', d: 'G', e: 'G' });
+    const before = run(b, { kind: 'place', ids: ['x'], at: 2, aimed: null });
+    expect(order(before)).toBe('xbcde');
+    const after = run(b, { kind: 'place', ids: ['x'], at: 4, aimed: null });
+    expect(order(after)).toBe('bcdex');
   });
 
-  it('兩個群組都碰得到時，加入對準的那張卡片的群組', () => {
-    const before = board(g('a.b'), { a: 'G', b: 'H' });
-    expect(groupOf(run(before, { kind: 'place', ids: ['x'], at: 1, aimed: 'b' }), 'x')).toBeNull();
-    const withX = board(g('a.bx'), { a: 'G', b: 'H' });
-    expect(groupOf(run(withX, { kind: 'place', ids: ['x'], at: 1, aimed: 'b' }), 'x')).toBe('H');
-    expect(groupOf(run(withX, { kind: 'place', ids: ['x'], at: 1, aimed: null }), 'x')).toBe('G');
-  });
-
-  it('資料夾不會加入群組', () => {
-    const next = run(board(g('ab.F'), { a: 'G', b: 'G' }), { kind: 'place', ids: ['F'], at: 2, aimed: null });
+  it('資料夾對準成員也不加入，被擠到那一段後面', () => {
+    const next = run(board('bcF', { b: 'G', c: 'G' }), { kind: 'place', ids: ['F'], at: 1, aimed: 'c' });
+    expect(order(next)).toBe('bcF');
     expect(groupOf(next, 'F')).toBeNull();
   });
 
-  it('還沒定下來的資料夾，第一次拖拽就用當下的欄數定下來', () => {
-    const loose = buildBoard({ stored: null, children: ['a', 'b', 'c'], autoColumns: 2, groups: [], groupOf: () => null });
-    expect(loose.fixed).toBe(false);
-    const next = run(loose, { kind: 'place', ids: ['a'], at: 3, aimed: null });
-    expect(next.fixed).toBe(true);
-    expect(draw(next)).toEqual(['.b', 'ca']);
+  it('拖拽不會讓還沒定下來的資料夾定下來', () => {
+    const loose = buildBoard({ stored: null, fixed: false, children: ['a', 'b'], autoColumns: 3, groups: [], groupOf: () => null });
+    const next = run(loose, { kind: 'place', ids: ['a'], at: 2, aimed: null });
+    expect(next.fixed).toBe(false);
+    expect(order(next)).toBe('ba');
   });
 });
 
 describe('鍵盤', () => {
-  it('一次挪一格：目標有卡片就互換', () => {
-    expect(draw(run(board(g('ab')), { kind: 'nudge', id: 'b', direction: 'left' }))).toEqual(['ba']);
-    expect(draw(run(board(g('a.')), { kind: 'nudge', id: 'a', direction: 'down' }))).toEqual(['..', 'a']);
+  it('一次挪一格：與那一格換位', () => {
+    expect(order(run(board('abcd'), { kind: 'nudge', id: 'b', direction: 'left' }))).toBe('bacd');
+    expect(order(run(board('abcdef'), { kind: 'nudge', id: 'b', direction: 'down' }))).toBe('acdefb');
   });
 
-  it('出界不動', () => {
-    expect(draw(run(board(g('ab')), { kind: 'nudge', id: 'a', direction: 'up' }))).toEqual(['ab']);
+  it('挪出群組的尾巴 = 離開；挪進群組 = 加入', () => {
+    const b = board('bcx', { b: 'G', c: 'G' });
+    const out = run(b, { kind: 'nudge', id: 'c', direction: 'right' });
+    expect(order(out)).toBe('bxc');
+    expect(groupOf(out, 'c')).toBeNull();
+    const into = run(b, { kind: 'nudge', id: 'x', direction: 'left' });
+    expect(groupOf(into, 'x')).toBe('G');
   });
 
-  it('標籤整組挪一格，目標要全空', () => {
-    const before = board(g('ab..'), { a: 'G', b: 'G' });
-    expect(draw(run(before, { kind: 'nudge-group', groupId: 'G', direction: 'right' }))).toEqual(['.ab']);
-    expect(() => run(board(g('abc'), { a: 'G', b: 'G' }), { kind: 'nudge-group', groupId: 'G', direction: 'right' })).toThrow(
-      'grid_shape_blocked',
-    );
+  it('標籤上整組挪：跨過一張、或跨過整個相鄰群組', () => {
+    const b = board('abcde', { b: 'G', c: 'G', d: 'H', e: 'H' });
+    expect(order(run(b, { kind: 'nudge-group', groupId: 'G', direction: 'left' }))).toBe('bcade');
+    expect(order(run(b, { kind: 'nudge-group', groupId: 'G', direction: 'right' }))).toBe('adebc');
+  });
+});
+
+describe('移動群組', () => {
+  it('整段搬，其他卡片讓位', () => {
+    const b = board('abcde', { d: 'G', e: 'G' });
+    expect(order(run(b, { kind: 'move-group', groupId: 'G', at: 1 }))).toBe('adebc');
+  });
+
+  it('落在別的群組中間就推到頭或尾', () => {
+    const b = board('abcdx', { a: 'H', b: 'H', c: 'H', x: 'G' });
+    expect(order(run(b, { kind: 'move-group', groupId: 'G', at: 1 }))).toBe('xabcd');
   });
 });
 
 describe('建立群組', () => {
-  it('合併選單：被拖的放到目標右邊一格', () => {
-    const next = run(board(g('ab.', 'x')), { kind: 'merge-group', targetId: 'a', ids: ['x'] });
-    expect(draw(next)).toEqual(['axb']);
+  it('合併選單：被拖的接在目標後面', () => {
+    const next = run(board('abcx'), { kind: 'merge-group', targetId: 'a', ids: ['x'] });
+    expect(order(next)).toBe('axbc');
     expect(groupOf(next, 'a')).toBe(groupOf(next, 'x'));
-    expect(groupOf(next, 'a')).not.toBeNull();
   });
 
-  it('目標在列尾就放在它下面', () => {
-    expect(draw(run(board(g('.a', 'x')), { kind: 'merge-group', targetId: 'a', ids: ['x'] }))).toEqual(['.a', '.x']);
-  });
-
-  it('框成群組：不相連就拒絕', () => {
-    expect(() => run(board(g('a.b')), { kind: 'frame', ids: ['a', 'b'] })).toThrow('grid_frame_disconnected');
-    const next = run(board(g('ab', '.c')), { kind: 'frame', ids: ['a', 'b', 'c'] });
+  it('框成群組：聚到第一張的位置', () => {
+    const next = run(board('axbyc'), { kind: 'frame', ids: ['c', 'a', 'b'] });
+    expect(order(next)).toBe('abcxy');
     expect(new Set(['a', 'b', 'c'].map((id) => groupOf(next, id))).size).toBe(1);
   });
 
   it('資料夾不能進群組', () => {
-    expect(() => run(board(g('aF')), { kind: 'merge-group', targetId: 'a', ids: ['F'] })).toThrow('group_links_only');
+    expect(() => run(board('aF'), { kind: 'merge-group', targetId: 'a', ids: ['F'] })).toThrow('group_links_only');
   });
 });
 
-describe('設定 tag', () => {
-  it('同名（不分大小寫）就加入，搬到群組旁邊的空格', () => {
-    const before = buildBoard({
-      stored: g('a...', '..', 'x'),
-      children: ['a', 'x'],
+describe('tag', () => {
+  it('同名（不分大小寫）就加入，接在那一段最後', () => {
+    const b = buildBoard({
+      stored: { columns: 4, cells: ['a', 'b', 'c', 'x'] },
+      fixed: true,
+      children: ['a', 'b', 'c', 'x'],
       autoColumns: 4,
       groups: [{ id: 'G', name: 'Read', color: 0 }],
-      groupOf: (id) => (id === 'a' ? 'G' : null),
+      groupOf: (id) => (id === 'a' || id === 'b' ? 'G' : null),
     });
-    const next = run(before, { kind: 'tag', ids: ['x'], name: ' read ' });
+    const next = run(b, { kind: 'tag', ids: ['x'], name: ' read ' });
+    expect(order(next)).toBe('abxc');
     expect(groupOf(next, 'x')).toBe('G');
-    expect(draw(next)).toEqual(['ax']);
   });
 
-  it('沒有同名的就建一個，位置不動', () => {
-    const next = run(board(g('a.x')), { kind: 'tag', ids: ['x'], name: 'new' });
-    expect(next.groups.map((group) => group.name)).toEqual(['new']);
-    expect(draw(next)).toEqual(['a.x']);
+  it('移出群組：在中間的被擠到那一段後面', () => {
+    const next = run(board('abcd', { a: 'G', b: 'G', c: 'G' }), { kind: 'untag', ids: ['b'] });
+    expect(order(next)).toBe('acbd');
+    expect(membersInOrder(next, 'G')).toEqual(['a', 'c']);
   });
 });
 
 describe('其他', () => {
-  it('有群組時不能恢復自動排列', () => {
-    expect(() => run(board(g('ab'), { a: 'G' }), { kind: 'auto' })).toThrow('grid_auto_has_groups');
-    expect(run(board(g('a.b')), { kind: 'auto' }).fixed).toBe(false);
+  it('有群組也能恢復自動排列', () => {
+    expect(run(board('ab', { a: 'G' }), { kind: 'auto' }).fixed).toBe(false);
+    expect(run(board('ab'), { kind: 'columns', columns: 2 }).grid.columns).toBe(2);
+  });
+
+  it('被別處弄散的群組照樣聚成一段（在第一個成員的位置）', () => {
+    expect(order(board('axbyc', { a: 'G', c: 'G' }))).toBe('acxby');
   });
 
   it('沒有成員的群組消失；標籤在第一個成員那格', () => {
-    const before = board(g('.ab'), { a: 'G', b: 'G' });
-    expect(labels(before).get(1)?.id).toBe('G');
-    expect(membersInOrder(before, 'G')).toEqual(['a', 'b']);
-    expect(run(before, { kind: 'dissolve', groupId: 'G' }).groups).toEqual([]);
+    const b = board('xab', { a: 'G', b: 'G' });
+    expect(labels(b).get(1)?.id).toBe('G');
+    expect(run(b, { kind: 'dissolve', groupId: 'G' }).groups).toEqual([]);
   });
 
   it('改名不能與同資料夾的群組撞名', () => {
-    const before = board(g('ab'), { a: 'G', b: 'H' });
-    expect(() => run(before, { kind: 'group-update', groupId: 'G', name: 'h' })).toThrow('group_name_taken');
+    expect(() => run(board('ab', { a: 'G', b: 'H' }), { kind: 'group-update', groupId: 'G', name: 'h' })).toThrow(
+      'group_name_taken',
+    );
   });
-});
 
-describe('拖標籤的落點', () => {
-  it('目標格子與放不放得下', async () => {
-    const { shapeTarget } = await import('@/shared/board');
-    const before = board(g('ab..', 'c...'), { a: 'G', b: 'G' });
-    expect(shapeTarget(before, 'G', 1)).toEqual({ cells: [1, 2], ok: true });
-    expect(shapeTarget(before, 'G', 4)).toEqual({ cells: [4, 5], ok: false });
-    expect(shapeTarget(before, 'G', 3).ok).toBe(false);
+  it('整組搬進來接在最後；攤平時放在原本那一格', () => {
+    const b = board('pqab');
+    expect(order(insertItems(b, ['a', 'b'], { id: 'G', name: '', color: 0 }))).toBe('pqab');
+    const flat = insertItems(b, ['a', 'b'], { id: 'G', name: '', color: 0 }, 1);
+    expect(order(flat)).toBe('pabq');
+    expect(groupOf(flat, 'a')).toBe('G');
   });
 });

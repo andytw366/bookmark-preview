@@ -837,13 +837,13 @@
     "message": "往左移"
   },
   "row_move_earlier_hint": {
-    "message": "往左挪一格，那一格有卡片就互換（Ctrl+Shift+方向鍵可以往四個方向挪）"
+    "message": "往左挪一格，與那一格的卡片換位（Ctrl+Shift+方向鍵可以往四個方向挪）"
   },
   "row_move_later": {
     "message": "往右移"
   },
   "row_move_later_hint": {
-    "message": "往右挪一格，那一格有卡片就互換（Ctrl+Shift+方向鍵可以往四個方向挪）"
+    "message": "往右挪一格，與那一格的卡片換位（Ctrl+Shift+方向鍵可以往四個方向挪）"
   },
   "row_open_in_gallery": {
     "message": "在全頁瀏覽開啟"
@@ -1818,23 +1818,14 @@
   "group_links_only": {
     "message": "只有書籤能放進群組，資料夾不行"
   },
-  "grid_shape_blocked": {
-    "message": "那裡放不下整個群組：目標格子要全空（也不能超出左右邊界）"
-  },
-  "grid_auto_has_groups": {
-    "message": "這個資料夾有群組，不能恢復自動排列 —— 自動換行排不出不規則的形狀。先解散群組。"
-  },
-  "grid_frame_disconnected": {
-    "message": "勾選的書籤要上下左右相連才能框成一個群組"
-  },
   "group_tag_hint": {
-    "message": "點一下開選單；拖曳可以整組搬移（Ctrl+Shift+方向鍵一次挪一格）"
+    "message": "點一下開選單；拖曳可以整組搬移，其他卡片會自動讓位（Ctrl+Shift+方向鍵一次挪一格）"
   },
   "grid_frame": {
     "message": "框成群組"
   },
   "grid_frame_hint": {
-    "message": "把勾選的書籤框成一個沒有名字的群組（要上下左右相連）"
+    "message": "把勾選的書籤聚在一起，框成一個沒有名字的群組"
   },
   "grid_columns": {
     "message": "欄數"
@@ -1857,13 +1848,13 @@
     "message": "恢復自動排列"
   },
   "grid_auto_hint": {
-    "message": "不再固定欄數與位置，改回跟著視窗寬度自動換行"
+    "message": "不再固定欄數，改回跟著視窗寬度換行（群組會跟著換行，不會被拆散）"
   },
   "options_grid_sync_title": {
     "message": "書籤的排列與群組"
   },
   "options_grid_sync_hint": {
-    "message": "全頁瀏覽裡排好的位置與群組（tag）跟著 Firefox 同步到其他裝置。固定佔用同步空間的 20 KB，其餘留給隱私空間。"
+    "message": "全頁瀏覽裡的群組（tag）與定下來的欄數跟著 Firefox 同步到其他裝置（排列順序本來就隨書籤同步）。固定佔用同步空間的 20 KB，其餘留給隱私空間。"
   },
   "options_grid_sync_checkbox": {
     "message": "同步書籤的排列與群組"
@@ -1912,6 +1903,14 @@
       },
       "bytes": {
         "content": "$2"
+      }
+    }
+  },
+  "grid_columns_auto": {
+    "message": "自動（$N$ 欄）",
+    "placeholders": {
+      "n": {
+        "content": "$1"
       }
     }
   }

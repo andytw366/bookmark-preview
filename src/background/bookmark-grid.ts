@@ -4,45 +4,36 @@ import type { BookmarkGrid, GridSyncStatus, StoredGroup } from '@/shared/message
 import {
   applyOp,
   buildBoard,
+  insertItems,
   membersInOrder,
   removeItems,
+  replaceItem,
   type Board,
   type GridOp,
 } from '@/shared/board';
-import {
-  EMPTY,
-  appendShape,
-  decodeCells,
-  indexOfId,
-  insertPush,
-  readingOrder,
-  restoreGhosts,
-  unmoved,
-  type Grid,
-} from '@/shared/grid';
-import { nextColor, sameName } from '@/shared/groups';
+import { indexOfId, readingOrder, unmoved } from '@/shared/grid';
+import { nextColor, sameName, type GroupInfo } from '@/shared/groups';
 import { t } from '@/shared/i18n';
 import { isPreviewableUrl } from '@/shared/url';
 import { getSettings } from '@/storage/settings';
 import { GRID_ITEM_LIMIT, GRID_PREFIX, GRID_SYNC_BUDGET, gridBytes, gridKey } from '@/storage/grid-sync';
 import { deviceId, syncAvailable } from '@/storage/vault-sync';
-import { mergeIntoNewFolder, placeBefore } from './bookmark-order';
+import { placeBefore } from './bookmark-order';
 
 /**
- * 原生書籤的固定格子與群組（第 3 期改版）。
+ * 原生書籤的版面（欄數）與群組。
  *
- * **WebExtension 讀不到 Firefox 原生的標籤**，所以群組與格子是擴充套件自己存的：
- * `storage.local` 的 `grid:<資料夾 guid>`，一個資料夾一份。明文沒有問題 —— 那些本來就是
- * 明文的 Firefox 書籤。
+ * **WebExtension 讀不到 Firefox 原生的標籤**，所以群組是擴充套件自己存的：
+ * `storage.local` 的 `grid:<資料夾 guid>`，一個資料夾一份
+ * `{ v, columns, groups: [{ id, name, color, members }], updatedAt, deviceId }`。
+ * 明文沒有問題 —— 那些本來就是明文的 Firefox 書籤。
  *
- * - **原生順序 = 格子的閱讀順序**：每次格子變動後把原生書籤搬成那個順序（只搬變了的那幾筆），
- *   擴充套件不在時，Firefox 的書籤選單與書籤管理員裡排列仍然合理。
+ * - **順序就是 Firefox 原生的順序**：卡片緊密排列、不留空格，所以不另外存順序；每次版面操作後
+ *   把原生書籤搬成畫面的順序（只搬變了的那幾筆）。擴充套件不在時，Firefox 的書籤選單裡群組成員也是相鄰的。
+ * - `columns` 是使用者按 − / + 定下來的欄數，0 = 跟著視窗（自動排列）。
  * - **跨裝置同步**：同一份也寫進 `storage.sync` 的同名鍵（預設打開，固定預算 20 KB）。
  *   讀到遠端那份時整份較新者勝。Firefox 同步會讓同一個書籤在各台電腦的 GUID 一致，
- *   這是能同步的前提；格子裡指向本機不存在的 GUID 當空格、但不刪掉它的位置
- *   （那筆書籤可能還沒同步過來，見 `restoreGhosts`）。
- * - 「恢復自動排列」寫一份 `columns: 0` 的墓碑而不是刪掉：刪掉的話另一台裝置的舊格子
- *   下次寫入就會傳回來。
+ *   這是能同步的前提；成員裡本機還沒有的 GUID 保留著（那筆書籤可能還沒同步過來）。
  *
  * **所有改動走同一個佇列，連 `onRemoved` / `onMoved` 的清理也是。** 版面操作自己就會
  * 搬書籤，那些搬動觸發的 `onMoved` 若與操作本身交錯，「讀 → 改 → 寫」會互相蓋掉。
@@ -54,9 +45,8 @@ const LEGACY_PREFIX = 'groups:';
 
 interface GridDoc {
   v: 1;
-  /** 0 = 墓碑：這個資料夾恢復成自動排列 */
+  /** 0 = 跟著視窗（自動排列） */
   columns: number;
-  cells: string[];
   groups: StoredGroup[];
   updatedAt: number;
   deviceId: string;
@@ -81,18 +71,22 @@ function asDoc(value: unknown): GridDoc | null {
     return null;
   }
   const doc = value as Partial<GridDoc>;
-  const cells = decodeCells(doc.cells);
   if (
     doc.v !== 1 ||
     typeof doc.columns !== 'number' ||
-    cells === null ||
     !Array.isArray(doc.groups) ||
     typeof doc.updatedAt !== 'number' ||
     typeof doc.deviceId !== 'string'
   ) {
     return null;
   }
-  return { ...doc, v: 1, columns: doc.columns, cells, groups: doc.groups.filter(isStoredGroup), updatedAt: doc.updatedAt, deviceId: doc.deviceId };
+  return {
+    v: 1,
+    columns: doc.columns,
+    groups: doc.groups.filter(isStoredGroup),
+    updatedAt: doc.updatedAt,
+    deviceId: doc.deviceId,
+  };
 }
 
 /** 同一個資料夾的兩份：較新的勝，同時間比 deviceId（兩台裝置選的是同一個就好） */
@@ -108,14 +102,9 @@ async function readDoc(folderId: string): Promise<GridDoc | null> {
   return asDoc((await browser.storage.local.get(key))[key]);
 }
 
-function gridOf(doc: GridDoc | null): Grid | null {
-  return doc === null || doc.columns <= 0 ? null : { columns: doc.columns, cells: doc.cells };
-}
-
 export async function getBookmarkGrid(folderId: string): Promise<BookmarkGrid | null> {
   const doc = await readDoc(folderId);
-  const grid = gridOf(doc);
-  return grid === null || doc === null ? null : { ...grid, groups: doc.groups };
+  return doc === null ? null : { columns: doc.columns, groups: doc.groups };
 }
 
 /** 畫面上看得到的子項目（與 `bookmark-tree` 的過濾一致：沒有分隔線、沒有 `place:`） */
@@ -133,31 +122,28 @@ interface Loaded {
   doc: GridDoc | null;
   board: Board;
   links: Set<string>;
-  live: Set<string>;
 }
 
 async function load(folderId: string, autoColumns: number): Promise<Loaded> {
   const doc = await readDoc(folderId);
-  const children = await visibleChildren(folderId);
+  const children = (await visibleChildren(folderId));
+  const ids = children.map((node) => node.id);
   const groupOf = new Map<string, string>();
   for (const group of doc?.groups ?? []) {
     for (const member of group.members) {
       groupOf.set(member, group.id);
     }
   }
+  const columns = doc?.columns ?? 0;
   const board = buildBoard({
-    stored: gridOf(doc),
-    children: children.map((node) => node.id),
+    stored: columns > 0 ? { columns, cells: ids } : null,
+    fixed: columns > 0,
+    children: ids,
     autoColumns,
     groups: (doc?.groups ?? []).map(({ id, name, color }) => ({ id, name, color })),
     groupOf: (id) => groupOf.get(id) ?? null,
   });
-  return {
-    doc,
-    board,
-    links: new Set(children.filter((node) => node.url !== undefined).map((node) => node.id)),
-    live: new Set(children.map((node) => node.id)),
-  };
+  return { doc, board, links: new Set(children.filter((node) => node.url !== undefined).map((node) => node.id)) };
 }
 
 /**
@@ -185,17 +171,26 @@ async function write(folderId: string, doc: GridDoc): Promise<void> {
   await upload([key]);
 }
 
-/** 版面寫回去：格子、群組（成員照閱讀順序）、原生順序 */
+/**
+ * 版面寫回去：欄數、群組（成員照順序）、原生順序。
+ * 群組裡本機還沒有的成員（另一台裝置同步過來、書籤本身還沒到）照樣留著。
+ */
 async function save(folderId: string, loaded: Loaded, next: Board): Promise<void> {
-  const stamp = { v: 1 as const, updatedAt: Date.now(), deviceId: await deviceId() };
-  if (!next.fixed) {
-    await write(folderId, { ...stamp, columns: 0, cells: [], groups: [] });
-    return;
-  }
-  const stored = gridOf(loaded.doc);
-  const grid = stored === null ? next.grid : restoreGhosts(stored, next.grid, loaded.live);
-  const groups = next.groups.map((group) => ({ ...group, members: membersInOrder(next, group.id) }));
-  await write(folderId, { ...stamp, columns: grid.columns, cells: grid.cells, groups });
+  const present = new Set(next.grid.cells);
+  const groups = next.groups.map((group) => ({
+    ...group,
+    members: [
+      ...membersInOrder(next, group.id),
+      ...(loaded.doc?.groups.find((old) => old.id === group.id)?.members.filter((id) => !present.has(id)) ?? []),
+    ],
+  }));
+  await write(folderId, {
+    v: 1,
+    columns: next.fixed ? next.grid.columns : 0,
+    groups,
+    updatedAt: Date.now(),
+    deviceId: await deviceId(),
+  });
   await syncNativeOrder(folderId, readingOrder(next.grid));
 }
 
@@ -219,44 +214,37 @@ export async function applyBookmarkGrid(folderId: string, columns: number, op: G
   });
 }
 
-function requireGroup(board: Board, groupId: string): void {
-  if (!board.groups.some((group) => group.id === groupId)) {
+function requireGroup(board: Board, groupId: string): GroupInfo {
+  const group = board.groups.find((item) => item.id === groupId);
+  if (group === undefined) {
     throw new Error(t('group_not_found'));
   }
+  return group;
 }
 
-/** 轉成資料夾：在標籤那一格建子資料夾，成員照閱讀順序搬進去。回傳新資料夾 id */
+/** 轉成資料夾：在第一個成員的位置建子資料夾，成員照順序搬進去。回傳新資料夾 id */
 export async function groupToFolder(folderId: string, groupId: string, columns: number): Promise<string> {
   return exclusive(async () => {
     const loaded = await load(folderId, columns);
-    requireGroup(loaded.board, groupId);
-    const group = loaded.board.groups.find((item) => item.id === groupId);
+    const group = requireGroup(loaded.board, groupId);
     const members = membersInOrder(loaded.board, groupId);
-    const label = indexOfId(loaded.board.grid, members[0] ?? EMPTY);
     const folder = await browser.bookmarks.create({
       parentId: folderId,
-      title: group === undefined || group.name === '' ? t('group_untitled') : group.name,
+      title: group.name === '' ? t('group_untitled') : group.name,
     });
     for (const id of members) {
       await browser.bookmarks.move(id, { parentId: folder.id });
     }
-    const next = removeItems(loaded.board, new Set(members));
-    const cells = [...next.grid.cells];
-    while (cells.length <= label) {
-      cells.push(EMPTY);
-    }
-    cells[label] = folder.id;
-    next.grid = { columns: next.grid.columns, cells };
-    loaded.live.add(folder.id);
+    const [first, ...rest] = members;
+    const next = removeItems(replaceItem(loaded.board, first ?? '', folder.id), new Set(rest));
     await save(folderId, loaded, next);
     return folder.id;
   });
 }
 
 /**
- * 攤平成群組：子資料夾裡的書籤搬回上層，從子資料夾原本那一格開始依序放（往後擠），
- * 成為一個同名群組（那裡已有同名的就加入），子資料夾刪掉。子資料夾裡還有資料夾時
- * 拒絕 —— 那些資料夾沒有地方放。
+ * 攤平成群組：子資料夾裡的書籤搬回上層、放在子資料夾原本的位置，成為一個同名群組
+ * （那裡已有同名的就加入），子資料夾刪掉。子資料夾裡還有資料夾時拒絕 —— 那些資料夾沒有地方放。
  */
 export async function flattenFolder(subfolderId: string, columns: number): Promise<void> {
   return exclusive(async () => {
@@ -278,23 +266,17 @@ export async function flattenFolder(subfolderId: string, columns: number): Promi
     await browser.bookmarks.removeTree(subfolderId);
 
     const loaded = await load(parentId, columns);
-    const next = loaded.board;
-    next.fixed = true;
-    next.grid = insertPush(next.grid, links, at === -1 ? next.grid.cells.length : at);
-    let group = next.groups.find((item) => sub.title.trim() !== '' && sameName(item.name, sub.title));
-    if (group === undefined) {
-      group = { id: crypto.randomUUID(), name: sub.title.trim(), color: nextColor(next.groups) };
-      next.groups.push(group);
-    }
-    for (const id of links) {
-      next.memberOf.set(id, group.id);
-    }
-    await save(parentId, loaded, next);
+    const group = loaded.board.groups.find((item) => sub.title.trim() !== '' && sameName(item.name, sub.title)) ?? {
+      id: crypto.randomUUID(),
+      name: sub.title.trim(),
+      color: nextColor(loaded.board.groups),
+    };
+    await save(parentId, loaded, insertItems(loaded.board, links, group, at === -1 ? undefined : at));
   });
 }
 
 /**
- * 拖群組的標籤到別的資料夾：整組照原形狀搬到那邊最後一列之後；那邊有同名群組就併進去，
+ * 拖群組的標籤到別的資料夾：整組照順序接在那邊最後；那邊有同名群組就併進去，
  * 沒有就照原樣（名稱、顏色）帶過去。
  */
 export async function moveGroup(
@@ -308,71 +290,27 @@ export async function moveGroup(
       return;
     }
     const source = await load(fromFolderId, columns);
-    requireGroup(source.board, groupId);
-    const group = source.board.groups.find((item) => item.id === groupId);
+    const group = requireGroup(source.board, groupId);
     const members = membersInOrder(source.board, groupId);
     for (const id of members) {
       await browser.bookmarks.move(id, { parentId: toFolderId });
     }
-    const memberSet = new Set(members);
-    await save(fromFolderId, source, removeItems(source.board, memberSet));
+    await save(fromFolderId, source, removeItems(source.board, new Set(members)));
 
     const target = await load(toFolderId, columns);
-    const next = target.board;
-    next.fixed = true;
-    next.grid = appendShape(next.grid, source.board.grid, memberSet);
-    let joined = next.groups.find((item) => group !== undefined && group.name !== '' && sameName(item.name, group.name));
-    if (joined === undefined) {
-      joined = { id: groupId, name: group?.name ?? '', color: group?.color ?? nextColor(next.groups) };
-      next.groups.push(joined);
-    }
-    for (const id of members) {
-      next.memberOf.set(id, joined.id);
-    }
-    await save(toFolderId, target, next);
+    const joined = target.board.groups.find((item) => group.name !== '' && sameName(item.name, group.name)) ?? group;
+    await save(toFolderId, target, insertItems(target.board, members, joined));
   });
 }
 
-/** 兩張卡片疊在一起 →「建立資料夾」：新資料夾佔被疊上去那張卡片的格子 */
-export async function mergeIntoFolder(targetId: string, ids: readonly string[], title: string): Promise<string> {
-  return exclusive(async () => {
-    const [target] = await browser.bookmarks.get(targetId);
-    const parentId = target?.parentId;
-    const loaded = parentId === undefined ? null : await load(parentId, 1);
-    const at = loaded === null ? -1 : indexOfId(loaded.board.grid, targetId);
-    const id = await mergeIntoNewFolder(targetId, ids, title);
-    if (parentId === undefined || loaded === null || !loaded.board.fixed) {
-      return id;
-    }
-    const next = removeItems(loaded.board, new Set([targetId, ...ids]));
-    if (at !== -1) {
-      const cells = [...next.grid.cells];
-      while (cells.length <= at) {
-        cells.push(EMPTY);
-      }
-      cells[at] = id;
-      next.grid = { columns: next.grid.columns, cells };
-    }
-    loaded.live.add(id);
-    await save(parentId, loaded, next);
-    return id;
-  });
-}
-
-/** 從某個資料夾的格子與群組裡拿掉幾個 id（被刪、被搬到別的資料夾） */
+/** 從某個資料夾的群組裡拿掉幾個 id（被刪、被搬到別的資料夾） */
 async function forget(folderId: string, ids: ReadonlySet<string>): Promise<void> {
   const doc = await readDoc(folderId);
-  if (doc === null || doc.columns <= 0) {
-    return;
-  }
-  const touched =
-    doc.cells.some((id) => ids.has(id)) || doc.groups.some((group) => group.members.some((id) => ids.has(id)));
-  if (!touched) {
+  if (doc === null || !doc.groups.some((group) => group.members.some((id) => ids.has(id)))) {
     return;
   }
   await write(folderId, {
     ...doc,
-    cells: doc.cells.map((id) => (ids.has(id) ? EMPTY : id)),
     groups: doc.groups
       .map((group) => ({ ...group, members: group.members.filter((id) => !ids.has(id)) }))
       .filter((group) => group.members.length > 0),

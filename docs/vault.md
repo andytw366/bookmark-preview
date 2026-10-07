@@ -147,7 +147,7 @@ subtree) and the background page's `isWithin` check is the second line.
 
 ## Order
 
-Vault folders can be rearranged in the full-page view (drag, or *Move left / right*; since phase 3 as a pinned grid, see [Groups](#groups)).
+Vault folders can be rearranged in the full-page view (drag, or *Move left / right*; see also [Groups](#groups)).
 The order lives in a separate encrypted **layout** document (`src/shared/vault-layout.ts`),
 not on the bookmark records: an older version rebuilding records field by field would drop
 an unknown `order` field during sync, and the two devices would then disagree forever about
@@ -167,13 +167,12 @@ failed unlock — the order is not worth locking anyone out over.
 
 ## Groups
 
-Vault grids and groups are three sections of the encrypted layout document:
+Vault layout and groups are three sections of the encrypted layout document:
 
-- `grid` — `{ folderKey: { columns, cells, updatedAt } }`, the pinned grid of a folder
-  (see [interface.md](interface.md#fixed-grid)); `columns: 0` is the tombstone for "back to
-  automatic". The `order` section keeps being written as the grid's reading order, so a
-  phase-2 device still sees a sensible order. Cells naming records that are not (yet) here
-  are shown empty and dropped on the next write.
+- `grid` — `{ folderKey: { columns, updatedAt } }`, the column count pinned with `−` / `+`
+  (see [interface.md](interface.md#layout)); `columns: 0` is the tombstone for "back to
+  automatic". There are no gaps, so the order is just the `order` section, which keeps being
+  written in display order (a phase-2 device sees the same order).
 - `groups` — `{ id: { folderId, name, color, updatedAt, deleted? } }` (older entries may
   still carry `collapsed`; it is ignored). Groups that lose their last member get a
   tombstone rather than being removed, so an older copy elsewhere cannot bring them back.
