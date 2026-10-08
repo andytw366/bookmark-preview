@@ -18,7 +18,7 @@
 ### 摘要
 
 ```
-用縮圖瀏覽書籤，而不是一排看不出內容的文字。內建以主密碼加密的隱私空間 —— 移進去的書籤會從 Firefox 的書籤選單中消失，只有解鎖後才看得到。所有資料留在本機，不做任何遙測。
+用縮圖瀏覽書籤，而不是一排看不出內容的文字。內建以主密碼加密的隱私空間 —— 移進去的書籤會從 Firefox 的書籤選單中消失，只有解鎖後才看得到。沒有伺服器，不做任何遙測。
 ```
 
 ### 完整描述
@@ -34,9 +34,19 @@
 
 判定完全不看網域，沒有站台清單，所以不需要為個別網站做調整。自動判定不可能對所有站台都準，因此也提供直接的出口：在任何頁面對著圖片按右鍵 →「設為這個書籤的預覽圖」。
 
+■ 整理：拖拽、群組與搜尋
+
+全頁瀏覽與側邊欄都能用拖拽排序，順序直接寫回 Firefox 的書籤；拖到資料夾上就移進去。把一張卡片疊在另一張上停一下，可以選擇建立群組或資料夾。
+
+群組就是 tag：同一個資料夾裡的幾個書籤用彩色框線圈在一起，加上名稱與顏色。之後可以改名、換色、整組搬動、轉成子資料夾，或反過來把資料夾攤平成群組。在搜尋框輸入「#名稱」就能跨資料夾找出所有同名群組的書籤；一般搜尋也找得到資料夾。
+
+全頁瀏覽支援瀏覽器的上一頁（Alt+←、滑鼠側鍵）回到剛才的資料夾，另有「↑」回上一層。
+
+書籤群組預設會透過 Firefox 同步到你的其他裝置，可以在設定頁關掉。
+
 ■ 隱私空間
 
-用主密碼建立一個加密的書籤空間。移進去的書籤會從 Firefox 的書籤管理員、書籤工具列與書籤選單中「消失」，只有解鎖後才看得到；連同它們的預覽圖一起加密（AES-256-GCM）。整個資料夾也可以連同層級一起移進去。
+用主密碼建立一個加密的書籤空間。移進去的書籤會從 Firefox 的書籤管理員、書籤工具列與書籤選單中「消失」，只有解鎖後才看得到；連同它們的預覽圖一起加密（AES-256-GCM）。整個資料夾也可以連同層級一起移進去。排序、群組與搜尋在隱私空間裡一樣能用，搜尋只在本機的已解密資料上進行。
 
 入口預設是隱藏的：側邊欄上沒有任何相關痕跡，要在搜尋框輸入一段自訂的觸發字串才會跳出密碼畫面。沒碰隱私空間滿一段時間（分鐘數可設定）、離開電腦、或關掉側邊欄，都會自動上鎖。
 
@@ -44,11 +54,11 @@
 
 ■ 隱私
 
-所有資料都留在你自己的裝置上（IndexedDB 與 storage.local）。沒有伺服器、沒有帳號、不做任何遙測。只有在你自己勾選同步時才會有資料離開裝置，而且是加密後的位元組。
+沒有伺服器、沒有帳號、不做任何遙測，開發者收不到你的任何資料。預覽圖與隱私空間存在本機（IndexedDB 與 storage.local）。會離開裝置的只有透過 Firefox 同步、存進你自己 Firefox 帳號的兩樣東西：書籤群組（預設開啟，與書籤本身一樣不另外加密，可在設定頁關掉），以及你自己勾選才會同步的隱私空間（只有密文）。
 
 ■ 鍵盤操作
 
-整套流程都能不碰滑鼠完成：方向鍵在書籤間移動、Enter 開啟、右方向鍵進資料夾、Backspace 回上一層、選單鍵或 Shift+F10 開右鍵選單。
+整套流程都能不碰滑鼠完成：方向鍵在書籤間移動、Enter 開啟、右方向鍵進資料夾、Backspace 回上一層、Ctrl+Shift+方向鍵移動書籤或整個群組、選單鍵或 Shift+F10 開右鍵選單。
 
 ■ 權限
 
@@ -81,7 +91,7 @@ Bookmark Preview
 ### Summary
 
 ```
-Browse bookmarks as visual previews instead of a wall of text. Includes a password-encrypted vault: bookmarks moved into it disappear from Firefox's bookmark menu until you unlock. Everything stays on your device. No telemetry.
+Browse bookmarks as visual previews instead of a wall of text. Includes a password-encrypted vault: bookmarks moved into it disappear from Firefox's bookmark menu until you unlock. No server, no telemetry.
 ```
 
 ### Description
@@ -99,9 +109,19 @@ Previews prefer the page's own cover art — comic and book covers, video thumbn
 
 The heuristics never look at the domain, so there is no site list to maintain and no per-site tweaking. Automatic detection can't be right everywhere, so there is a direct override: right-click any image on any page and choose "Use as this bookmark's preview".
 
+■ Organise: drag and drop, groups and search
+
+Drag to reorder in the full-page view and the sidebar — the order is written back to Firefox's own bookmarks. Drop on a folder to move into it. Rest one card on another and choose to create a group or a folder.
+
+A group is a tag: a few bookmarks in one folder framed together with a coloured outline, a name and a colour. Rename it, recolour it, move it as a whole, turn it into a subfolder, or flatten a folder into a group. Type "#name" in the search box to find every bookmark tagged with that name across all folders; plain search now finds folders too.
+
+The full-page view supports the browser's Back (Alt+←, the mouse back button) to return to the folder you were just in, and "↑" to go up a level.
+
+Bookmark groups sync to your other devices through Firefox Sync by default; you can turn that off in settings.
+
 ■ The vault
 
-Create an encrypted bookmark space behind a master password. Bookmarks moved into it disappear from Firefox's bookmark manager, toolbar and menu; they are only visible after you unlock. Their preview images are encrypted too (AES-256-GCM). Whole folders can be moved in with their structure intact.
+Create an encrypted bookmark space behind a master password. Bookmarks moved into it disappear from Firefox's bookmark manager, toolbar and menu; they are only visible after you unlock. Their preview images are encrypted too (AES-256-GCM). Whole folders can be moved in with their structure intact. Reordering, groups and search work in the vault too; search runs locally on the already-decrypted data.
 
 The entrance is hidden by default: the sidebar shows no trace of it. You type a trigger string of your choosing into the search box to bring up the password screen. It re-locks automatically a configurable number of minutes after you last touched the vault, when you walk away from the machine, or when you close the sidebar.
 
@@ -109,11 +129,11 @@ A forgotten master password cannot be recovered, so you get a recovery key when 
 
 ■ Privacy
 
-Everything stays on your device (IndexedDB and storage.local). No server, no account, no telemetry of any kind. Data leaves your device only if you opt into sync, and then only as encrypted bytes.
+No server, no account, no telemetry of any kind — the developer receives none of your data. Previews and the vault live on your device (IndexedDB and storage.local). Only two things leave it, both through Firefox Sync into your own Firefox Account: bookmark groups (on by default, not encrypted beyond what Firefox Sync does for your bookmarks themselves, can be turned off in settings), and the vault if you opt in (ciphertext only).
 
 ■ Keyboard
 
-The whole flow works without a mouse: arrow keys to move between bookmarks, Enter to open, Right Arrow to enter a folder, Backspace to go up, Menu key or Shift+F10 for the context menu.
+The whole flow works without a mouse: arrow keys to move between bookmarks, Enter to open, Right Arrow to enter a folder, Backspace to go up, Ctrl+Shift+arrows to move a bookmark or a whole group, Menu key or Shift+F10 for the context menu.
 
 ■ Permissions
 
@@ -131,6 +151,38 @@ The whole flow works without a mouse: arrow keys to move between bookmarks, Ente
 
 ```
 bookmarks, thumbnails, preview, privacy, encryption
+```
+
+---
+
+## 版本說明（1.2.0）
+
+送審表單的「版本說明」欄，中英各一份。沒有新權限。
+
+```
+・全頁瀏覽支援瀏覽器的上一頁（Alt+←、滑鼠側鍵）回到剛才的資料夾，另有「↑」回上一層。
+・拖拽排序，順序寫回 Firefox 的書籤；拖到資料夾上就移進去。側邊欄也能拖。
+・兩張卡片疊在一起，可選擇建立群組或資料夾。
+・群組＝tag：設定 tag、改名、換色、整組搬動、轉成資料夾，或把資料夾攤平成群組。
+　側邊欄也顯示群組。
+・搜尋找得到資料夾；輸入「#名稱」跨資料夾找出同名群組的書籤。
+・隱私空間也能排序、建群組與搜尋（搜尋只在本機進行）。
+・書籤群組預設透過 Firefox 同步到你的其他裝置，可在設定頁關掉。
+```
+
+```
+・The full-page view supports the browser's Back (Alt+←, the mouse back button) to
+  return to the folder you were just in, plus "↑" to go up a level.
+・Drag to reorder; the order is written back to Firefox's bookmarks. Drop on a
+  folder to move into it. Works in the sidebar too.
+・Rest one card on another to create a group or a folder.
+・Groups are tags: set a tag, rename, recolour, move a whole group, turn it into a
+  folder, or flatten a folder into a group. The sidebar shows groups too.
+・Search finds folders, and "#name" finds every bookmark in groups of that name
+  across folders.
+・The vault gets reordering, groups and search (search runs locally).
+・Bookmark groups sync to your other devices through Firefox Sync by default; this
+  can be turned off in settings.
 ```
 
 ---

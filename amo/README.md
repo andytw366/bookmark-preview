@@ -57,7 +57,7 @@ python3 scripts/amo-paste.py     # → amo/paste/*.txt
 | 欄位 | 值 |
 |---|---|
 | 名稱 | `書籤預覽`（zh-TW）／`Bookmark Preview`（en-US） |
-| 版本 | `1.1.1` |
+| 版本 | `1.2.0` |
 | 擴充套件 ID | `bookmark-preview@andytw366.github.io`（**發布後不能再改**） |
 | 授權條款 | **Mozilla Public License 2.0**（下拉選單裡選 MPL-2.0，與版本庫的 `LICENSE` 一致） |
 | 首頁 | `https://github.com/andytw366/bookmark-preview` |

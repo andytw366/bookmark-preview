@@ -21,10 +21,17 @@ limited to 3000 characters**, so this is deliberately terse — run
 
 ---
 
-## New in 1.1.1
+## New in 1.2.0
 
-Fixes only; no new permissions, APIs or deps. Two new kinds of request, both made from a
-page the user already has open, using `scripting` and `<all_urls>` — see below.
+Folder Back/Up, drag-and-drop ordering, bookmark groups. No new permissions, requests or deps.
+
+- `storage.sync` now also holds bookmark groups, **on by default**: `grid:<folder guid>` =
+  group names, colours, member GUIDs, random device ID. Not encrypted by us (like the
+  bookmark titles Sync already carries); in the privacy policy; turning it off in settings
+  removes the keys. Fixed 20 KB budget (`grid-sync.ts`). Vault groups stay in vault ciphertext.
+- `history.pushState` for folders: bookmarks use `#folder=<guid>`; vault folders store only a
+  random token, mapped in memory and cleared on lock (`gallery-history.ts`).
+- Vault drag data has no URL, internal type only (`useGridDrag.ts`).
 
 ## Source and build
 
@@ -38,7 +45,7 @@ npm run build
 `vite build` runs twice (the pages, then `vite.config.background.ts`) because an MV3
 background script must be one IIFE. The `.zip` is `npm run package`.
 
-Verified for 1.1.1: those commands reproduce the submitted `dist/`, all 24 files identical.
+Verified for 1.2.0: those commands reproduce the submitted `dist/`, all 24 files identical.
 
 ## No remote code
 
@@ -63,8 +70,8 @@ All to build a preview; every URL is the bookmark's own or one its page declares
 - `HEAD` on the bookmarked URL, from the page, to see where it redirects — a bookmark
   saved as `http://` must still match the open tab.
 
-**Nothing is uploaded; no developer endpoint.** Everything stays on the device, except
-Firefox Sync — user-enabled, AES-256-GCM ciphertext only; the key never touches disk.
+**Nothing is uploaded; no developer endpoint.** Only Firefox Sync leaves the device: the
+vault (opt-in, AES-256-GCM ciphertext; the key never touches disk) and groups (above).
 
 ## Optional permissions
 
