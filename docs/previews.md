@@ -158,7 +158,12 @@ Choices made deliberately:
   the right answer. Icons also skip the site-wide learning.
 
 An existing non-icon thumbnail of an entry URL is not "fresh": the next visit replaces it
-instead of waiting `thumbMaxAgeDays`. The cost is that an entry URL whose icon cannot be
+instead of waiting `thumbMaxAgeDays`, and "Fetch missing previews" replaces it too (icon
+only — if no icon can be fetched the existing preview stays, it is never swapped for an
+`og:image`). Manually picked previews are left alone.
+
+The icon scales with its tile (55% of the tile's short side, via a size container), capped
+at twice the icon's own resolution so a lone 16px favicon does not become a blur. The cost is that an entry URL whose icon cannot be
 fetched reruns the pipeline on every visit.
 
 ## The manual override

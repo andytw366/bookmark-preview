@@ -280,15 +280,19 @@ body {
 
 /*
  * 網站圖示：方塊沿用 .thumb 的尺寸與面板底色（大卡就是 16:9），圖示置中。
- * --icon-size 由元件給（48px，原圖太小時 32px 起跳）；小列模式的方塊只有
- * --thumb-size 見方，max-* 讓它縮成方塊的 60%，四周還留得出邊。
+ *
+ * 用 size container 讓圖示跟著方塊縮放：取方塊短邊的 55%（大卡約 70px、小列約 24px、
+ * 全頁瀏覽隨卡片大小）。每種顯示方式的方塊都有明確尺寸，size containment 不會讓它塌掉。
+ * --icon-limit 由元件給（原圖的兩倍，至少 32px），小圖示不會被放成糊的。
  */
+.thumb--icon {
+  container-type: size;
+}
+
 .thumb--icon img {
   display: block;
-  width: var(--icon-size, 48px);
-  height: var(--icon-size, 48px);
-  max-width: 60%;
-  max-height: 60%;
+  width: min(var(--icon-limit, 48px), 55cqmin);
+  height: min(var(--icon-limit, 48px), 55cqmin);
   object-fit: contain;
 }
 

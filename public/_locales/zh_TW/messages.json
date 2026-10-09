@@ -716,7 +716,7 @@
     "message": "補抓中…"
   },
   "backfill_hint": {
-    "message": "為還沒有預覽圖的書籤抓取 og:image。會對這些網站發出請求。"
+    "message": "為還沒有預覽圖的書籤抓取 og:image；指向整個網站、還沒顯示網站圖示的書籤則抓網站圖示。會對這些網站發出請求。"
   },
   "backfill_needs_permission_hint": {
     "message": "需要先授予網站存取權限"

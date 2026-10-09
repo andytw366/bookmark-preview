@@ -716,7 +716,7 @@
     "message": "Fetching…"
   },
   "backfill_hint": {
-    "message": "Fetch the og:image for bookmarks that have no preview yet. This makes a request to each of those sites."
+    "message": "Fetch the og:image for bookmarks that have no preview yet, and the site icon for bookmarks of whole sites that don't show one yet. This makes a request to each of those sites."
   },
   "backfill_needs_permission_hint": {
     "message": "Needs permission to access websites first"

@@ -13,7 +13,8 @@ import { listBookmarks, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
 
 /**
- * 手動補抓：為還沒有任何縮圖的書籤抓 og:image。
+ * 手動補抓：為還沒有任何縮圖的書籤抓 og:image（入口網址先試網站圖示）。
+ * 已經有縮圖、但應該是網站圖示的入口網址也一併換掉（`needsIconUpgrade`）。
  *
  * 刻意不做成安裝時自動執行 —— 這會對幾百個網域發出請求，
  * 使用者應該明確知道自己按了這個按鈕。
@@ -42,11 +43,14 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
     );
 
     const choices = await getPreviewChoices();
-    const targets: { url: string; key: string }[] = [];
+    const targets: { url: string; key: string; iconOnly: boolean }[] = [];
     for (const url of candidates) {
       const key = await urlKey(url);
-      if ((await getThumb(key)) === undefined) {
-        targets.push({ url, key });
+      const existing = await getThumb(key);
+      if (existing === undefined) {
+        targets.push({ url, key, iconOnly: false });
+      } else if (needsIconUpgrade(settings, url, existing.source, choices[key])) {
+        targets.push({ url, key, iconOnly: true });
       }
     }
 
@@ -63,7 +67,11 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const found = await iconOrOg(settings, item.url, { learn: true, choice: choices[item.key] });
+        const found = await iconOrOg(settings, item.url, {
+          learn: true,
+          choice: choices[item.key],
+          iconOnly: item.iconOnly,
+        });
         if (found !== null) {
           await putThumb({
             key: item.key,
@@ -109,13 +117,16 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
   running = true;
   try {
     const settings = await getSettings();
-    const targets: { id: string; url: string; choice: PreviewChoice | undefined }[] = [];
+    const targets: { id: string; url: string; choice: PreviewChoice | undefined; iconOnly: boolean }[] = [];
     for (const record of listBookmarks()) {
       if (!isPreviewableUrl(record.url) || isBlocked(hostnameOf(record.url), settings.captureBlocklist)) {
         continue;
       }
-      if ((await getThumb(vaultThumbKey(record.id))) === undefined) {
-        targets.push({ id: record.id, url: record.url, choice: record.preview });
+      const existing = await getThumb(vaultThumbKey(record.id));
+      if (existing === undefined) {
+        targets.push({ id: record.id, url: record.url, choice: record.preview, iconOnly: false });
+      } else if (needsIconUpgrade(settings, record.url, existing.source, record.preview)) {
+        targets.push({ id: record.id, url: record.url, choice: record.preview, iconOnly: true });
       }
     }
 
@@ -132,7 +143,11 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const found = await iconOrOg(settings, item.url, { learn: false, choice: item.choice });
+        const found = await iconOrOg(settings, item.url, {
+          learn: false,
+          choice: item.choice,
+          iconOnly: item.iconOnly,
+        });
         if (found !== null) {
           await storeVaultThumbnail(item.id, found.thumbnail, found.source);
           broadcast('thumbs/updated', { key: vaultThumbKey(item.id) });
@@ -157,7 +172,7 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
 async function iconOrOg(
   settings: Settings,
   url: string,
-  { learn, choice }: { learn: boolean; choice: PreviewChoice | undefined },
+  { learn, choice, iconOnly }: { learn: boolean; choice: PreviewChoice | undefined; iconOnly: boolean },
 ): Promise<{ thumbnail: Thumbnail; source: ThumbSource } | null> {
   if (wantsSiteIcon(settings, url, choice)) {
     const icon = await fetchIconThumbnail(url);
@@ -165,6 +180,27 @@ async function iconOrOg(
       return { thumbnail: icon, source: 'icon' };
     }
   }
+  // 換成圖示的那種：手上已經有一張了，拿不到圖示就留著它，不要換成一張 og 圖
+  if (iconOnly) {
+    return null;
+  }
   const og = await fetchOgThumbnail(url, { learn });
   return og === null ? null : { thumbnail: og, source: 'og' };
+}
+
+/**
+ * 已經有縮圖、但照現在的規則應該是網站圖示的 —— 補抓也把它換掉。
+ *
+ * 補抓原本只管「完全沒有縮圖」的書籤。網站圖示是 1.3.0 才有的，升級前補抓過的入口網址
+ * 手上都是 og 圖，只照原本的規則的話，要一個一個造訪才會換（`capture.ts` 的 `staleForIcon`）。
+ *
+ * 右鍵指定過的（`manual`）不動；手動選了「頁面預覽」的，`wantsSiteIcon` 本來就回 false。
+ */
+function needsIconUpgrade(
+  settings: Settings,
+  url: string,
+  source: ThumbSource,
+  choice: PreviewChoice | undefined,
+): boolean {
+  return source !== 'icon' && choice !== 'manual' && wantsSiteIcon(settings, url, choice);
 }

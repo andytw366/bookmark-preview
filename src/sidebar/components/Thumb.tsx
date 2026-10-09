@@ -52,13 +52,14 @@ export function Thumb({ url, hostname }: ThumbProps) {
  *
  * 底色用面板色而不是網域色相 —— 跟 Zen 的釘選格子一樣素，讓圖示自己說話。
  *
- * **不放大成糊圖**：顯示 48px；原圖比 48 小時用 `max(原圖, 32)`。
- * 小列模式的方塊本身不到 48，由 CSS 再限制成方塊的 60%。
+ * 大小跟著方塊走（CSS 取方塊短邊的一半多），原本固定 48px 在大卡裡顯得很空。
+ * 上限是原圖的兩倍（至少 32px）：多數站台有 180px 以上的 touch icon／manifest 圖示，
+ * 只有一張 16px favicon 的那種放到滿格只會是一團糊。
  */
 export function IconThumb({ src, width, height }: { src: string; width: number; height: number }) {
-  const size = Math.min(48, Math.max(width, height, 32));
+  const limit = Math.max(Math.max(width, height) * 2, 32);
   return (
-    <div className="thumb thumb--icon" style={{ '--icon-size': `${String(size)}px` } as CSSProperties}>
+    <div className="thumb thumb--icon" style={{ '--icon-limit': `${String(limit)}px` } as CSSProperties}>
       <img src={src} alt="" loading="lazy" decoding="async" />
     </div>
   );
