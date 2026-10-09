@@ -1,4 +1,5 @@
 import {
+  conventionalTouchIcons,
   iconsFromManifest,
   rankIconCandidates,
   UNDECLARED_ICON_SIZE,
@@ -53,6 +54,8 @@ const ICON_MAX = 256;
 const MIN_ICON_SIDE = 16;
 /** 最多試幾個候選。全部失敗的站台不該拖著對外發一長串請求 */
 const MAX_ATTEMPTS = 8;
+/** 解出來最短邊到這個大小就夠用了，不再往下試（顯示最大約 80 CSS px，高 DPI 下 160） */
+const GOOD_ENOUGH_SIDE = 128;
 const MANIFEST_TIMEOUT_MS = 8_000;
 const MAX_MANIFEST_BYTES = 500_000;
 
@@ -142,8 +145,9 @@ export async function iconThumbnailFromTab(tabId: number, url: string): Promise<
   if (tab.favIconUrl !== undefined && tab.favIconUrl !== '') {
     candidates.push({ url: tab.favIconUrl, size: UNDECLARED_ICON_SIZE });
   }
+  candidates.push(...conventionalTouchIcons(url));
 
-  return firstDecodable(rankIconCandidates(candidates), async (iconUrl) => {
+  return bestDecodable(rankIconCandidates(candidates), async (iconUrl) => {
     const direct = await fetchImageBlob(iconUrl);
     if (direct !== null || iconUrl.startsWith('data:')) {
       return direct;
@@ -170,6 +174,7 @@ export async function fetchIconThumbnail(pageUrl: string): Promise<Thumbnail | n
       candidates.push(...(await manifestIcons(declared.manifest, { credentials: 'omit' })));
     }
   }
+  candidates.push(...conventionalTouchIcons(base));
   const ranked = rankIconCandidates(candidates);
   try {
     // 墊底：沒宣告的站台多半還是有這個檔案。已經在清單裡就不重複
@@ -180,24 +185,39 @@ export async function fetchIconThumbnail(pageUrl: string): Promise<Thumbnail | n
   } catch {
     // base 不是網址，什麼都不必試了
   }
-  return firstDecodable(ranked, (iconUrl) => fetchImageBlob(iconUrl, { credentials: 'omit' }));
+  return bestDecodable(ranked, (iconUrl) => fetchImageBlob(iconUrl, { credentials: 'omit' }));
 }
 
-async function firstDecodable(
+/**
+ * 依序取下來解碼，留下**最大的**那張；解到夠大（`GOOD_ENOUGH_SIDE`）就提早停。
+ *
+ * 不是「第一張能解碼的就用」：排序靠的是宣告或猜測的尺寸，而那常常不準 —— 沒寫 `sizes`
+ * 的 `<link rel="icon">` 可能是 16px，猜 120 的慣例路徑可能是 57px。第一張就停的話，
+ * 排在前面的小圖會擋掉後面真正大的那張，放大顯示就是糊的。
+ */
+async function bestDecodable(
   urls: readonly string[],
   fetchBlob: (url: string) => Promise<Blob | null>,
 ): Promise<Thumbnail | null> {
+  let best: Thumbnail | null = null;
   for (const url of urls.slice(0, MAX_ATTEMPTS)) {
     const blob = await fetchBlob(url);
     if (blob === null) {
       continue;
     }
     const thumbnail = await decodeIcon(blob);
-    if (thumbnail !== null) {
-      return thumbnail;
+    if (thumbnail === null) {
+      continue;
+    }
+    const side = Math.min(thumbnail.width, thumbnail.height);
+    if (best === null || side > Math.min(best.width, best.height)) {
+      best = thumbnail;
+    }
+    if (side >= GOOD_ENOUGH_SIDE) {
+      break;
     }
   }
-  return null;
+  return best;
 }
 
 /**
@@ -272,6 +292,8 @@ async function decodeIcon(blob: Blob): Promise<Thumbnail | null> {
     if (context === null) {
       throw new Error(t('image_no_2d_context'));
     }
+    // 512 的 manifest 圖示一步縮到 256：預設的平滑品質會讓細線發毛
+    context.imageSmoothingQuality = 'high';
     context.drawImage(source.image, 0, 0, width, height);
     const encoded = await encodeWithAlpha(canvas);
     return { bytes: await encoded.arrayBuffer(), mime: encoded.type, width, height };
@@ -349,15 +371,13 @@ async function rasterizeSvg(blob: Blob) {
   }
 }
 
-/** WebP 有 alpha；不支援時退 PNG（不是 JPEG —— JPEG 會把透明變黑底） */
+/**
+ * 一律 PNG：無損、有 alpha。
+ *
+ * 原本是有損 WebP（quality 0.9），但圖示全是銳利的邊與細字，有損壓縮在那些邊上留下的雜訊
+ * 放大顯示時很明顯 —— 這是「解析度很差」的原因之一。最長邊 256 的 PNG 通常只有幾十 KB。
+ * 不用 JPEG：透明會變黑底。
+ */
 async function encodeWithAlpha(canvas: OffscreenCanvas): Promise<Blob> {
-  try {
-    const webp = await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
-    if (webp.type === 'image/webp') {
-      return webp;
-    }
-  } catch {
-    // 落到 PNG
-  }
   return canvas.convertToBlob({ type: 'image/png' });
 }

@@ -111,6 +111,30 @@ export function iconsFromManifest(json: unknown, manifestUrl: string): IconCandi
   return found;
 }
 
+/**
+ * 沒宣告也常常存在的 iOS 慣例路徑。iOS 會自己去網站根目錄找這兩個檔，所以很多站台放了卻沒寫
+ * `<link>`：Twitch 只宣告 16／32px，根目錄卻有 180px 的；Google 學術只有 favicon.ico，根目錄有 120px 的。
+ *
+ * 尺寸猜 120（不是規格預設的 180）：老站台放的常是 57／72px。猜的只影響試的順序，
+ * 真正的大小由 `site-icon.ts` 解碼後比較。
+ */
+export const CONVENTIONAL_TOUCH_ICON_SIZE = 120;
+
+export function conventionalTouchIcons(pageUrl: string): IconCandidate[] {
+  try {
+    const origin = new URL(pageUrl).origin;
+    if (!/^https?:/.test(origin)) {
+      return [];
+    }
+    return ['/apple-touch-icon.png', '/apple-touch-icon-precomposed.png'].map((path) => ({
+      url: `${origin}${path}`,
+      size: CONVENTIONAL_TOUCH_ICON_SIZE,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** 只收網頁協定與 `data:`（`tab.favIconUrl` 常是 data:） */
 function usable(url: string): boolean {
   return /^(https?:|data:image\/)/i.test(url);

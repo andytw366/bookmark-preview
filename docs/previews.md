@@ -142,10 +142,17 @@ Where the icon comes from (`background/site-icon.ts`):
   the page's credentials), and `tab.favIconUrl`.
 - **No tab** (backfill, refresh without a tab): the same declarations parsed from the
   fetched HTML, then `/favicon.ico` as a last resort.
-- Largest first, square preferred; `mask-icon` and `monochrome` icons are skipped. The
-  first that decodes with a shortest side of at least 16px wins. SVGs are rasterized
-  through an `<img>` after their root is given explicit dimensions (Firefox draws a
-  dimensionless SVG at 0×0). Stored at most 256px, transparency kept (WebP, else PNG).
+- Both paths also try the iOS convention paths `/apple-touch-icon.png` and
+  `/apple-touch-icon-precomposed.png`, which many sites serve without declaring them
+  (Twitch declares only 16/32px but serves a 180px one; Google Scholar only declares
+  `favicon.ico` but serves 120px).
+- Largest first, square preferred; `mask-icon` and `monochrome` icons are skipped.
+  Declared and guessed sizes are often wrong, so candidates are decoded in that order and
+  the **largest** is kept, stopping early at 128px; the first decodable one is not simply
+  taken. SVGs are rasterized through an `<img>` after their root is given explicit
+  dimensions (Firefox draws a dimensionless SVG at 0×0). Stored at most 256px as **PNG**,
+  lossless with transparency; lossy WebP left visible noise around the sharp edges icons
+  are made of.
 
 Choices made deliberately:
 

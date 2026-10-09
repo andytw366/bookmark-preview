@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  conventionalTouchIcons,
   iconsFromManifest,
   looksLikeSvg,
   parseSizes,
@@ -126,5 +127,20 @@ describe('wantsSiteIcon', () => {
   it('手動選擇蓋過規則，設定關著也一樣', () => {
     expect(wantsSiteIcon(off, 'https://mail.google.com/mail/u/0/', 'icon')).toBe(true);
     expect(wantsSiteIcon(on, 'https://x.com/someone', 'page')).toBe(false);
+  });
+});
+
+/** 沒宣告也常常存在的 iOS 慣例路徑（Twitch 只宣告 32px，根目錄卻有 180px 的） */
+describe('conventionalTouchIcons', () => {
+  it('取網站根目錄，不管書籤在哪一層', () => {
+    expect(conventionalTouchIcons('https://www.twitch.tv/directory?x=1').map((icon) => icon.url)).toEqual([
+      'https://www.twitch.tv/apple-touch-icon.png',
+      'https://www.twitch.tv/apple-touch-icon-precomposed.png',
+    ]);
+  });
+
+  it('不是網頁就沒有', () => {
+    expect(conventionalTouchIcons('data:text/html,hi')).toEqual([]);
+    expect(conventionalTouchIcons('nope')).toEqual([]);
   });
 });
