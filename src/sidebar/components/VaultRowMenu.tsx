@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { request } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder } from '@/shared/types';
+import { vaultThumbKey } from '@/shared/url';
 import { Popover } from './Popover';
+import { PreviewModeItem } from './PreviewModeItem';
 import { ReorderItems, type ReorderActions } from './ReorderItems';
 import { TagItems, type TagActions } from './TagItems';
 import { t } from '@/shared/i18n';
@@ -269,6 +271,12 @@ export function VaultRowMenu({
           >
             {t('action_refresh_thumb')}
           </button>
+          <PreviewModeItem
+            thumbKey={vaultThumbKey(target.record.id)}
+            send={async (mode) => request('vault/set-thumb-mode', { id: target.record.id, mode })}
+            onClose={onClose}
+            onNotice={onNotice}
+          />
         </>
       ) : null}
 

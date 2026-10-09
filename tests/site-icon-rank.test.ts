@@ -6,6 +6,7 @@ import {
   rankIconCandidates,
   SCALABLE_SIZE,
 } from '@/shared/site-icon-rank';
+import { wantsSiteIcon } from '@/background/site-icon';
 
 /**
  * 網站圖示的候選排序：尺寸大的優先、偏好正方形。
@@ -107,5 +108,23 @@ describe('rankIconCandidates', () => {
         { url: 'javascript:alert(1)', size: 999 },
       ]),
     ).toEqual(['data:image/png;base64,AAAA']);
+  });
+});
+
+/** 決定順序：手動選擇 > 設定與入口規則；`manual`（右鍵指定過圖）不表態 */
+describe('wantsSiteIcon', () => {
+  const on = { entryIcons: true };
+  const off = { entryIcons: false };
+
+  it('沒有手動選擇時照設定與入口規則', () => {
+    expect(wantsSiteIcon(on, 'https://twitch.tv/')).toBe(true);
+    expect(wantsSiteIcon(off, 'https://twitch.tv/')).toBe(false);
+    expect(wantsSiteIcon(on, 'https://github.com/u/repo')).toBe(false);
+    expect(wantsSiteIcon(on, 'https://twitch.tv/', 'manual')).toBe(true);
+  });
+
+  it('手動選擇蓋過規則，設定關著也一樣', () => {
+    expect(wantsSiteIcon(off, 'https://mail.google.com/mail/u/0/', 'icon')).toBe(true);
+    expect(wantsSiteIcon(on, 'https://x.com/someone', 'page')).toBe(false);
   });
 });

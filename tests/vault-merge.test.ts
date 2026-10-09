@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   contentTag,
   countAlive,
+  hex,
   mergeVaults,
   pruneTombstones,
   sanitizeVaultPayload,
@@ -306,5 +307,47 @@ describe('countAlive', () => {
     );
     expect(report.bookmarks.added).toBe(1);
     expect(report.folders.added).toBe(1);
+  });
+});
+
+/** 隱私書籤手動選的預覽方式（`PrivateBookmark.preview`） */
+describe('preview 欄位', () => {
+  const base = { id: 'a', url: 'https://x.example/', title: 'x', folderId: null, createdAt: 1, updatedAt: 2 };
+
+  it('sanitize 留下 icon／page，其他值丟掉', () => {
+    const result = sanitizeVaultPayload({
+      bookmarks: [
+        { ...base, preview: 'icon' },
+        { ...base, id: 'b', preview: 'page' },
+        { ...base, id: 'c', preview: 'manual' },
+        { ...base, id: 'd', preview: 42 },
+      ],
+      folders: [],
+    });
+    expect(result.bookmarks.map((record) => record.preview)).toEqual(['icon', 'page', undefined, undefined]);
+    expect('preview' in result.bookmarks[2]!).toBe(false);
+  });
+
+  it('改了選擇指紋就變；沒選過的指紋不受這個欄位影響', async () => {
+    const plain = { version: 1 as const, bookmarks: [base], folders: [] };
+    const icon = { ...plain, bookmarks: [{ ...base, preview: 'icon' as const }] };
+    const page = { ...plain, bookmarks: [{ ...base, preview: 'page' as const }] };
+    expect(await contentTag(icon)).not.toBe(await contentTag(plain));
+    expect(await contentTag(icon)).not.toBe(await contentTag(page));
+    // 沒選過的書籤，指紋要與加這個欄位之前那一版算法一樣 —— 不然升級後每台裝置都會認定
+    // 「雲端跟我不一樣」而整份重寫。這裡照舊版的欄位清單自己算一次來比
+    const old = JSON.stringify([
+      1,
+      [JSON.stringify([base.id, base.url, base.title, base.folderId, base.createdAt, base.updatedAt, false])],
+      [],
+    ]);
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(old)));
+    expect(await contentTag(plain)).toBe(hex(digest.subarray(0, 16)));
+  });
+
+  it('合併時跟著整筆走，較新的贏', () => {
+    const mine = { version: 1 as const, bookmarks: [{ ...base, preview: 'icon' as const, updatedAt: 5 }], folders: [] };
+    const theirs = { version: 1 as const, bookmarks: [{ ...base, preview: 'page' as const, updatedAt: 9 }], folders: [] };
+    expect(mergeVaults(mine, theirs).payload.bookmarks[0]?.preview).toBe('page');
   });
 });

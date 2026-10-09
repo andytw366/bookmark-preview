@@ -1,3 +1,4 @@
+import { setPreviewChoice } from '@/storage/preview-choice';
 import { broadcast } from '@/shared/messages';
 import { urlKey } from '@/shared/url';
 import { recordCapture, type CaptureDiagnostic } from '@/storage/diagnostics';
@@ -105,6 +106,8 @@ async function applyManualCover(
       encrypted: false,
       iv: null,
     });
+    // 記下「這張是手動指定的」，自動擷取就不會在過期後把它蓋掉（`storage/preview-choice.ts`）
+    await setPreviewChoice(match.bookmarkUrl, 'manual');
     await recordCapture({ ...stamp, stage: 'manual:ok', ...via });
     broadcast('thumbs/updated', { key });
   } catch (cause) {

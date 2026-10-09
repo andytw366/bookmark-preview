@@ -146,6 +146,18 @@ describe('隱私書籤的縮圖', () => {
     expect(bodyOf(backfill, 'async function iconOrOg')).not.toContain('putThumb');
   });
 
+  /**
+   * 「改用網站圖示／頁面預覽」：一般書籤記在 `storage.local`（`setPreviewChoice`），隱私書籤只能記在
+   * 加密的 payload（`setVaultPreview`）。寫錯一邊不會有任何錯誤，選擇照樣生效。
+   */
+  it('隱私書籤的預覽選擇不寫進 storage.local', () => {
+    const body = bodyOf(refresh, 'export async function setVaultThumbnailMode');
+    expect(body).toContain('setVaultPreview');
+    expect(body).not.toContain('setPreviewChoice');
+    const vaultBody = bodyOf(refresh, 'export async function refreshVaultThumbnail');
+    expect(vaultBody).not.toContain('PreviewChoice');
+  });
+
   /** 移進隱私空間（單筆、整個資料夾）與每次解鎖，都要清掉明文快取裡的痕跡 */
   it('移入與解鎖都清明文快取', () => {
     const vault = readFileSync('src/background/vault.ts', 'utf8');

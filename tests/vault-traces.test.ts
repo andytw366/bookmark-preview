@@ -3,6 +3,7 @@ import { forgetPlaintextTraces } from '@/background/vault-traces';
 import { getLastCapture, recordCapture } from '@/storage/diagnostics';
 import { isResolved, rememberRedirect } from '@/storage/redirect-map';
 import { noteDeclaredImages } from '@/storage/site-image-stats';
+import { getPreviewChoice, setPreviewChoice } from '@/storage/preview-choice';
 
 /**
  * 書籤移進隱私空間後，明文快取裡不能再找得到它的網址（2026-10-09 實機發現：
@@ -63,6 +64,15 @@ describe('forgetPlaintextTraces', () => {
     await recordCapture({ stage: 'ok', url: 'https://other.example/', at: 1 });
     await forgetPlaintextTraces(['https://secret.example/']);
     expect((await getLastCapture())?.url).toBe('https://other.example/');
+  });
+
+  /** 鍵是雜湊，但對得上猜得到的網址；那筆選擇移入時已經搬進加密 payload */
+  it('手動選的預覽方式也清掉，別人的留著', async () => {
+    await setPreviewChoice('https://secret.example/', 'icon');
+    await setPreviewChoice('https://keep.example/', 'page');
+    await forgetPlaintextTraces(['https://secret.example']);
+    expect(await getPreviewChoice('https://secret.example/')).toBeUndefined();
+    expect(await getPreviewChoice('https://keep.example/')).toBe('page');
   });
 
   it('頁面拿光的圖與空掉的網域整筆刪掉', async () => {

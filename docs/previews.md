@@ -167,6 +167,19 @@ Automatic detection cannot be right everywhere, so there is a direct escape hatc
 **right-click any image on any page → "Use as this bookmark's preview"**. This works for
 vault bookmarks too (the thumbnail is encrypted with the master password).
 
+A manually picked image is remembered (`storage/preview-choice.ts`, keyed by URL hash), so
+automatic capture no longer replaces it once it is older than `thumbMaxAgeDays` — before
+1.3.0 it was stored as an ordinary `cover` and silently overwritten on a later visit.
+"Refresh preview" clears that pin.
+
+The row menu also has **"Use site icon" / "Use page preview"**, labelled by what the row
+shows right now. It fixes what the entry-URL rule gets wrong (a one-level profile page)
+or cannot see (`mail.google.com/mail/u/0/`). The choice is remembered and **beats the
+setting and the rule**. Normal bookmarks keep it in that same hashed map; vault bookmarks
+keep it in the encrypted payload (`PrivateBookmark.preview`), never in `storage.local`. It
+moves with the bookmark into and out of the vault, and the plaintext entry is cleared on
+move-in like the other caches (`vault-traces.ts`).
+
 ## Capture triggers
 
 **A newly created bookmark is captured immediately**, without waiting for the next visit.

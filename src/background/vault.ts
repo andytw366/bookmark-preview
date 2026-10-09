@@ -18,6 +18,7 @@ import type { VaultThumbPayload } from '@/shared/messages';
 import type {
   PrivateBookmark,
   PrivateFolder,
+  PreviewMode,
   ThumbSource,
   VaultMeta,
   VaultPayload,
@@ -61,6 +62,7 @@ import {
 import { clearLayoutEnvelope } from '@/storage/layout-sync';
 import { getSettings } from '@/storage/settings';
 import { deleteThumb, getThumb, listKeys as listThumbKeys, putThumb } from '@/storage/thumbs-db';
+import { getPreviewChoice, setPreviewChoice } from '@/storage/preview-choice';
 import {
   clearSyncEnvelope,
   deviceId,
@@ -1057,9 +1059,23 @@ async function encryptThumb(record: PrivateBookmark): Promise<void> {
   await deleteThumb(plainKey);
 }
 
-/** 移出隱私空間時把縮圖還原成明文。 */
+/**
+ * 移入時把一般書籤手動選的預覽方式搬進加密的 record。明文那份由 `forgetTraces` 清掉。
+ * `manual`（右鍵指定過圖）不搬：隱私書籤沒有自動擷取，本來就不會被蓋掉。
+ */
+async function carryPreviewChoiceIn(record: PrivateBookmark): Promise<void> {
+  const choice = await getPreviewChoice(record.url);
+  if (choice === 'icon' || choice === 'page') {
+    record.preview = choice;
+  }
+}
+
+/** 移出隱私空間時把縮圖還原成明文，手動選的預覽方式也還給一般書籤。 */
 async function decryptThumbToPlain(record: PrivateBookmark): Promise<void> {
   const { key: k } = requireUnlocked();
+  if (record.preview !== undefined) {
+    await setPreviewChoice(record.url, record.preview);
+  }
   const encryptedKey = vaultThumbKey(record.id);
   const existing = await getThumb(encryptedKey);
   if (existing === undefined || !existing.encrypted || existing.iv === null) {
@@ -1214,6 +1230,7 @@ async function importOneLocked(bookmarkId: string, purgeHistory: boolean): Promi
       createdAt: now,
       updatedAt: now,
     };
+    await carryPreviewChoiceIn(record);
     current.bookmarks.push(record);
     await encryptThumb(record);
     await persist();
@@ -1294,6 +1311,7 @@ async function importFolderLocked(folderId: string, purgeHistory: boolean): Prom
   // 縮圖逐筆搬成加密版（明文那份會被刪掉），失敗不該讓整個移入停下 ——
   // 少一張預覽圖重抓就有，書籤沒進來才是真的損失
   for (const record of records) {
+    await carryPreviewChoiceIn(record);
     try {
       await encryptThumb(record);
     } catch {
@@ -1371,6 +1389,23 @@ export async function importManyNativeBookmarks(
 }
 
 /** 重新命名隱私書籤。原生書籤走 `bookmarks/rename`，這裡的記錄不在書籤樹裡。 */
+/**
+ * 記下這筆隱私書籤手動選的預覽方式。寫在加密的 payload 裡，`updatedAt` 跟著動，
+ * 跨裝置合併時整筆以較新的為準（`vault-merge.ts`）。
+ */
+export async function setVaultPreview(id: string, mode: PreviewMode): Promise<void> {
+  return exclusive(async () => {
+    const { payload: current } = requireUnlocked();
+    const record = current.bookmarks.find((item) => item.id === id && item.deleted !== true);
+    if (record === undefined) {
+      throw new Error(t('vault_bookmark_not_found'));
+    }
+    record.preview = mode;
+    record.updatedAt = Date.now();
+    await persist();
+  });
+}
+
 export async function renameBookmark(id: string, title: string): Promise<void> {
   return exclusive(async () => {
     const { payload: current } = requireUnlocked();

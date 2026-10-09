@@ -1,11 +1,12 @@
 import { forgetCapture } from '@/storage/diagnostics';
 import { forgetRedirects } from '@/storage/redirect-map';
+import { forgetPreviewChoices } from '@/storage/preview-choice';
 import { forgetPages } from '@/storage/site-image-stats';
 
 /**
  * 把這些網址在 `storage.local` 明文快取裡的痕跡清掉。書籤移進隱私空間時、以及每次解鎖時呼叫。
  *
- * 那三份快取（轉址表、全站共用圖的學習紀錄、最後一次擷取的診斷）都只記一般書籤，
+ * 那幾份快取（轉址表、全站共用圖的學習紀錄、最後一次擷取的診斷、手動選的預覽方式）都只記一般書籤，
  * 隱私空間那幾條路不寫進去（`tests/vault-thumb-privacy.test.ts` 釘著）。但書籤**還是一般書籤的時候**
  * 寫下的紀錄不會因為它被移進隱私空間就消失 —— 1.2.0 以前就是這樣，Wikipedia 移進去之後
  * 頁面網址還躺在 `siteImageStats` 裡。
@@ -23,4 +24,6 @@ export async function forgetPlaintextTraces(urls: readonly string[]): Promise<vo
   const all = [...urls, ...finals];
   await forgetPages(all);
   await forgetCapture(all);
+  // 手動選的預覽方式：鍵是雜湊，但對得上猜得到的網址。移入時已經搬進加密 payload（`vault.ts`）
+  await forgetPreviewChoices(urls);
 }

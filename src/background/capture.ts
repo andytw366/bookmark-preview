@@ -4,6 +4,7 @@ import { hostnameOf, isPreviewableUrl, normalizeUrl, urlKey } from '@/shared/url
 import { recordCapture, type CaptureStage } from '@/storage/diagnostics';
 import { getSettings, isBlocked } from '@/storage/settings';
 import { getThumb, putThumb } from '@/storage/thumbs-db';
+import { getPreviewChoice } from '@/storage/preview-choice';
 import { resolveBookmarkForPage } from './bookmark-index';
 import { findOpenTabResolving } from './open-tab';
 import { noteDeclaredImages } from '@/storage/site-image-stats';
@@ -96,7 +97,7 @@ async function captureForNewBookmark(node: browser.bookmarks.BookmarkTreeNode): 
   // 往下傳分頁停在的那個網址（`target.pageUrl`），鍵用書籤的 —— 理由見 `OpenTab`
   await produceThumbnailNow(target.tabId, target.pageUrl, key, {
     preference: settings.previewSource,
-    icon: wantsSiteIcon(settings, url),
+    icon: wantsSiteIcon(settings, url, await getPreviewChoice(url)),
   });
 }
 
@@ -180,8 +181,14 @@ async function schedule(tabId: number, tab: browser.tabs.Tab): Promise<void> {
   const key = await urlKey(match.bookmarkUrl);
   const existing = await getThumb(key);
   const maxAge = settings.thumbMaxAgeDays * DAY_MS;
+  const choice = await getPreviewChoice(match.bookmarkUrl);
+  // 右鍵指定過的圖不讓自動擷取蓋掉。沒有縮圖（被清掉了）時照常抓
+  if (choice === 'manual' && existing !== undefined) {
+    await skip('skipped:manual', url);
+    return;
+  }
   // 入口網址看的是**書籤的**網址：分頁可能已被轉到更深的路徑（Drive → /drive/my-drive）
-  const icon = wantsSiteIcon(settings, match.bookmarkUrl);
+  const icon = wantsSiteIcon(settings, match.bookmarkUrl, choice);
   // 只有「自動產生的」縮圖才會因為過期而重抓。手動補抓的 og 圖不主動覆蓋。
   const autoSource =
     existing?.source === 'capture' || existing?.source === 'cover' || existing?.source === 'icon';
@@ -190,7 +197,10 @@ async function schedule(tabId: number, tab: browser.tabs.Tab): Promise<void> {
    * 就會變成圖示，不必等 `thumbMaxAgeDays`。代價：抓不到圖示的入口網址每次造訪都會重跑
    * 整條管線（圖示失敗後照舊寫入封面／截圖，下次又不是 icon），接受。
    */
-  const staleForIcon = icon && existing !== undefined && existing.source !== 'icon';
+  // 手動選了「頁面預覽」而手上還是圖示，也一樣換掉。只看手動選擇：設定關掉時不主動換回來
+  const staleForIcon =
+    existing !== undefined &&
+    (icon ? existing.source !== 'icon' : choice === 'page' && existing.source === 'icon');
   if (
     autoSource &&
     !staleForIcon &&

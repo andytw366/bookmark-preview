@@ -697,6 +697,18 @@
   "preview_entry_icons_hint": {
     "message": "When a bookmark points to a site rather than a page in it (a path at most one level deep and no query, like google.com/maps or twitch.tv), use the site's icon as its preview. Turning this off keeps existing icons until they expire or you refresh the preview."
   },
+  "row_use_site_icon": {
+    "message": "Use site icon"
+  },
+  "row_use_site_icon_hint": {
+    "message": "Show this site's icon instead of a cover or screenshot, and keep it that way"
+  },
+  "row_use_page_preview": {
+    "message": "Use page preview"
+  },
+  "row_use_page_preview_hint": {
+    "message": "Show a cover or screenshot of the page instead of the site icon, and keep it that way"
+  },
   "backfill_start": {
     "message": "Fetch missing previews"
   },

@@ -15,6 +15,7 @@ import type {
   OpenTarget,
   PrivateBookmark,
   PrivateFolder,
+  PreviewMode,
   Settings,
   ThumbSource,
   VaultState,
@@ -228,6 +229,8 @@ export type Protocol = {
   'settings/patch': { request: Partial<Settings>; response: Settings };
   'thumbs/backfill': { request: void; response: BackfillReport };
   'thumbs/refresh': { request: { url: string }; response: RefreshReport };
+  /** 列選單「改用網站圖示／改用頁面預覽」：記住選擇並照它重抓 */
+  'thumbs/set-mode': { request: { url: string; mode: PreviewMode }; response: RefreshReport };
   /**
    * 取明文縮圖的位元組。
    *
@@ -292,6 +295,7 @@ export type Protocol = {
     response: void;
   };
   'vault/refresh-thumb': { request: { id: string }; response: RefreshReport };
+  'vault/set-thumb-mode': { request: { id: string; mode: PreviewMode }; response: RefreshReport };
   'vault/backfill': { request: void; response: BackfillReport };
   'vault/export': { request: { id: string; parentId?: string }; response: VaultState };
   'vault/export-many': {

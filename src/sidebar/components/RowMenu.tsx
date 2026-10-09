@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { request } from '@/shared/messages';
 import type { BookmarkNode } from '@/shared/types';
 import { folderHash } from '../lib/gallery-history';
+import { knownDigest } from '../lib/thumb-cache';
+import { PreviewModeItem } from './PreviewModeItem';
 import { FolderPicker } from './FolderPicker';
 import { Popover } from './Popover';
 import { ReorderItems, type ReorderActions } from './ReorderItems';
@@ -186,6 +188,12 @@ export function RowMenu({
           >
             {t('action_refresh_thumb')}
           </button>
+          <PreviewModeItem
+            thumbKey={knownDigest(node.url)}
+            send={async (mode) => request('thumbs/set-mode', { url: node.url, mode })}
+            onClose={onClose}
+            onNotice={onNotice}
+          />
         </>
       ) : (
         // 只有書籤這邊有：隱私資料夾的 id 不能出現在網址上（理由見 gallery-history）

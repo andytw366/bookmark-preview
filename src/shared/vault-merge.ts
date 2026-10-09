@@ -227,6 +227,9 @@ export function sanitizeVaultPayload(value: unknown): VaultPayload {
       createdAt: asTime(item.createdAt) ?? updatedAt,
       updatedAt,
     };
+    if (item.preview === 'icon' || item.preview === 'page') {
+      record.preview = item.preview;
+    }
     if (item.deleted === true) {
       record.deleted = true;
     }
@@ -272,7 +275,17 @@ function canonical(payload: VaultPayload): string {
   const bookmarks = [...payload.bookmarks]
     .sort(byId)
     .map((r) =>
-      JSON.stringify([r.id, r.url, r.title, r.folderId, r.createdAt, r.updatedAt, r.deleted === true]),
+      JSON.stringify([
+        r.id,
+        r.url,
+        r.title,
+        r.folderId,
+        r.createdAt,
+        r.updatedAt,
+        r.deleted === true,
+        // 只在有值時才加：沒選過的書籤指紋與加這個欄位之前一樣，升級後同步不會整份重寫
+        ...(r.preview === undefined ? [] : [r.preview]),
+      ]),
     );
   const folders = [...payload.folders]
     .sort(byId)

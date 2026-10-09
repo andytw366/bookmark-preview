@@ -2,12 +2,13 @@ import { broadcast, type BackfillReport } from '@/shared/messages';
 import { hostnameOf, isPreviewableUrl, urlKey } from '@/shared/url';
 import { getSettings, isBlocked } from '@/storage/settings';
 import { getThumb, putThumb } from '@/storage/thumbs-db';
+import { getPreviewChoices } from '@/storage/preview-choice';
 import { bookmarkedUrls } from './bookmark-index';
 import { hasHostAccess } from './capture';
 import { fetchOgThumbnail } from './og-fetcher';
 import { fetchIconThumbnail, wantsSiteIcon } from './site-icon';
 import type { Thumbnail } from './image';
-import type { Settings, ThumbSource } from '@/shared/types';
+import type { PreviewChoice, Settings, ThumbSource } from '@/shared/types';
 import { listBookmarks, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
 
@@ -40,6 +41,7 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
       (url) => isPreviewableUrl(url) && !isBlocked(hostnameOf(url), settings.captureBlocklist),
     );
 
+    const choices = await getPreviewChoices();
     const targets: { url: string; key: string }[] = [];
     for (const url of candidates) {
       const key = await urlKey(url);
@@ -61,7 +63,7 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const found = await iconOrOg(settings, item.url, { learn: true });
+        const found = await iconOrOg(settings, item.url, { learn: true, choice: choices[item.key] });
         if (found !== null) {
           await putThumb({
             key: item.key,
@@ -107,13 +109,13 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
   running = true;
   try {
     const settings = await getSettings();
-    const targets: { id: string; url: string }[] = [];
+    const targets: { id: string; url: string; choice: PreviewChoice | undefined }[] = [];
     for (const record of listBookmarks()) {
       if (!isPreviewableUrl(record.url) || isBlocked(hostnameOf(record.url), settings.captureBlocklist)) {
         continue;
       }
       if ((await getThumb(vaultThumbKey(record.id))) === undefined) {
-        targets.push({ id: record.id, url: record.url });
+        targets.push({ id: record.id, url: record.url, choice: record.preview });
       }
     }
 
@@ -130,7 +132,7 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const found = await iconOrOg(settings, item.url, { learn: false });
+        const found = await iconOrOg(settings, item.url, { learn: false, choice: item.choice });
         if (found !== null) {
           await storeVaultThumbnail(item.id, found.thumbnail, found.source);
           broadcast('thumbs/updated', { key: vaultThumbKey(item.id) });
@@ -155,9 +157,9 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
 async function iconOrOg(
   settings: Settings,
   url: string,
-  { learn }: { learn: boolean },
+  { learn, choice }: { learn: boolean; choice: PreviewChoice | undefined },
 ): Promise<{ thumbnail: Thumbnail; source: ThumbSource } | null> {
-  if (wantsSiteIcon(settings, url)) {
+  if (wantsSiteIcon(settings, url, choice)) {
     const icon = await fetchIconThumbnail(url);
     if (icon !== null) {
       return { thumbnail: icon, source: 'icon' };

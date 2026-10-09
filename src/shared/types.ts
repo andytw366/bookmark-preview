@@ -46,6 +46,15 @@ export type OpenTarget = 'current' | 'newTab' | 'newTabBackground';
  */
 export type ThumbSource = 'cover' | 'capture' | 'og' | 'icon';
 
+/**
+ * 使用者對單一書籤的手動選擇：網站圖示或頁面預覽（封面／截圖）。優先於設定與入口規則。
+ * 一般書籤記在 `storage/preview-choice.ts`，隱私書籤記在加密的 `PrivateBookmark.preview`。
+ */
+export type PreviewMode = 'icon' | 'page';
+
+/** 一般書籤多一種：`manual` ＝右鍵指定過預覽圖，自動擷取不覆蓋（見 `storage/preview-choice.ts`） */
+export type PreviewChoice = PreviewMode | 'manual';
+
 /** 有封面圖時優先用封面，還是優先用網頁截圖。 */
 export type PreviewSource = 'cover-first' | 'screenshot-first';
 
@@ -82,6 +91,11 @@ export interface PrivateBookmark {
   folderId: string | null;
   createdAt: number;
   updatedAt: number;
+  /**
+   * 手動選的預覽方式（列選單「改用網站圖示／改用頁面預覽」）。沒有就照設定與入口規則。
+   * 放在加密的 payload 裡 —— 隱私書籤的任何東西都不能寫進 `storage.local`。
+   */
+  preview?: PreviewMode;
   deleted?: true;
 }
 

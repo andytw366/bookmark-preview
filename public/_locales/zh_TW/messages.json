@@ -697,6 +697,18 @@
   "preview_entry_icons_hint": {
     "message": "書籤指的是一個網站而不是其中一頁時（路徑最多一層、沒有查詢參數，例如 google.com/maps、twitch.tv），預覽改用網站圖示。關掉後已經是圖示的不會馬上換回來，要等過期或「重新抓預覽圖」"
   },
+  "row_use_site_icon": {
+    "message": "改用網站圖示"
+  },
+  "row_use_site_icon_hint": {
+    "message": "改用這個網站的圖示當預覽，之後自動擷取也不會換回來"
+  },
+  "row_use_page_preview": {
+    "message": "改用頁面預覽"
+  },
+  "row_use_page_preview_hint": {
+    "message": "改用頁面的封面或截圖當預覽，之後自動擷取也不會換回圖示"
+  },
   "backfill_start": {
     "message": "補抓預覽圖"
   },

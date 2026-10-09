@@ -18,6 +18,8 @@ export type CaptureStage =
   | 'skipped:blocklisted'
   | 'skipped:not-bookmarked'
   | 'skipped:fresh'
+  /** 右鍵指定過預覽圖，自動擷取不覆蓋（`storage/preview-choice.ts`） */
+  | 'skipped:manual'
   | 'skipped:navigated-away'
   /** 剛加入書籤，但那個網址沒有開著的分頁可供擷取 */
   | 'skipped:not-open'
@@ -98,6 +100,7 @@ export function describeCapture(diagnostic: CaptureDiagnostic): string | null {
       return t('capture_skip_not_open');
     case 'skipped:not-bookmarked':
     case 'skipped:fresh':
+    case 'skipped:manual':
     case 'skipped:unsupported-url':
     case 'skipped:navigated-away':
       return null;

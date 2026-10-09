@@ -4,7 +4,7 @@ import {
   UNDECLARED_ICON_SIZE,
   type IconCandidate,
 } from '@/shared/site-icon-rank';
-import type { Settings } from '@/shared/types';
+import type { PreviewChoice, Settings } from '@/shared/types';
 import { isEntryUrl, normalizeUrl } from '@/shared/url';
 import { t } from '@/shared/i18n';
 import { fetchImageBlob, fetchImageBlobInPage, injectWithArgs } from './image-grab';
@@ -32,9 +32,19 @@ import { extractIconUrls, fetchHtmlDocument } from './og-fetcher';
 /**
  * 這個書籤要不要先試網站圖示。**傳書籤自己的網址**（理由見 `isEntryUrl`）。
  *
+ * 決定順序：手動選擇（列選單「改用網站圖示／改用頁面預覽」）> 設定與入口規則。
+ * `manual`（右鍵指定過圖）不表態，照規則。
+ *
  * 每一條寫縮圖的路都經過這裡，漏一條就會「這裡有圖示、那裡沒有」。
  */
-export function wantsSiteIcon(settings: Pick<Settings, 'entryIcons'>, bookmarkUrl: string): boolean {
+export function wantsSiteIcon(
+  settings: Pick<Settings, 'entryIcons'>,
+  bookmarkUrl: string,
+  choice?: PreviewChoice,
+): boolean {
+  if (choice === 'icon' || choice === 'page') {
+    return choice === 'icon';
+  }
   return settings.entryIcons && isEntryUrl(bookmarkUrl);
 }
 

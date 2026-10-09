@@ -1,6 +1,8 @@
 import { broadcast } from '@/shared/messages';
 import { urlKey } from '@/shared/url';
 import { getSettings } from '@/storage/settings';
+import { getPreviewChoice, setPreviewChoice } from '@/storage/preview-choice';
+import type { PreviewMode } from '@/shared/types';
 import { deleteThumb, putThumb } from '@/storage/thumbs-db';
 import {
   coverThumbnailFor,
@@ -13,7 +15,7 @@ import { fetchIconThumbnail, iconThumbnailFromTab, wantsSiteIcon } from './site-
 import type { Thumbnail } from './image';
 import type { ThumbSource } from '@/shared/types';
 import { findOpenTabResolving } from './open-tab';
-import { findVaultBookmarkById, storeVaultThumbnail, vaultThumbKey } from './vault';
+import { findVaultBookmarkById, setVaultPreview, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
 
 export interface RefreshReport {
@@ -47,7 +49,16 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
   // 分頁停在 https（或首頁被轉到語系路徑）時，頁面明明開著，而失敗訊息卻會叫他
   // 「先開啟那個頁面」—— 那句話會讓人反覆試同一件事
   const settings = await getSettings();
-  const icon = wantsSiteIcon(settings, url);
+  /*
+   * 明確按了「重新抓」＝不要右鍵指定的那張了，清掉 `manual`，之後自動擷取也照常。
+   * 「改用網站圖示／頁面預覽」的選擇留著：那才是使用者要這個書籤長什麼樣子。
+   */
+  let choice = await getPreviewChoice(url);
+  if (choice === 'manual') {
+    await setPreviewChoice(url, null);
+    choice = undefined;
+  }
+  const icon = wantsSiteIcon(settings, url, choice);
   const open = await findOpenTabResolving(url, true);
   if (open !== undefined) {
     const produced = await produceThumbnailNow(open.tabId, open.pageUrl, key, {
@@ -140,8 +151,9 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
    * 一般書籤那條路記，隱私空間這條不記，與診斷（`recordCapture`）完全一樣的取捨。
    */
   const settings = await getSettings();
-  // 入口網址先試網站圖示，與一般書籤同一個規則。圖示沒有學習，本來就不碰 `site-image-stats`
-  const icon = wantsSiteIcon(settings, url);
+  // 入口網址先試網站圖示，與一般書籤同一個規則（手動選擇記在加密的 record 裡）。
+  // 圖示沒有學習，本來就不碰 `site-image-stats`
+  const icon = wantsSiteIcon(settings, url, record.preview);
   const open = await findOpenTabResolving(url, false);
   if (open !== undefined) {
     const order: ('icon' | 'cover' | 'capture')[] =
@@ -185,4 +197,20 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
   }
   await store(thumbnail, 'og');
   return { ok: true, detail: t('refresh_done_via_og') };
+}
+
+/**
+ * 列選單的「改用網站圖示／改用頁面預覽」：記下選擇，然後照新的選擇重抓。
+ *
+ * 記下來是必要的，不然下次自動擷取又會照入口規則蓋回去。
+ */
+export async function setThumbnailMode(url: string, mode: PreviewMode): Promise<RefreshReport> {
+  await setPreviewChoice(url, mode);
+  return refreshThumbnail(url);
+}
+
+/** 隱私書籤版：選擇寫進加密的 payload（`setVaultPreview`），**不能**進 `storage.local` */
+export async function setVaultThumbnailMode(id: string, mode: PreviewMode): Promise<RefreshReport> {
+  await setVaultPreview(id, mode);
+  return refreshVaultThumbnail(id);
 }

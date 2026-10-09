@@ -1,4 +1,5 @@
 import { urlKey } from '@/shared/url';
+import { prunePreviewChoices } from '@/storage/preview-choice';
 import { pruneMissing } from '@/storage/thumbs-db';
 import { readMeta } from '@/storage/vault-store';
 import { bookmarkedUrls } from './bookmark-index';
@@ -24,5 +25,6 @@ export async function pruneOrphanThumbs(): Promise<number> {
   const urls = await bookmarkedUrls();
   const keys = await Promise.all([...urls].map(urlKey));
   const keep = new Set([...keys, ...protectedThumbKeys()]);
+  await prunePreviewChoices(new Set(keys));
   return pruneMissing(keep);
 }

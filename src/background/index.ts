@@ -20,7 +20,12 @@ import { collectFolderChoices, collectRoots } from './bookmark-tree';
 import { startBookmarkWatcher } from './bookmark-watcher';
 import { startCapturePipeline, startPermissionWatcher } from './capture';
 import { registerPickCoverMenu } from './pick-cover';
-import { refreshThumbnail, refreshVaultThumbnail } from './refresh-thumb';
+import {
+  refreshThumbnail,
+  refreshVaultThumbnail,
+  setThumbnailMode,
+  setVaultThumbnailMode,
+} from './refresh-thumb';
 import {
   adoptSyncedVault,
   changePassword,
@@ -172,6 +177,7 @@ serve({
 
   'thumbs/backfill': async () => backfillThumbnails(),
   'thumbs/refresh': async ({ url }) => refreshThumbnail(url),
+  'thumbs/set-mode': async ({ url, mode }) => setThumbnailMode(url, mode),
   'thumbs/get': async ({ key }) => {
     const record = await getThumb(key);
     // 加密的縮圖（隱私書籤）走 vault/thumb 那條路，這裡一律當成沒有
@@ -244,6 +250,7 @@ serve({
     return announceVault();
   },
   'vault/refresh-thumb': async ({ id }) => acted(refreshVaultThumbnail(id)),
+  'vault/set-thumb-mode': async ({ id, mode }) => acted(setVaultThumbnailMode(id, mode)),
   'vault/folders': async () => listFolders(),
   'vault/folder-create': async ({ name, parentId }) => acted(createFolder(name, parentId)),
   'vault/folder-rename': async ({ id, name }) => acted(renameFolder(id, name)),
