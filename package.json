@@ -1,6 +1,6 @@
 {
   "name": "bookmark-preview-vault",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "description": "Firefox sidebar extension: visual bookmark previews with an encrypted private space",
