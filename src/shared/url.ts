@@ -60,6 +60,29 @@ export function normalizeUrl(raw: string): string {
 }
 
 /**
+ * 這個書籤指的是「一個網站／App」而不是「一則內容」嗎？
+ *
+ * 判準只看網址的形狀、不看網域：**路徑最多一層、而且沒有 query**。
+ * `google.com/maps`、`drive.google.com`、`twitch.tv` 是；`youtube.com/watch?v=…`、
+ * `github.com/u/repo` 不是。`x.com/某人` 這種一層的個人頁也會被當成入口 —— 使用者接受這個誤判。
+ *
+ * **一律傳書籤自己的網址**，不是分頁停在的網址：Drive 會轉到 `/drive/my-drive`，那是兩層。
+ *
+ * 考慮過、放棄的訊號：「有 Web App manifest」。YouTube、Twitch 首頁沒有，MDN、GitHub 的內容頁反而有。
+ */
+export function isEntryUrl(raw: string): boolean {
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+    return parsed.pathname.split('/').filter(Boolean).length <= 1 && parsed.search === '';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 兩個網址指的是不是同一個頁面。
  *
  * 「同一頁」的判準與縮圖鍵一致（`normalizeUrl`）：忽略 fragment 與尾端斜線，

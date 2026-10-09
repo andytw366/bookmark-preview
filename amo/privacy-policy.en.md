@@ -71,7 +71,8 @@ in `storage.sync`, so the same groups appear on your other devices. On this path
 
 **3. Fetching preview images requests the sites you have bookmarked.**
 "Fetch missing previews" and "Refresh preview" connect to **the bookmark's own URL** to
-read the page's cover image (`og:image` and similar). This is an ordinary web request,
+read the page's cover image (`og:image` and similar) or, for a bookmark that points to a
+whole site, that site's icon and Web App manifest. This is an ordinary web request,
 equivalent to you opening that URL yourself; it goes only to that site, with no
 intermediary server. When the page is open in a tab, the request for the image itself is
 made **from that page**, so it carries the same cookies the page used to load the image —

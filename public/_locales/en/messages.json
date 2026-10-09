@@ -691,6 +691,12 @@
   "preview_capture_first_hint": {
     "message": "Prefer a screenshot of the page and fall back to a cover image"
   },
+  "preview_entry_icons": {
+    "message": "Site icons for home pages"
+  },
+  "preview_entry_icons_hint": {
+    "message": "When a bookmark points to a site rather than a page in it (a path at most one level deep and no query, like google.com/maps or twitch.tv), use the site's icon as its preview. Turning this off keeps existing icons until they expire or you refresh the preview."
+  },
   "backfill_start": {
     "message": "Fetch missing previews"
   },

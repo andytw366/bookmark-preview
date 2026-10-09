@@ -77,7 +77,7 @@ async function applyManualCover(
     const via = { detail: t('pick_strategy_used', grabbed.strategy) };
 
     if (priv !== null) {
-      await storeVaultThumbnail(priv.id, thumbnail);
+      await storeVaultThumbnail(priv.id, thumbnail, 'cover');
       broadcast('thumbs/updated', { key: vaultThumbKey(priv.id) });
       return;
     }

@@ -9,7 +9,7 @@ interface ThumbProps {
 
 /**
  * 預覽區塊，實作三層 fallback：
- * 內容封面圖 → 網頁截圖 → 網域色卡。
+ * 內容封面圖 → 網頁截圖 → 網域色卡。入口網址另有網站圖示（`IconThumb`）。
  *
  * 封面圖與截圖的呈現方式刻意不同：
  * - **封面圖**（漫畫／書籍封面、影片縮圖）採用圖片自己的長寬比並完整顯示。
@@ -19,6 +19,10 @@ interface ThumbProps {
 export function Thumb({ url, hostname }: ThumbProps) {
   const thumb = useThumb(url);
   const hue = hueFromString(hostname);
+
+  if (thumb !== null && thumb.source === 'icon') {
+    return <IconThumb src={thumb.src} width={thumb.width} height={thumb.height} />;
+  }
 
   if (thumb !== null) {
     const isCover = thumb.source === 'cover' || thumb.source === 'og';
@@ -39,6 +43,23 @@ export function Thumb({ url, hostname }: ThumbProps) {
       aria-hidden="true"
     >
       <span className="thumb__initial">{initialOf(hostname)}</span>
+    </div>
+  );
+}
+
+/**
+ * 網站圖示：與截圖同樣大小的素色方塊，圖示置中（入口網址，見 `isEntryUrl`）。
+ *
+ * 底色用面板色而不是網域色相 —— 跟 Zen 的釘選格子一樣素，讓圖示自己說話。
+ *
+ * **不放大成糊圖**：顯示 48px；原圖比 48 小時用 `max(原圖, 32)`。
+ * 小列模式的方塊本身不到 48，由 CSS 再限制成方塊的 60%。
+ */
+export function IconThumb({ src, width, height }: { src: string; width: number; height: number }) {
+  const size = Math.min(48, Math.max(width, height, 32));
+  return (
+    <div className="thumb thumb--icon" style={{ '--icon-size': `${String(size)}px` } as CSSProperties}>
+      <img src={src} alt="" loading="lazy" decoding="async" />
     </div>
   );
 }

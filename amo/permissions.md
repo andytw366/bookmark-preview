@@ -54,6 +54,7 @@ Worth stating because reviewers commonly ask:
   modified.
 - **No `nativeMessaging`**, no remote code. Everything ships in the package; there is no
   `eval` and no dynamically loaded script.
-- **No backend server.** The only outbound requests fetch the bookmark's own URL to read
-  its `og:image`; sync (vault ciphertext, opt-in; bookmark groups, default on) goes
+- **No backend server.** The only outbound requests go to the bookmark's own site, to read
+  its `og:image` or, for a bookmark of a whole site, its icon and Web App manifest — no
+  third-party icon service; sync (vault ciphertext, opt-in; bookmark groups, default on) goes
   through Firefox's own `storage.sync`.

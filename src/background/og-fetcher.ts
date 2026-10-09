@@ -1,6 +1,14 @@
 import * as coverParams from '@/shared/cover-params';
 import { imagesInJsonLd } from '@/shared/json-ld';
 import { MIN_COVER_EDGES } from '@/shared/image-structure';
+import {
+  looksLikeSvg,
+  parseSizes,
+  SCALABLE_SIZE,
+  UNDECLARED_ICON_SIZE,
+  UNDECLARED_TOUCH_ICON_SIZE,
+  type IconCandidate,
+} from '@/shared/site-icon-rank';
 import { noteDeclaredImages } from '@/storage/site-image-stats';
 import { makeCoverThumbnail, type Thumbnail } from './image';
 
@@ -76,6 +84,16 @@ function withTimeout(): { signal: AbortSignal; done: () => void } {
 }
 
 async function fetchHtml(pageUrl: string): Promise<string | null> {
+  return (await fetchHtmlDocument(pageUrl))?.html ?? null;
+}
+
+/**
+ * 抓頁面 HTML，連同轉址後的最終網址一起回傳。
+ *
+ * 匯出給 `site-icon.ts`（沒開分頁時解析圖示）：`<link rel="icon">` 的相對路徑要以
+ * **最終網址**為基準解析，首頁被轉到語系路徑或子網域時，用書籤網址解析會指錯地方。
+ */
+export async function fetchHtmlDocument(pageUrl: string): Promise<{ html: string; url: string } | null> {
   const { signal, done } = withTimeout();
   try {
     // credentials: 'omit' —— 不要帶著使用者的 cookie 去抓頁面。
@@ -91,7 +109,7 @@ async function fetchHtml(pageUrl: string): Promise<string | null> {
     if (declared > MAX_HTML_BYTES) {
       return null;
     }
-    return await response.text();
+    return { html: await response.text(), url: response.url === '' ? pageUrl : response.url };
   } catch {
     return null;
   } finally {
@@ -199,4 +217,48 @@ function extractImageUrls(html: string, pageUrl: string): string[] {
   }
 
   return found;
+}
+
+/**
+ * 從 HTML 解析網站圖示的宣告：`<link rel="icon">`、`apple-touch-icon` 與 manifest 的網址。
+ *
+ * 與 `site-icon.ts` 注入分頁的 `collectIconCandidates` 是同一套規則 —— 那支要序列化後
+ * 注入頁面，引用不到這裡，只好各寫一份。改一邊要記得改另一邊。
+ *
+ * `rel~="icon"` 不會配到 `mask-icon`（那是單一個 token），Safari 的單色剪影本來就不要。
+ */
+export function extractIconUrls(
+  html: string,
+  pageUrl: string,
+): { icons: IconCandidate[]; manifest: string | null } {
+  const document_ = new DOMParser().parseFromString(html, 'text/html');
+  const resolve = (raw: string | null): string | null => {
+    if (raw === null || raw.trim() === '') {
+      return null;
+    }
+    try {
+      const url = new URL(raw.trim(), pageUrl);
+      return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'data:'
+        ? url.toString()
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const icons: IconCandidate[] = [];
+  for (const link of document_.querySelectorAll('link[rel~="icon" i], link[rel~="apple-touch-icon" i]')) {
+    const url = resolve(link.getAttribute('href'));
+    if (url === null) {
+      continue;
+    }
+    const touch = (link.getAttribute('rel') ?? '').toLowerCase().includes('apple-touch-icon');
+    const parsed = parseSizes(link.getAttribute('sizes'));
+    const size = looksLikeSvg(url, link.getAttribute('type'))
+      ? SCALABLE_SIZE
+      : (parsed?.size ?? (touch ? UNDECLARED_TOUCH_ICON_SIZE : UNDECLARED_ICON_SIZE));
+    icons.push({ url, size, ...(parsed?.oblong === true ? { oblong: true } : {}) });
+  }
+  const manifest = resolve(document_.querySelector('link[rel~="manifest" i]')?.getAttribute('href') ?? null);
+  return { icons, manifest };
 }

@@ -10,6 +10,7 @@ import { noteDeclaredImages } from '@/storage/site-image-stats';
 import { coverCandidatesFromTab, DECLARED_THRESHOLD, SITE_WIDE_PENALTY } from './cover';
 import { grabCoverThumbnail } from './cover-grab';
 import { makeThumbnail, type Thumbnail } from './image';
+import { iconThumbnailFromTab, wantsSiteIcon } from './site-icon';
 import { t } from '@/shared/i18n';
 
 /**
@@ -93,7 +94,10 @@ async function captureForNewBookmark(node: browser.bookmarks.BookmarkTreeNode): 
   }
 
   // 往下傳分頁停在的那個網址（`target.pageUrl`），鍵用書籤的 —— 理由見 `OpenTab`
-  await produceThumbnailNow(target.tabId, target.pageUrl, key, settings.previewSource);
+  await produceThumbnailNow(target.tabId, target.pageUrl, key, {
+    preference: settings.previewSource,
+    icon: wantsSiteIcon(settings, url),
+  });
 }
 
 function cancel(tabId: number): void {
@@ -176,9 +180,23 @@ async function schedule(tabId: number, tab: browser.tabs.Tab): Promise<void> {
   const key = await urlKey(match.bookmarkUrl);
   const existing = await getThumb(key);
   const maxAge = settings.thumbMaxAgeDays * DAY_MS;
+  // 入口網址看的是**書籤的**網址：分頁可能已被轉到更深的路徑（Drive → /drive/my-drive）
+  const icon = wantsSiteIcon(settings, match.bookmarkUrl);
   // 只有「自動產生的」縮圖才會因為過期而重抓。手動補抓的 og 圖不主動覆蓋。
-  const autoSource = existing?.source === 'capture' || existing?.source === 'cover';
-  if (autoSource && !justCaptured(tabId, key) && Date.now() - existing.capturedAt < maxAge) {
+  const autoSource =
+    existing?.source === 'capture' || existing?.source === 'cover' || existing?.source === 'icon';
+  /*
+   * 入口網址的既有縮圖還不是圖示 → 不算「還很新」，這次就換掉。升級後第一次造訪地圖
+   * 就會變成圖示，不必等 `thumbMaxAgeDays`。代價：抓不到圖示的入口網址每次造訪都會重跑
+   * 整條管線（圖示失敗後照舊寫入封面／截圖，下次又不是 icon），接受。
+   */
+  const staleForIcon = icon && existing !== undefined && existing.source !== 'icon';
+  if (
+    autoSource &&
+    !staleForIcon &&
+    !justCaptured(tabId, key) &&
+    Date.now() - existing.capturedAt < maxAge
+  ) {
     await skip('skipped:fresh', url);
     return;
   }
@@ -189,7 +207,7 @@ async function schedule(tabId: number, tab: browser.tabs.Tab): Promise<void> {
     tabId,
     setTimeout(() => {
       pending.delete(tabId);
-      void produceThumbnailNow(tabId, url, key, settings.previewSource);
+      void produceThumbnailNow(tabId, url, key, { preference: settings.previewSource, icon });
     }, SETTLE_MS),
   );
 }
@@ -232,7 +250,8 @@ function forget(tabId: number): void {
 }
 
 /**
- * 依偏好順序產生縮圖：封面圖優先，或截圖優先。
+ * 依偏好順序產生縮圖：封面圖優先，或截圖優先。入口網址（`icon`）先試網站圖示，
+ * 失敗才走原本的順序。
  *
  * 封面圖之所以值得排在前面：對漫畫、影片、書籍、商品這類「內容頁」，
  * 頁面上的封面遠比一張網頁截圖更能代表這個書籤 —— 截圖裡通常只看到
@@ -243,13 +262,21 @@ export async function produceThumbnailNow(
   tabId: number,
   url: string,
   key: string,
-  preference: PreviewSource,
+  { preference, icon }: { preference: PreviewSource; icon: boolean },
 ): Promise<boolean> {
-  const order: ('cover' | 'capture')[] =
+  const order: ('icon' | 'cover' | 'capture')[] =
     preference === 'cover-first' ? ['cover', 'capture'] : ['capture', 'cover'];
+  if (icon) {
+    order.unshift('icon');
+  }
 
   for (const attempt of order) {
-    const ok = attempt === 'cover' ? await tryCover(tabId, url, key) : await tryCapture(tabId, url, key);
+    const ok =
+      attempt === 'icon'
+        ? await tryIcon(tabId, url, key)
+        : attempt === 'cover'
+          ? await tryCover(tabId, url, key)
+          : await tryCapture(tabId, url, key);
     if (ok) {
       return true;
     }
@@ -323,6 +350,30 @@ async function tryCover(tabId: number, url: string, key: string): Promise<boolea
     return true;
   } catch (cause) {
     console.warn('[bookmark-preview] cover grab failed', url, cause);
+    return false;
+  }
+}
+
+/** 網站圖示沒有「學習」：不碰 `site-image-stats` */
+async function tryIcon(tabId: number, url: string, key: string): Promise<boolean> {
+  try {
+    const thumbnail = await iconThumbnailFromTab(tabId, url);
+    if (thumbnail === null) {
+      return false;
+    }
+    await putThumb({
+      key,
+      ...thumbnail,
+      source: 'icon',
+      capturedAt: Date.now(),
+      encrypted: false,
+      iv: null,
+    });
+    await skip('ok', url);
+    broadcast('thumbs/updated', { key });
+    return true;
+  } catch (cause) {
+    console.warn('[bookmark-preview] site icon grab failed', url, cause);
     return false;
   }
 }

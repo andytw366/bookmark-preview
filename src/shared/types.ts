@@ -41,8 +41,10 @@ export type OpenTarget = 'current' | 'newTab' | 'newTabBackground';
  * - `cover`：頁面的內容封面圖（漫畫／書籍封面、影片縮圖）。維持原始長寬比。
  * - `capture`：網頁畫面截圖，統一裁切成 16:9。
  * - `og`：手動補抓時從伺服器端解析出的 og:image。
+ * - `icon`：網站圖示。書籤是「入口網址」（`isEntryUrl`）而且設定 `entryIcons` 開著時才會有，
+ *   畫成素色方塊正中間一個圖示，見 `src/background/site-icon.ts`。
  */
-export type ThumbSource = 'cover' | 'capture' | 'og';
+export type ThumbSource = 'cover' | 'capture' | 'og' | 'icon';
 
 /** 有封面圖時優先用封面，還是優先用網頁截圖。 */
 export type PreviewSource = 'cover-first' | 'screenshot-first';
@@ -165,6 +167,13 @@ export interface Settings {
    * 比網頁截圖更能代表這個書籤。找不到封面才退回截圖。
    */
   previewSource: PreviewSource;
+  /**
+   * 書籤指的是「一個網站」而不是「一則內容」時（`isEntryUrl`：路徑最多一層、沒有 query），
+   * 預覽改用網站圖示。預設開。
+   *
+   * 關掉時不主動把既有的圖示換回來，要等過期或手動「重新抓預覽圖」。
+   */
+  entryIcons: boolean;
   /** 不擷取的網域樣式（子字串比對主機名稱） */
   captureBlocklist: string[];
   /** 縮圖多久後視為過期而重新擷取 */

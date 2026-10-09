@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSamePage } from '@/shared/url';
+import { isEntryUrl, isSamePage } from '@/shared/url';
 
 /**
  * 「這個網址現在有沒有開著」的判準。
@@ -37,5 +37,44 @@ describe('isSamePage', () => {
 
   it('查詢字串有差就是不同頁（?id=1 與 ?id=2 是兩本書）', () => {
     expect(isSamePage('https://example.com/v?id=1', 'https://example.com/v?id=2')).toBe(false);
+  });
+});
+
+/**
+ * 「入口網址」：書籤指的是一個網站／App，預覽改用網站圖示。
+ * 判準只看形狀（路徑最多一層、沒有 query），例子都是 NEXT.md 定案時列的。
+ */
+describe('isEntryUrl', () => {
+  it.each([
+    'https://www.google.com.tw/maps',
+    'https://google.com/maps',
+    'https://drive.google.com',
+    'https://www.youtube.com/',
+    'https://twitch.tv',
+    'https://www.reddit.com/',
+    'https://example.com/#section',
+    // 使用者接受的誤判：一層的個人頁
+    'https://x.com/someone',
+    'https://github.com/someone',
+  ])('%s 是入口', (url) => {
+    expect(isEntryUrl(url)).toBe(true);
+  });
+
+  it.each([
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://github.com/u/repo',
+    'https://example.com/comic/123/chapter-4',
+    'https://developer.mozilla.org/en-US/docs/Web/API',
+    // 抓不到的：三層路徑，留給手動切換
+    'https://mail.google.com/mail/u/0/',
+    'https://example.com/?q=1',
+  ])('%s 不是入口', (url) => {
+    expect(isEntryUrl(url)).toBe(false);
+  });
+
+  it('解析不了或不是網頁協定就不是', () => {
+    expect(isEntryUrl('not a url')).toBe(false);
+    expect(isEntryUrl('about:blank')).toBe(false);
+    expect(isEntryUrl('javascript:void(0)')).toBe(false);
   });
 });

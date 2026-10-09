@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { request, subscribe } from '@/shared/messages';
 import { hueFromString, initialOf, vaultThumbKey } from '@/shared/url';
+import { IconThumb } from './Thumb';
 import {
   holdThumb,
   peekThumb,
@@ -89,6 +90,10 @@ export function VaultThumb({ id, hostname }: VaultThumbProps) {
       releaseThumb(key);
     };
   }, [id]);
+
+  if (loaded !== null && loaded.source === 'icon') {
+    return <IconThumb src={loaded.src} width={loaded.width} height={loaded.height} />;
+  }
 
   if (loaded !== null) {
     const isCover = loaded.source === 'cover' || loaded.source === 'og';

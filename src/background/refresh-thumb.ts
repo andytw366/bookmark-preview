@@ -9,6 +9,9 @@ import {
   screenshotThumbnailFor,
 } from './capture';
 import { fetchOgThumbnail } from './og-fetcher';
+import { fetchIconThumbnail, iconThumbnailFromTab, wantsSiteIcon } from './site-icon';
+import type { Thumbnail } from './image';
+import type { ThumbSource } from '@/shared/types';
 import { findOpenTabResolving } from './open-tab';
 import { findVaultBookmarkById, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
@@ -43,16 +46,35 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
   // 使用者是明確按下去的，所以找不到時值得多花一個請求解析轉址：書籤存 http、
   // 分頁停在 https（或首頁被轉到語系路徑）時，頁面明明開著，而失敗訊息卻會叫他
   // 「先開啟那個頁面」—— 那句話會讓人反覆試同一件事
+  const settings = await getSettings();
+  const icon = wantsSiteIcon(settings, url);
   const open = await findOpenTabResolving(url, true);
   if (open !== undefined) {
-    const settings = await getSettings();
-    const produced = await produceThumbnailNow(open.tabId, open.pageUrl, key, settings.previewSource);
+    const produced = await produceThumbnailNow(open.tabId, open.pageUrl, key, {
+      preference: settings.previewSource,
+      icon,
+    });
     return produced
       ? { ok: true, detail: t('refresh_done') }
       : { ok: false, detail: t('refresh_no_cover_on_page') };
   }
 
-  // 頁面沒開著：退回伺服器端的 og:image
+  // 頁面沒開著：入口網址先試網站圖示（抓 HTML 解析），再退回伺服器端的 og:image
+  if (icon) {
+    const iconThumbnail = await fetchIconThumbnail(url);
+    if (iconThumbnail !== null) {
+      await putThumb({
+        key,
+        ...iconThumbnail,
+        source: 'icon',
+        capturedAt: Date.now(),
+        encrypted: false,
+        iv: null,
+      });
+      broadcast('thumbs/updated', { key });
+      return { ok: true, detail: t('refresh_done') };
+    }
+  }
   const thumbnail = await fetchOgThumbnail(url, { learn: true });
   if (thumbnail === null) {
     return {
@@ -101,8 +123,8 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
   }
   const url = record.url;
 
-  const store = async (thumbnail: { bytes: ArrayBuffer; mime: string; width: number; height: number }) => {
-    await storeVaultThumbnail(id, thumbnail);
+  const store = async (thumbnail: Thumbnail, source: ThumbSource) => {
+    await storeVaultThumbnail(id, thumbnail, source);
     broadcast('thumbs/updated', { key: vaultThumbKey(id) });
   };
 
@@ -117,23 +139,37 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
    * 只留在記憶體裡、用完就丟（`storage/redirect-map.ts` 開頭寫了同一條規則）。
    * 一般書籤那條路記，隱私空間這條不記，與診斷（`recordCapture`）完全一樣的取捨。
    */
+  const settings = await getSettings();
+  // 入口網址先試網站圖示，與一般書籤同一個規則。圖示沒有學習，本來就不碰 `site-image-stats`
+  const icon = wantsSiteIcon(settings, url);
   const open = await findOpenTabResolving(url, false);
   if (open !== undefined) {
-    const { previewSource } = await getSettings();
-    const order: ('cover' | 'capture')[] =
-      previewSource === 'cover-first' ? ['cover', 'capture'] : ['capture', 'cover'];
+    const order: ('icon' | 'cover' | 'capture')[] =
+      settings.previewSource === 'cover-first' ? ['cover', 'capture'] : ['capture', 'cover'];
+    if (icon) {
+      order.unshift('icon');
+    }
     for (const attempt of order) {
       const thumbnail =
-        attempt === 'cover'
-          ? await coverThumbnailFor(open.tabId, open.pageUrl, { learn: false })
-          : await screenshotThumbnailFor(open.tabId, open.pageUrl);
+        attempt === 'icon'
+          ? await iconThumbnailFromTab(open.tabId, open.pageUrl)
+          : attempt === 'cover'
+            ? await coverThumbnailFor(open.tabId, open.pageUrl, { learn: false })
+            : await screenshotThumbnailFor(open.tabId, open.pageUrl);
       if (thumbnail !== null) {
-        await store(thumbnail);
+        await store(thumbnail, attempt);
         return { ok: true, detail: t('refresh_done') };
       }
     }
   }
 
+  if (icon) {
+    const iconThumbnail = await fetchIconThumbnail(url);
+    if (iconThumbnail !== null) {
+      await store(iconThumbnail, 'icon');
+      return { ok: true, detail: t('refresh_done') };
+    }
+  }
   const thumbnail = await fetchOgThumbnail(url, { learn: false });
   if (thumbnail === null) {
     // 「分頁沒開」與「分頁開著但這頁沒有可用的封面」是兩件事，不能用同一句話帶過：
@@ -147,6 +183,6 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
           : t('refresh_no_tab_no_server'),
     };
   }
-  await store(thumbnail);
+  await store(thumbnail, 'og');
   return { ok: true, detail: t('refresh_done_via_og') };
 }

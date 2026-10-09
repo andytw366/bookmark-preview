@@ -12,6 +12,10 @@ background page fails on both.
 
 ## The ranking, in order of trust
 
+Entry URLs (a site rather than a page in it) go through the site-icon path first — see
+[Entry URLs show the site icon](#entry-urls-show-the-site-icon). Everything below applies
+when that is off, does not apply, or finds no usable icon.
+
 The heuristics **never look at the domain**. There is no site list and no per-site
 selector, so no site needs individual handling.
 
@@ -114,6 +118,48 @@ learning nothing; it now extracts **every** preview image the page declares and 
 site-wide ones last (not removed — some pages genuinely have nothing else). That also
 closed a smaller gap: on some sites the `og:image` is a shared logo while `twitter:image`
 is the real content image, and looking only at the first one never reached it.
+
+## Entry URLs show the site icon
+
+When a bookmark points to **a site or app rather than a piece of content** — Google Maps,
+Drive, YouTube's home page, Twitch — its preview is the site's icon on a plain panel, like
+Zen's pinned tiles. A screenshot of a login wall or a static map declared as `og:image`
+represents "this app" worse than its icon does.
+
+**The rule looks only at the shape of the bookmark's own URL**: at most one path segment
+and no query (`isEntryUrl` in `shared/url.ts`). `google.com/maps`, `drive.google.com` and
+`twitch.tv/` qualify; `youtube.com/watch?v=…` and `github.com/u/repo` do not. A one-level
+profile page (`x.com/someone`) is a known, accepted false positive; a deep app URL such as
+`mail.google.com/mail/u/0/` is a known miss. It is the **bookmark's** URL, never the tab's:
+Drive redirects to `/drive/my-drive`, which is two levels. The switch is "Site icons for
+home pages" in the overflow menu, on by default; turning it off does not replace existing
+icons until they expire or are refreshed.
+
+Where the icon comes from (`background/site-icon.ts`):
+
+- **Tab open**: `<link rel="icon">` / `apple-touch-icon` from the top frame, the Web App
+  manifest's `icons[]` (fetched from the background, or from inside the page when it needs
+  the page's credentials), and `tab.favIconUrl`.
+- **No tab** (backfill, refresh without a tab): the same declarations parsed from the
+  fetched HTML, then `/favicon.ico` as a last resort.
+- Largest first, square preferred; `mask-icon` and `monochrome` icons are skipped. The
+  first that decodes with a shortest side of at least 16px wins. SVGs are rasterized
+  through an `<img>` after their root is given explicit dimensions (Firefox draws a
+  dimensionless SVG at 0×0). Stored at most 256px, transparency kept (WebP, else PNG).
+
+Choices made deliberately:
+
+- **Not "has a Web App manifest"** as the signal. YouTube's and Twitch's home pages have
+  none, while MDN and GitHub content pages do.
+- **No third-party icon service** (Google `s2/favicons`, DuckDuckGo). Those would send the
+  domain of every bookmark to a third party. Every request here goes to the bookmark's own
+  site, the same as fetching its `og:image`.
+- **No edge threshold** (`MIN_COVER_EDGES`). A monochrome logo can fail it, and it is still
+  the right answer. Icons also skip the site-wide learning.
+
+An existing non-icon thumbnail of an entry URL is not "fresh": the next visit replaces it
+instead of waiting `thumbMaxAgeDays`. The cost is that an entry URL whose icon cannot be
+fetched reruns the pipeline on every visit.
 
 ## The manual override
 

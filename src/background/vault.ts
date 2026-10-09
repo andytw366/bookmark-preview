@@ -18,6 +18,7 @@ import type { VaultThumbPayload } from '@/shared/messages';
 import type {
   PrivateBookmark,
   PrivateFolder,
+  ThumbSource,
   VaultMeta,
   VaultPayload,
   VaultState,
@@ -1117,10 +1118,15 @@ export function findVaultBookmarkByUrl(url: string): PrivateBookmark | null {
   );
 }
 
-/** 以隱私空間的金鑰加密並存入縮圖。 */
+/**
+ * 以隱私空間的金鑰加密並存入縮圖。
+ *
+ * `source` 由呼叫端傳：顯示方式看它（`icon` 畫成置中的圖示、截圖填滿、其餘維持比例）。
+ */
 export async function storeVaultThumbnail(
   id: string,
   thumbnail: { bytes: ArrayBuffer; mime: string; width: number; height: number },
+  source: ThumbSource,
 ): Promise<void> {
   {
     const { key: k } = requireUnlocked();
@@ -1131,7 +1137,7 @@ export async function storeVaultThumbnail(
       mime: thumbnail.mime,
       width: thumbnail.width,
       height: thumbnail.height,
-      source: 'cover',
+      source,
       capturedAt: Date.now(),
       encrypted: true,
       iv: sealed.iv,

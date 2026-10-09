@@ -144,6 +144,14 @@ cat > "$PROFILE/bookmarks.html" <<'HTML'
     <DL><p>
         <DT><A HREF="https://www.nycu.edu.tw/">陽明交通大學</A>
         <DT><A HREF="https://bugzilla.mozilla.org/">Bugzilla</A>
+        <DT><H3>網站入口</H3>
+        <DL><p>
+            <DT><A HREF="https://www.google.com.tw/maps">Google 地圖</A>
+            <DT><A HREF="https://www.youtube.com/">YouTube</A>
+            <DT><A HREF="https://www.youtube.com/watch?v=dQw4w9WgXcQ">YouTube 影片（不是入口）</A>
+            <DT><A HREF="https://www.twitch.tv/">Twitch</A>
+            <DT><A HREF="https://drive.google.com/">Google 雲端硬碟</A>
+        </DL><p>
     </DL><p>
 HTML
 fi

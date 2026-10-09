@@ -8,6 +8,9 @@ interface PreviewOptionsMenuProps {
   y: number;
   previewSource: PreviewSource;
   onPreviewSourceChange: (source: PreviewSource) => void;
+  /** 入口網址用網站圖示（`Settings.entryIcons`） */
+  entryIcons: boolean;
+  onEntryIconsChange: (on: boolean) => void;
   /** 沒有網站存取權限時無法補抓 */
   canBackfill: boolean;
   backfillBusy: boolean;
@@ -34,6 +37,8 @@ export function PreviewOptionsMenu({
   y,
   previewSource,
   onPreviewSourceChange,
+  entryIcons,
+  onEntryIconsChange,
   canBackfill,
   backfillBusy,
   backfillKind,
@@ -66,6 +71,22 @@ export function PreviewOptionsMenu({
         }}
       >
         {t('preview_capture_first')}
+      </button>
+      {/*
+        開關，不是單選：與上面兩項無關，它決定的是「入口網址」要不要整個跳過封面／截圖。
+        文字刻意短 —— 選單最寬 220px、側邊欄最窄 240px，完整規則放在 title。
+      */}
+      <button
+        type="button"
+        className={`rowmenu__item${entryIcons ? ' rowmenu__item--on' : ''}`}
+        title={t('preview_entry_icons_hint')}
+        aria-pressed={entryIcons}
+        onClick={() => {
+          onEntryIconsChange(!entryIcons);
+          onClose();
+        }}
+      >
+        {t('preview_entry_icons')}
       </button>
 
       <hr className="rowmenu__divider" />

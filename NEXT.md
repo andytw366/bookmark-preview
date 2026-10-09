@@ -1,14 +1,146 @@
 # 接手指南 / 待辦
 
-最後更新：2026-10-09（**1.2.0 已送審並公開上架**（同一天查到 `public` / `1.2.0`）。下一個 session：使用者要深入討論預覽圖（preview）的部分）
+最後更新：2026-10-10（1.2.0 已公開上架。「網站入口顯示網站圖示」**第 1 期已實作並實機驗收**（未 commit、未送審）；**下一步是第 2 期手動切換**）
 
-## 下一個 session 從這裡開始：討論預覽圖（preview）
+## 下一個 session 從這裡開始：網站入口顯示網站圖示（2026-10-10 定案）
 
-使用者 2026-10-09 送完 1.2.0 之後說「接下來想再更進一步討論 preview 的部分」，另開 session。
-還沒講要討論什麼 —— **先問使用者想改善的是哪一塊**，不要自己挑題目開工。可以先讀的背景：
-`docs/previews.md`（整條預覽管線）、[PLAN.md](PLAN.md) 的封面判定，以及本檔「之後才輪得到的事」表格裡跟預覽有關的幾條
-（grok.com／poelab.com 卡 Cloudflare、bilibili 輪播圖、轉址沒涵蓋的情況）。
-注意 1.2.0 起隱私書籤的抓圖路徑 `learn: false`、不寫明文快取（`docs/vault.md`「No vault URL in plaintext caches」），改預覽管線時別破壞。
+### 使用者要的是什麼
+
+使用者拿 Zen 瀏覽器的釘選格子比較（深色方塊、正中間一個網站圖示，Gmail、地圖、YouTube、Twitch……）：
+**書籤指的是「一個網站／App」而不是「一則內容」時，預覽應該是那個網站的圖示**，不是截圖、也不是站方的分享圖。
+實際的兩個反例：
+
+- **Google 地圖**（書籤 `google.com.tw/maps`）現在是一大張靜態地圖 —— 它宣告的 `og:image` 是
+  `maps.google.com/maps/api/staticmap?center=…`（2026-10-10 用 curl 確認），管線把它當第 2 層的可信封面。
+- **Google Drive、Gmail 之類**什麼都沒宣告，只剩開啟後的截圖（登入牆、檔案清單）。
+
+### 為什麼現在做不到（給實作者的背景）
+
+- Zen 讀的是瀏覽器自己的 `favicons.sqlite`。**擴充套件讀不到**：`bookmarks` API 不給圖示，唯一拿得到的是開著的分頁的 `tab.favIconUrl`。
+- 我們從沒存過圖示：`PLAN.md` 規劃的第三層「favicon 卡片」實作成了首字母色卡（`hueFromString`、`Thumb.tsx` 的 placeholder）。
+  `ThumbSource` 只有 `cover` / `capture` / `og`。
+- **不用第三方圖示服務**（Google `s2/favicons`、DuckDuckGo icons）：會把每個書籤的網域送給第三方，違反隱私政策。
+
+### 使用者拍板的決定（不要再改）
+
+1. **自動規則：「入口網址」就用網站圖示。** 判準只看書籤網址的形狀，不看網域：正規化後
+   **路徑最多一層、而且沒有 query**（fragment 本來就被 `normalizeUrl` 去掉）。
+   - 會變圖示：`google.com/maps`、`drive.google.com`、`youtube.com`、`twitch.tv`、`reddit.com/`
+   - 維持現狀：`youtube.com/watch?v=…`（有 query）、`github.com/u/repo`（兩層）、漫畫頁、文件頁
+   - 使用者**接受**的誤判：`x.com/某人`、`github.com/某人` 這種一層的個人頁也會變圖示。
+   - 抓不到：`mail.google.com/mail/u/0/`（三層）—— 靠第 2 期的手動切換。
+   - 考慮過、放棄的訊號：「有 Web App manifest」。curl 實測 YouTube、Twitch 首頁沒有，MDN、GitHub 的內容頁反而有。
+2. **做成設定開關，預設開**，放在「更多選項」選單「預覽圖來源」那兩個選項底下。
+   **使用者特別交代：注意文字長度。** 選單 `.rowmenu` 寬 160～220px，側邊欄最窄 240px。
+   建議文字：zh「首頁用網站圖示」、en「Site icons for home pages」；完整規則放 `title` 提示。實機看過不換行才算數。
+
+### 第 1 期：自動規則＋設定＋顯示（中）—— ✅ 2026-10-10 完成
+
+**實作落點**（下面的規劃保留當作依據）：`shared/url.ts` 的 `isEntryUrl`、`shared/site-icon-rank.ts`（sizes／manifest 解析與排序，純函式）、
+`background/site-icon.ts`（`iconThumbnailFromTab`、`fetchIconThumbnail`、`wantsSiteIcon`）、`og-fetcher.ts` 匯出
+`fetchHtmlDocument` 與 `extractIconUrls`、`image-grab.ts` 匯出 `fetchImageBlob`／`fetchImageBlobInPage`（只取位元組，
+圖示有自己的解碼）。`produceThumbnailNow` 改收 `{ preference, icon }`；`storeVaultThumbnail` 的 `source` 改為必填參數
+（隱私書籤的截圖現在記成 `capture`、og 記成 `og`，以前一律 `cover`）。補抓兩種共用 `backfill.ts` 的 `iconOrOg`。
+顯示是 `Thumb.tsx` 匯出的 `IconThumb`，`VaultThumb` 共用。測試：`tests/site-icon-rank.test.ts`、`url.test.ts`、
+`vault-thumb-privacy.test.ts` 多兩條（`site-icon.ts` 不落地、隱私空間走加密寫入）。
+
+**驗收結果**（firefox-e2e，種子書籤多了「其他書籤 / 網站入口」資料夾）
+
+| 項目 | 結果 |
+|---|---|
+| 造訪 `google.com.tw/maps` → 地圖圖示（不是靜態地圖） | ✅ |
+| `youtube.com/` 圖示；`youtube.com/watch?v=…` 仍是影片封面 | ✅ |
+| 設定關掉、重抓地圖（沒開分頁）→ 回到靜態地圖；YouTube 的圖示留著 | ✅ |
+| 隱私書籤 `stackoverflow.com/` 重新抓 → 圖示；`idb-grep.py` 0 筆（對照組 1 筆） | ✅ |
+| 補抓：沒開過的 Twitch、Drive 拿到圖示（Drive 會轉到登入頁，仍拿到 Drive 圖示） | ✅ |
+| 240px 側邊欄「更多選項」：中文與英文文字都不換行（英文是暫時塞進 zh_TW 目錄看的） | ✅ |
+| 大卡、小列、全頁瀏覽三種顯示 | ✅ |
+| `npm run verify` | ✅（lint 仍是原本那 3 個警告） |
+
+**驗收時發現的事**
+- **改了 `_locales` 之後 `KEEP_PROFILE=1` 重啟，畫面會顯示鍵名**（`preview_entry_icons`）：Firefox 把語系訊息快取在
+  `.test-profile/startupCache`。`rm -rf .test-profile/startupCache` 再啟動就好。
+- **預設種子書籤有很多本身就是入口網址**（`github.com/`、`arxiv.org/`、本地測試頁 `127.0.0.1:8899/`、`/video`、`/lazy`……
+  都是一層路徑）。設定預設開，所以**之後驗封面判定要先把「首頁用網站圖示」關掉**，不然那些測試頁拿到的是圖示。
+- 「首頁用網站圖示」打勾的樣子跟上面兩個單選一樣，看起來像第三個單選。使用者沒要求改，先記下。
+- 下次送審：`amo/reviewer-notes.md` 的「New in」要寫這一項（外送請求多了同站的圖示與 manifest，不經第三方）。
+  隱私政策第 3 點與 `amo/permissions.md` 已經改了。
+
+<details><summary>原本的規劃</summary>
+
+
+**資料**
+- `ThumbSource` 加 `'icon'`（`src/shared/types.ts`），`Settings` 加 `entryIcons: boolean`，`DEFAULT_SETTINGS` 設 true。
+- `src/shared/url.ts` 加 `isEntryUrl(raw)`：`new URL` 後，`pathname.split('/').filter(Boolean).length <= 1 && search === ''`；
+  解析失敗回 false。**判斷一律用書籤自己的網址**，不是分頁停在的網址（Drive 會轉到 `/drive/my-drive`，那是兩層）。
+  `tests/url.test.ts` 補上面列的每個例子。
+
+**取得圖示**（新檔 `src/background/site-icon.ts`，只回傳 `Thumbnail`、不寫入，與 `coverThumbnailFor` 同一個形狀，這樣隱私書籤才能加密寫入）
+- **分頁開著**：注入一支收集函式（照 `cover.ts` 的 `executeScript` 寫法，只掃最上層 frame），回傳候選 `{ url, size }`：
+  `link[rel~="icon"]`（讀 `sizes`；`any` 或 `.svg` 當作很大）、`link[rel="apple-touch-icon"]`（沒寫 sizes 就當 180）、
+  `link[rel="manifest"]` 的 href。manifest 在背景頁 fetch JSON 取 `icons[]`（`src` 相對於 manifest 網址解析）；
+  失敗就在頁面內 fetch（地圖的 manifest 是 `crossorigin="use-credentials"`）。最後加上 `tab.favIconUrl`（可能是 `data:`）。
+- **分頁沒開**（補抓、沒開分頁時的重新抓）：`og-fetcher.ts` 已經抓了 HTML，加 `extractIconUrls(html, pageUrl)`
+  解析同樣的 link 與 manifest；全都沒有就試 `/<origin>/favicon.ico`。
+- **排序**：尺寸大的優先，偏好正方形；`mask-icon`（單色）不要。逐一取下，第一張能解碼、最短邊 ≥ 16px 的就用。
+  分頁開著時用 `grabImage(tabId, url, { allowScreenshot: false, minEdges: 0 })` 的階梯；沒開時用背景頁 fetch。
+- **不套 `MIN_COVER_EDGES`**：單色的圖示（例如 Threads 的黑底白字）邊緣分數可能過不了門檻，而它就是對的答案。
+- 存檔：保持原尺寸，最長邊縮到 256px，**要保留透明**。`image.ts` 的編碼是先試 WebP（有 alpha，OK），不支援才退 JPEG；
+  JPEG 會把透明變黑底，退到那裡時要先鋪上卡片底色，或者圖示改用 PNG。
+- ⚠️ **SVG**：背景頁的 `createImageBitmap` 解不了 SVG blob。用 `new Image()` 加 blob URL 畫到 canvas；
+  SVG 沒有寫 `width`/`height` 時 Firefox 會畫成 0×0，要先指定尺寸。做不出來就跳過 SVG，換下一個候選，不要卡在這裡。
+
+**管線**（每一條寫縮圖的路都要接，漏一條就會「這裡有圖示、那裡沒有」）
+- `produceThumbnailNow` 多收一個 `bookmarkUrl`（呼叫端都有：`schedule` 的 `match.bookmarkUrl`、`captureForNewBookmark` 的 `node.url`、
+  `refreshThumbnail` 的 `url`）。`entryIcons && isEntryUrl(bookmarkUrl)` 時順序變成 **icon → 原本的 cover／capture 順序**；
+  icon 失敗照原本的流程走。
+- `refreshThumbnail` 沒開分頁那段、`backfillThumbnails`：入口網址先試圖示，再試 og。
+- **隱私書籤三處**（`refreshVaultThumbnail` 兩段、`backfillVaultThumbnails`）照做；`storeVaultThumbnail` 現在把 `source` 寫死成
+  `'cover'`，要改成由參數傳入。圖示沒有「學習」，不碰 `site-image-stats`；不呼叫 `recordCapture`。
+  `tests/vault-thumb-privacy.test.ts` 的靜態檢查要還是綠的。
+- **舊縮圖怎麼換掉**：`schedule` 的「還很新就跳過」（`autoSource` 那段），在「入口網址＋設定開＋既有縮圖不是 `icon`」時不跳過。
+  這樣升級後下次造訪地圖就會換成圖示，不用等 14 天。`autoSource` 也要把 `'icon'` 算進去。
+  代價：抓不到圖示的入口網址每次造訪都會重跑整條管線，接受。
+- 設定**關掉**時不主動把既有圖示換回來，要等過期或手動「重新抓預覽圖」。`title` 提示裡寫一句。
+
+**顯示**（`Thumb.tsx`、`VaultThumb.tsx`；全頁瀏覽也用這兩個元件，不用另外改）
+- `source === 'icon'` 畫成新的 `thumb--icon`：與截圖同樣 16:9 的方塊，底色用卡片既有的面板色（不要網域色相，跟 Zen 一樣素），
+  圖示置中、`object-fit: contain`。
+- **不放大成糊圖**：顯示尺寸是 48px；原圖小於 48 時，用 `max(原圖, 32)`。列表密度的方塊比較小，要用 `min(48px, 60%)` 之類的限制。
+  兩種密度都截圖看。
+
+**文件與文案**
+- `docs/previews.md` 加一節「Entry URLs show the site icon」：判準、為什麼不用 manifest、為什麼不用第三方服務、
+  為什麼不套 edge 門檻。「The ranking」那節開頭補一句「入口網址先走這裡」。
+- 隱私政策第 3 點（`amo/privacy-policy.*.md`）、`amo/permissions.md` 第 57 行：外送請求多了「同一個網站的圖示與 manifest」，
+  性質跟 og:image 一樣（同一個網站、不經中介）。下次送審的 reviewer notes 也要提。
+
+**驗收**（用 firefox-e2e skill；容器連得到外網，2026-10-10 curl 實測過）
+- 書籤 `https://www.google.com.tw/maps`：造訪後變成地圖圖示，不是靜態地圖。
+- 書籤 `https://www.youtube.com/`：圖示；書籤 `youtube.com/watch?v=…`：仍是影片封面。
+- 設定關掉、刪縮圖後重抓地圖：回到靜態地圖。
+- 隱私書籤的入口網址「重新抓預覽圖」：圖示，而且 `idb-grep.py` 對它的網址是 0 筆。
+- 「補抓預覽圖」：沒開過的入口網址拿到圖示（走 HTML 解析或 `/favicon.ico`）。
+- 側邊欄 240px 寬，打開「更多選項」：新選項不換行、不被切掉。
+- `npm run verify` 全綠。
+
+</details>
+
+### 第 2 期：手動切換（小～中，第 1 期驗收完再做）← 下一步
+
+列選單（`RowMenu.tsx`、`VaultRowMenu.tsx`）加一項，依目前狀態顯示「改用網站圖示」或「改用頁面預覽」，
+用來救第 1 期判錯的（個人頁）和抓不到的（Gmail 的三層路徑）。
+- 選擇要**記住**，不然下次自動擷取又會蓋回去。一般書籤：`storage.local` 一份 `{ [urlKey]: 'icon' | 'page' }`
+  （鍵是雜湊，不含明文網址，與縮圖鍵同性質）。隱私書籤：記在加密的 payload 裡（`PrivateBookmark` 加選填欄位，
+  `sanitizeVaultPayload` 和 `vault-merge` 要認得它），**不能**寫進 `storage.local`。
+- 決定順序：手動記錄 > 設定與入口規則。
+- 順便查：右鍵「設為這個書籤的預覽圖」存的是 `source: 'cover'`，被 `autoSource` 算成自動產生的，14 天後再造訪會被蓋掉。
+  這是不是本來就有的問題？要的話一起用這份記錄解決。
+
+### 背景（改預覽管線時別破壞）
+
+`docs/previews.md` 是整條預覽管線。1.2.0 起隱私書籤的抓圖路徑 `learn: false`、不寫明文快取
+（`docs/vault.md`「No vault URL in plaintext caches」）。
 
 ## （已完成）1.2.0 送審
 

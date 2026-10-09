@@ -56,7 +56,7 @@ const MAX_IMAGE_BYTES = 12_000_000;
  * 型別定義把 func 宣告成無參數且回傳 void，所以 args 與回傳值都得繞過型別。
  * 集中在這裡轉型一次，比在每個呼叫點各灑一次乾淨。
  */
-async function injectWithArgs<T>(
+export async function injectWithArgs<T>(
   tabId: number,
   func: (...args: never[]) => unknown,
   args: unknown[],
@@ -112,23 +112,41 @@ async function decode(blob: Blob, minEdges = 0): Promise<Thumbnail | null> {
 }
 
 async function tryDirectFetch(imageUrl: string, minEdges = 0): Promise<Thumbnail | null> {
+  const blob = await fetchImageBlob(imageUrl);
+  return blob === null ? null : decode(blob, minEdges);
+}
+
+/**
+ * 背景頁 fetch，只取位元組、不解碼。
+ *
+ * 匯出給 `site-icon.ts`：圖示的解碼規則不同（要保留透明、要能解 SVG），
+ * 但取位元組的階梯應該與封面同一套。
+ *
+ * `credentials` 預設 include —— 有些圖片綁 session。對自動判定的圖也合理：
+ * 帶的是該站台自己的 cookie，不會外流給第三方。沒開分頁的路（補抓）要傳 omit，
+ * 與 `og-fetcher.ts` 抓頁面的政策一致。
+ *
+ * 刻意不檢查 content-type：真正的判斷標準是「能不能解碼成圖片」。
+ */
+export async function fetchImageBlob(
+  imageUrl: string,
+  { credentials = 'include' }: { credentials?: RequestCredentials } = {},
+): Promise<Blob | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
   }, TIMEOUT_MS);
   try {
-    // credentials: 'include' —— 有些圖片綁 session。這是使用者主動指定的圖片，
-    // 帶上該站台自己的 cookie 是合理的（而且不會外流給第三方）。
-    // 刻意不檢查 content-type：真正的判斷標準是「能不能解碼成圖片」。
     const response = await fetch(imageUrl, {
-      credentials: 'include',
+      credentials,
       redirect: 'follow',
       signal: controller.signal,
     });
     if (!response.ok) {
       return null;
     }
-    return await decode(await response.blob(), minEdges);
+    const blob = await response.blob();
+    return blob.size === 0 || blob.size > MAX_IMAGE_BYTES ? null : blob;
   } catch {
     return null;
   } finally {
@@ -176,13 +194,19 @@ function fetchInPage(url: string): Promise<string | null> {
 }
 
 async function tryPageFetch(tabId: number, imageUrl: string, minEdges = 0): Promise<Thumbnail | null> {
+  const blob = await fetchImageBlobInPage(tabId, imageUrl);
+  return blob === null ? null : decode(blob, minEdges);
+}
+
+/** 在頁面裡 fetch，只取位元組（理由與 `fetchImageBlob` 相同）。只跑最上層 frame */
+export async function fetchImageBlobInPage(tabId: number, imageUrl: string): Promise<Blob | null> {
   try {
     const dataUrl = await injectWithArgs<string>(tabId, fetchInPage as never, [imageUrl]);
     if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
       return null;
     }
     // data: URL 不走網路，這個 fetch 只是把它變回位元組（截圖那一段也是這樣做的）
-    return await decode(await (await fetch(dataUrl)).blob(), minEdges);
+    return await (await fetch(dataUrl)).blob();
   } catch {
     return null;
   }

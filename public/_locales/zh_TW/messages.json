@@ -691,6 +691,12 @@
   "preview_capture_first_hint": {
     "message": "優先使用網頁截圖，找不到才用封面圖"
   },
+  "preview_entry_icons": {
+    "message": "首頁用網站圖示"
+  },
+  "preview_entry_icons_hint": {
+    "message": "書籤指的是一個網站而不是其中一頁時（路徑最多一層、沒有查詢參數，例如 google.com/maps、twitch.tv），預覽改用網站圖示。關掉後已經是圖示的不會馬上換回來，要等過期或「重新抓預覽圖」"
+  },
   "backfill_start": {
     "message": "補抓預覽圖"
   },

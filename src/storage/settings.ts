@@ -6,6 +6,7 @@ const KEY = 'settings';
 export const DEFAULT_SETTINGS: Settings = {
   captureEnabled: true,
   previewSource: 'cover-first',
+  entryIcons: true,
   captureBlocklist: [],
   thumbMaxAgeDays: 14,
   density: 'card',

@@ -10,6 +10,8 @@ interface ToolbarProps {
   onDensityChange: (density: Density) => void;
   previewSource: PreviewSource;
   onPreviewSourceChange: (source: PreviewSource) => void;
+  entryIcons: boolean;
+  onEntryIconsChange: (on: boolean) => void;
   /** 沒有網站存取權限時無法補抓，按鈕停用 */
   canBackfill: boolean;
   /**
@@ -64,6 +66,8 @@ export function Toolbar({
   onDensityChange,
   previewSource,
   onPreviewSourceChange,
+  entryIcons,
+  onEntryIconsChange,
   canBackfill,
   backfillKind,
   canSelect,
@@ -174,6 +178,8 @@ export function Toolbar({
           y={menu.y}
           previewSource={previewSource}
           onPreviewSourceChange={onPreviewSourceChange}
+          entryIcons={entryIcons}
+          onEntryIconsChange={onEntryIconsChange}
           canBackfill={canBackfill}
           backfillBusy={backfill.busy}
           backfillKind={backfillKind}

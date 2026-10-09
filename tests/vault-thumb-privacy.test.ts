@@ -125,6 +125,27 @@ describe('隱私書籤的縮圖', () => {
     expect(body).toContain('if (priv === null)');
   });
 
+  /**
+   * 網站圖示（入口網址）兩個入口都會被隱私書籤呼叫，所以整個模組都只能回傳位元組：
+   * 不寫縮圖、不記診斷、不學全站共用圖、不記轉址 —— 任何一個都會把網址或圖留成明文。
+   */
+  it('site-icon.ts 只回傳位元組，什麼都不落地', () => {
+    const icon = withoutComments(readFileSync('src/background/site-icon.ts', 'utf8'));
+    for (const name of ['putThumb', 'recordCapture', 'noteDeclaredImages', 'rememberRedirect', 'storage.local']) {
+      expect(icon, name).not.toContain(name);
+    }
+  });
+
+  /** 隱私空間的重抓與補抓也要先試圖示，寫入一樣經過 `storeVaultThumbnail` */
+  it('隱私空間的圖示走加密寫入', () => {
+    const backfill = readFileSync('src/background/backfill.ts', 'utf8');
+    const refreshBody = bodyOf(refresh, 'export async function refreshVaultThumbnail');
+    expect(refreshBody).toContain('iconThumbnailFromTab');
+    expect(refreshBody).toContain('fetchIconThumbnail');
+    expect(bodyOf(backfill, 'export async function backfillVaultThumbnails')).toContain('iconOrOg');
+    expect(bodyOf(backfill, 'async function iconOrOg')).not.toContain('putThumb');
+  });
+
   /** 移進隱私空間（單筆、整個資料夾）與每次解鎖，都要清掉明文快取裡的痕跡 */
   it('移入與解鎖都清明文快取', () => {
     const vault = readFileSync('src/background/vault.ts', 'utf8');

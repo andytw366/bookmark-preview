@@ -5,6 +5,9 @@ import { getThumb, putThumb } from '@/storage/thumbs-db';
 import { bookmarkedUrls } from './bookmark-index';
 import { hasHostAccess } from './capture';
 import { fetchOgThumbnail } from './og-fetcher';
+import { fetchIconThumbnail, wantsSiteIcon } from './site-icon';
+import type { Thumbnail } from './image';
+import type { Settings, ThumbSource } from '@/shared/types';
 import { listBookmarks, storeVaultThumbnail, vaultThumbKey } from './vault';
 import { t } from '@/shared/i18n';
 
@@ -58,12 +61,12 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const thumbnail = await fetchOgThumbnail(item.url, { learn: true });
-        if (thumbnail !== null) {
+        const found = await iconOrOg(settings, item.url, { learn: true });
+        if (found !== null) {
           await putThumb({
             key: item.key,
-            ...thumbnail,
-            source: 'og',
+            ...found.thumbnail,
+            source: found.source,
             capturedAt: Date.now(),
             encrypted: false,
             iv: null,
@@ -127,9 +130,9 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const thumbnail = await fetchOgThumbnail(item.url, { learn: false });
-        if (thumbnail !== null) {
-          await storeVaultThumbnail(item.id, thumbnail);
+        const found = await iconOrOg(settings, item.url, { learn: false });
+        if (found !== null) {
+          await storeVaultThumbnail(item.id, found.thumbnail, found.source);
           broadcast('thumbs/updated', { key: vaultThumbKey(item.id) });
           ok += 1;
         }
@@ -143,4 +146,23 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
   } finally {
     running = false;
   }
+}
+
+/**
+ * 沒開分頁時能拿到的預覽：入口網址先試網站圖示（解析 HTML、最後試 `/favicon.ico`），
+ * 再退回 og:image。兩種補抓共用，免得一邊有圖示、另一邊沒有。
+ */
+async function iconOrOg(
+  settings: Settings,
+  url: string,
+  { learn }: { learn: boolean },
+): Promise<{ thumbnail: Thumbnail; source: ThumbSource } | null> {
+  if (wantsSiteIcon(settings, url)) {
+    const icon = await fetchIconThumbnail(url);
+    if (icon !== null) {
+      return { thumbnail: icon, source: 'icon' };
+    }
+  }
+  const og = await fetchOgThumbnail(url, { learn });
+  return og === null ? null : { thumbnail: og, source: 'og' };
 }

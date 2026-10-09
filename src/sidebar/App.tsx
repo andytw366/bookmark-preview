@@ -631,6 +631,10 @@ export function App() {
           onPreviewSourceChange={(previewSource) => {
             update({ previewSource });
           }}
+          entryIcons={settings.entryIcons}
+          onEntryIconsChange={(entryIcons) => {
+            update({ entryIcons });
+          }}
           canBackfill={permission.granted === true}
           // 站在隱私空間按補抓，要抓的是隱私書籤（加密寫入），不是一般書籤
           backfillKind="vault/backfill"
@@ -816,6 +820,10 @@ export function App() {
             previewSource={settings.previewSource}
             onPreviewSourceChange={(previewSource) => {
               update({ previewSource });
+            }}
+            entryIcons={settings.entryIcons}
+            onEntryIconsChange={(entryIcons) => {
+              update({ entryIcons });
             }}
             canBackfill={permission.granted === true}
             backfillKind="thumbs/backfill"

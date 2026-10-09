@@ -1768,6 +1768,10 @@ export function Gallery() {
           onPreviewSourceChange={(previewSource) => {
             update({ previewSource });
           }}
+          entryIcons={settings.entryIcons}
+          onEntryIconsChange={(entryIcons) => {
+            update({ entryIcons });
+          }}
           canBackfill={permissionGranted}
           backfillBusy={backfill.busy}
           // 站在隱私空間要抓的是隱私書籤（加密寫入），不是一般書籤
