@@ -32,6 +32,7 @@ Folder Back/Up, drag-and-drop ordering, bookmark groups. No new permissions, req
 - `history.pushState` for folders: bookmarks use `#folder=<guid>`; vault folders store only a
   random token, mapped in memory and cleared on lock (`gallery-history.ts`).
 - Vault drag data has no URL, internal type only (`useGridDrag.ts`).
+- Fix: vault URLs are kept out of plaintext caches and cleared on move-in/unlock (`vault-traces.ts`).
 
 ## Source and build
 
