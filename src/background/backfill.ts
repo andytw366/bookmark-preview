@@ -58,7 +58,7 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const thumbnail = await fetchOgThumbnail(item.url);
+        const thumbnail = await fetchOgThumbnail(item.url, { learn: true });
         if (thumbnail !== null) {
           await putThumb({
             key: item.key,
@@ -127,7 +127,7 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
         if (item === undefined) {
           return;
         }
-        const thumbnail = await fetchOgThumbnail(item.url);
+        const thumbnail = await fetchOgThumbnail(item.url, { learn: false });
         if (thumbnail !== null) {
           await storeVaultThumbnail(item.id, thumbnail);
           broadcast('thumbs/updated', { key: vaultThumbKey(item.id) });

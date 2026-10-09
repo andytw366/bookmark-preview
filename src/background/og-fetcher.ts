@@ -19,7 +19,8 @@ const TIMEOUT_MS = 8_000;
 const MAX_HTML_BYTES = 4_000_000;
 const MAX_IMAGE_BYTES = 8_000_000;
 
-export async function fetchOgThumbnail(pageUrl: string): Promise<Thumbnail | null> {
+/** `learn` 見 `noteDeclaredImages`：隱私書籤一律傳 false */
+export async function fetchOgThumbnail(pageUrl: string, { learn }: { learn: boolean }): Promise<Thumbnail | null> {
   const html = await fetchHtml(pageUrl);
   if (html === null) {
     return null;
@@ -32,7 +33,7 @@ export async function fetchOgThumbnail(pageUrl: string): Promise<Thumbnail | nul
   // 判定為全站共用的排到最後，但**不移除**：某些頁面真的只有那一張圖可用，
   // 那時 logo 仍勝過完全沒有預覽圖。與分頁擷取那條路的政策一致
   // （`SITE_WIDE_PENALTY` 是降級而非排除）。
-  const siteWide = await noteDeclaredImages(pageUrl, declared);
+  const siteWide = await noteDeclaredImages(pageUrl, declared, { learn });
   const ranked = [
     ...declared.filter((url) => !siteWide.has(url)),
     ...declared.filter((url) => siteWide.has(url)),

@@ -1,6 +1,6 @@
 import { broadcast } from '@/shared/messages';
 import { urlKey } from '@/shared/url';
-import { recordCapture } from '@/storage/diagnostics';
+import { recordCapture, type CaptureDiagnostic } from '@/storage/diagnostics';
 import { putThumb } from '@/storage/thumbs-db';
 import { matchBookmark, resolveBookmarkForPage } from './bookmark-index';
 import { grabImage } from './image-grab';
@@ -49,10 +49,22 @@ async function applyManualCover(
   tabId: number | undefined,
 ): Promise<void> {
   const stamp = { url: pageUrl, at: Date.now() };
+  // 隱私書籤已經不在原生書籤樹裡，要分開判斷，而且縮圖必須加密
+  const priv = findVaultBookmarkByUrl(pageUrl);
+  /*
+   * 隱私書籤**連診斷都不記**，成功失敗都一樣：`recordCapture` 把網址明文寫進 `storage.local`，
+   * 「manual:ok」更等於寫明「這個網址是書籤」—— 而它不在原生書籤裡，看的人一猜就知道它在哪。
+   * 代價是隱私書籤在這裡失敗時設定頁看不到原因（與 `refreshVaultThumbnail` 同一個取捨）。
+   */
+  const note = async (diagnostic: CaptureDiagnostic): Promise<void> => {
+    if (priv === null) {
+      await recordCapture(diagnostic);
+    }
+  };
   try {
     const grabbed = await grabImage(tabId, imageUrl);
     if (grabbed === null) {
-      await recordCapture({
+      await note({
         ...stamp,
         stage: 'manual:failed',
         detail: t('pick_all_strategies_failed'),
@@ -64,11 +76,8 @@ async function applyManualCover(
     // 這裡原本把它丟掉，於是診斷只看得到「成功」而看不出走了哪條路）
     const via = { detail: t('pick_strategy_used', grabbed.strategy) };
 
-    // 隱私書籤已經不在原生書籤樹裡，要分開判斷，而且縮圖必須加密
-    const priv = findVaultBookmarkByUrl(pageUrl);
     if (priv !== null) {
       await storeVaultThumbnail(priv.id, thumbnail);
-      await recordCapture({ ...stamp, stage: 'manual:ok', ...via });
       broadcast('thumbs/updated', { key: vaultThumbKey(priv.id) });
       return;
     }
@@ -99,7 +108,7 @@ async function applyManualCover(
     await recordCapture({ ...stamp, stage: 'manual:ok', ...via });
     broadcast('thumbs/updated', { key });
   } catch (cause) {
-    await recordCapture({
+    await note({
       ...stamp,
       stage: 'manual:failed',
       detail: cause instanceof Error ? cause.message : String(cause),

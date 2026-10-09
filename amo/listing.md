@@ -168,6 +168,8 @@ bookmarks, thumbnails, preview, privacy, encryption
 ・搜尋找得到資料夾；輸入「#名稱」跨資料夾找出同名群組的書籤。
 ・隱私空間也能排序、建群組與搜尋（搜尋只在本機進行）。
 ・書籤群組預設透過 Firefox 同步到你的其他裝置，可在設定頁關掉。
+・修正：書籤移進隱私空間後，網址仍留在本機的預覽圖快取裡（明文）。現在移入時會清掉，
+　解鎖時也會把舊版本留下的一併清除；隱私書籤重抓預覽圖時也不再寫入。
 ```
 
 ```
@@ -183,6 +185,9 @@ bookmarks, thumbnails, preview, privacy, encryption
 ・The vault gets reordering, groups and search (search runs locally).
 ・Bookmark groups sync to your other devices through Firefox Sync by default; this
   can be turned off in settings.
+・Fixed: a bookmark moved into the vault left its URL in plaintext in the local
+  preview caches. It is now removed on move-in, leftovers from earlier versions are
+  removed on unlock, and refreshing a vault preview no longer writes there.
 ```
 
 ---

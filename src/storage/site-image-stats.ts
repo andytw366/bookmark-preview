@@ -33,10 +33,15 @@ async function write(stats: Stats): Promise<void> {
  *
  * 記錄與查詢合併成一個動作，因為呼叫端每次都是先記錄再判斷，
  * 分開兩個函式只會讓呼叫端有機會忘記其中一步。
+ *
+ * **`learn: false` = 只查不記**，給隱私書籤用：這張表把頁面網址明文存在 `storage.local`，
+ * 隱私書籤的網址寫進來就等於從隱私空間漏出去（與 `redirect-map.ts`、`recordCapture`
+ * 同一條規則）。刻意做成必填，呼叫端不能靠預設值帶過。
  */
 export async function noteDeclaredImages(
   pageUrl: string,
   imageUrls: readonly string[],
+  { learn }: { learn: boolean },
 ): Promise<Set<string>> {
   if (imageUrls.length === 0) {
     return new Set();
@@ -54,16 +59,22 @@ export async function noteDeclaredImages(
   const siteWide = new Set<string>();
 
   for (const imageUrl of imageUrls) {
-    const pages = forHost[imageUrl] ?? [];
+    const pages = [...(forHost[imageUrl] ?? [])];
     if (!pages.includes(page) && pages.length < PAGES_TO_CONFIRM) {
       pages.push(page);
     }
-    forHost[imageUrl] = pages;
     if (pages.length >= PAGES_TO_CONFIRM) {
       siteWide.add(imageUrl);
     }
+    if (learn) {
+      forHost[imageUrl] = pages;
+    }
   }
 
+  // 隱私書籤：照樣用已學到的結論判斷，但這一頁不准留下來 —— 頁面網址是明文
+  if (!learn) {
+    return siteWide;
+  }
   stats[host] = capImages(forHost, MAX_IMAGES_PER_HOST);
   await write(capKeys(stats, MAX_HOSTS));
   return siteWide;
@@ -121,4 +132,38 @@ function capImages(
 /** 使用者可能想重置學習結果（例如網站改版了）。 */
 export async function clearSiteImageStats(): Promise<void> {
   await browser.storage.local.remove(KEY);
+}
+
+/**
+ * 把這些頁面從學習紀錄裡拿掉（書籤移進隱私空間時）。
+ *
+ * 只拿掉頁面，不動其他頁面學到的結論；某張圖的頁面拿光了就整筆刪掉，網域空了也刪。
+ */
+export async function forgetPages(pageUrls: readonly string[]): Promise<void> {
+  if (pageUrls.length === 0) {
+    return;
+  }
+  const gone = new Set(pageUrls.map(normalizeUrl));
+  const stats = await read();
+  let changed = false;
+  for (const [host, forHost] of Object.entries(stats)) {
+    for (const [imageUrl, pages] of Object.entries(forHost)) {
+      const kept = pages.filter((page) => !gone.has(page));
+      if (kept.length === pages.length) {
+        continue;
+      }
+      changed = true;
+      if (kept.length === 0) {
+        delete forHost[imageUrl];
+      } else {
+        forHost[imageUrl] = kept;
+      }
+    }
+    if (Object.keys(forHost).length === 0) {
+      delete stats[host];
+    }
+  }
+  if (changed) {
+    await write(stats);
+  }
 }

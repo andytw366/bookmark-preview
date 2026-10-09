@@ -188,6 +188,27 @@ device's edit.
 Searching the vault (plain text or `#tag`, see [interface.md](interface.md#search)) happens
 in the page over the decrypted data; the query lives only in memory and is cleared on lock.
 
+## No vault URL in plaintext caches
+
+Three plaintext caches in `storage.local` record URLs for native bookmarks: the redirect
+table (`redirectTargets`, `storage/redirect-map.ts`), the site-wide-image learning
+(`siteImageStats`, `storage/site-image-stats.ts`) and the last capture diagnostic
+(`lastCapture`, `storage/diagnostics.ts`). Vault paths never write to them: redirect
+resolution keeps its result in memory, `noteDeclaredImages` is called with `learn: false`
+(still reads what was learned, writes nothing), and no diagnostic is recorded — including a
+right-click "Use as this bookmark's preview" on a vault page. `tests/vault-thumb-privacy.test.ts`
+checks these statically.
+
+What a bookmark left there **while it was still native** is removed when it moves in, and
+again on every unlock for all vault URLs (`background/vault-traces.ts`): that also covers
+leftovers from versions before 1.2.0 and bookmarks moved in on another device, whose native
+copy here was deleted by Firefox Sync rather than by the move-in. A redirect entry is
+removed when either its key or its target is a vault URL.
+
+Not covered: `lastCapture` records the last page you visited whether or not it is a
+bookmark. Visiting a vault URL records it as "not bookmarked", the same information your
+browser history holds.
+
 ## Whole folders move in and out, structure intact
 
 Pressing the lock icon on a bookmark folder (or "Move the whole folder into the vault")

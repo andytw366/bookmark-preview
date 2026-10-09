@@ -269,7 +269,11 @@ export async function produceThumbnailNow(
  * 嚴格字串比對會讓「書籤存 `https://x.com`、分頁顯示 `https://x.com/`」
  * 這種完全正常的情況被誤判成「使用者已經換頁」。
  */
-export async function coverThumbnailFor(tabId: number, url: string): Promise<Thumbnail | null> {
+export async function coverThumbnailFor(
+  tabId: number,
+  url: string,
+  { learn }: { learn: boolean },
+): Promise<Thumbnail | null> {
   const fresh = await browser.tabs.get(tabId);
   if (normalizeUrl(fresh.url ?? '') !== normalizeUrl(url)) {
     return null;
@@ -285,7 +289,7 @@ export async function coverThumbnailFor(tabId: number, url: string): Promise<Thu
   const declared = candidates
     .filter((candidate) => candidate.score >= DECLARED_THRESHOLD)
     .map((candidate) => candidate.url);
-  const siteWide = await noteDeclaredImages(url, declared);
+  const siteWide = await noteDeclaredImages(url, declared, { learn });
   const ranked = candidates
     .map((candidate) =>
       siteWide.has(candidate.url)
@@ -302,7 +306,7 @@ export async function coverThumbnailFor(tabId: number, url: string): Promise<Thu
 
 async function tryCover(tabId: number, url: string, key: string): Promise<boolean> {
   try {
-    const thumbnail = await coverThumbnailFor(tabId, url);
+    const thumbnail = await coverThumbnailFor(tabId, url, { learn: true });
     if (thumbnail === null) {
       return false;
     }

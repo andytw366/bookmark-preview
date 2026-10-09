@@ -1,6 +1,6 @@
 # 接手指南 / 待辦
 
-最後更新：2026-10-09（**1.2.0 送審資料都備好了；但驗證時發現隱私空間有明文網址殘留（1.1.x 就有），送審前要使用者決定先修還是先送**）
+最後更新：2026-10-09（**1.2.0 送審資料都備好了；送審前發現的隱私空間明文網址殘留已修好並實機驗過，等使用者上傳送審**）
 
 ## 下一個 session 從這裡開始：1.2.0 送審
 
@@ -34,6 +34,8 @@
 
 移進隱私空間時群組**不會跟著帶進去**（兩個書籤進去後是散的）—— 不是洩漏，但使用者可能預期會帶；要不要做另外問。
 
+✅ **已修（2026-10-09，使用者決定先修再送）**，結果見下面「修完的實機驗證」。原本的發現：
+
 ⚠️ **同一趟發現的隱私空間缺口（與群組無關，1.1.x 就有，已上架的版本也有）**：`storage.local` 有三份**明文**快取記著網址，
 書籤移進隱私空間後不會清：
 
@@ -46,6 +48,30 @@
 修法方向：隱私的那幾條路不呼叫 `noteDeclaredImages`、不寫 `redirectTargets` / `lastCapture`；移入隱私空間時（`vault.ts` 刪原生書籤那裡）
 從這三份裡刪掉該網址；啟動時一次性清掉已在隱私空間裡的網址（舊版本留下的）。驗法：`idb-grep.py` 對隱私書籤的網址要 0 筆。
 **要不要擋 1.2.0 送審由使用者決定**（見對話）。
+
+**修完的做法**（設計寫在 `docs/vault.md`「No vault URL in plaintext caches」）：
+
+- `noteDeclaredImages(…, { learn })` 必填；`coverThumbnailFor`、`fetchOgThumbnail` 也帶 `learn`。隱私的三個呼叫點
+  （`refreshVaultThumbnail` 兩處、`backfillVaultThumbnails`）傳 false：照讀學到的結論，不寫。
+- 第四個漏洞（修的時候找到的）：右鍵「設為這個書籤的預覽圖」對隱私書籤成功後記 `manual:ok` 診斷 —— 明文寫著「這個網址是書籤」。
+  現在隱私書籤成功失敗都不記（`pick-cover.ts` 的 `note`）。
+- `background/vault-traces.ts` 的 `forgetPlaintextTraces`：移入（單筆、資料夾）後、以及**每次解鎖**對全部隱私網址清三份快取。
+  轉址表**鍵或值**是隱私網址都刪（實機抓到：已刪的 `https://developer.mozilla.org` → `/zh-TW` 那筆，值正是隱私書籤）。
+- 測試：`tests/vault-traces.test.ts`（記憶體 `storage.local`）、`tests/vault-thumb-privacy.test.ts` 多三項靜態檢查（改回 `learn: true` 會紅，試過）。
+
+**修完的實機驗證**（`KEEP_PROFILE=1` 重開沿用同一個 profile，`idb-grep.py` 對照組「開發文件」每次都是 1）：
+
+| 情境 | 結果 |
+|---|---|
+| 修之前移進去的 Wikipedia、Google、SO：重開、解鎖 | 三份快取裡都 0 筆 ✅ |
+| 移入 MDN（轉址表有一筆） | 第一版只比鍵、沒清到「別的鍵 → MDN 網址」那筆；改成鍵或值都比之後，解鎖即清 ✅ |
+| 隱私書籤 Wikipedia「重新抓預覽圖」（訊息：從 og:image 抓到） | `wikipedia`、`wikimedia` 0 筆 ✅ |
+
+留著沒處理：`lastCapture` 記「最後造訪的頁面」，造訪隱私網址時記成「不是書籤」—— 與瀏覽記錄同等資訊，沒透露它在隱私空間。
+SO 那筆就是這樣（Cloudflare 檢查頁的網址帶 `__cf_chl_tk`，與書籤網址不同，所以清不到，也不需要清）。
+
+⚠️ `KEEP_PROFILE=1` 重開時 `test-headless.sh` 照樣會重新種書籤：展示用那組被換掉一部分（GitHub、ChatGPT、YouTube 不見了），
+預設那組又加一次。要接著用同一個 profile 測的話要知道書籤會變。
 
 順手修：`scripts/idb-grep.py` 的對照組對中文無效 —— `encode('latin1', 'ignore')` 把中文變成空位元組，每一列都「找得到」（11/11）。
 已改成 Latin-1 編不了就不比。之前用中文當對照組的結論要重看（第 3 期以前的紀錄）。

@@ -53,7 +53,7 @@ export async function refreshThumbnail(url: string): Promise<RefreshReport> {
   }
 
   // 頁面沒開著：退回伺服器端的 og:image
-  const thumbnail = await fetchOgThumbnail(url);
+  const thumbnail = await fetchOgThumbnail(url, { learn: true });
   if (thumbnail === null) {
     return {
       ok: false,
@@ -125,7 +125,7 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
     for (const attempt of order) {
       const thumbnail =
         attempt === 'cover'
-          ? await coverThumbnailFor(open.tabId, open.pageUrl)
+          ? await coverThumbnailFor(open.tabId, open.pageUrl, { learn: false })
           : await screenshotThumbnailFor(open.tabId, open.pageUrl);
       if (thumbnail !== null) {
         await store(thumbnail);
@@ -134,7 +134,7 @@ export async function refreshVaultThumbnail(id: string): Promise<RefreshReport> 
     }
   }
 
-  const thumbnail = await fetchOgThumbnail(url);
+  const thumbnail = await fetchOgThumbnail(url, { learn: false });
   if (thumbnail === null) {
     // 「分頁沒開」與「分頁開著但這頁沒有可用的封面」是兩件事，不能用同一句話帶過：
     // 前者的下一步是去開那個頁面，後者再開幾次也沒用。實測時就被這句話誤導過一次

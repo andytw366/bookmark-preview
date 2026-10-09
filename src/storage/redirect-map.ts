@@ -53,3 +53,32 @@ export async function rememberRedirect(bookmarkUrl: string, finalUrl: string): P
 export async function isResolved(bookmarkUrl: string): Promise<boolean> {
   return normalizeUrl(bookmarkUrl) in (await read());
 }
+
+/**
+ * 把這些網址的紀錄拿掉（書籤移進隱私空間時），回傳被拿掉的那幾筆的最終網址 ——
+ * 呼叫端要拿那些網址去清其他地方（分頁停在的是最終網址，不是書籤網址）。
+ *
+ * **鍵或值是這些網址都算。** 值也要比：另一個書籤（例如已經刪掉的 `https://x/`）轉址到的
+ * 正好是這個隱私書籤的網址（`https://x/zh-TW`）時，那筆紀錄同樣把隱私網址明文留著 ——
+ * 2026-10-09 實機就是這樣留下 MDN 的。
+ */
+export async function forgetRedirects(urls: readonly string[]): Promise<string[]> {
+  if (urls.length === 0) {
+    return [];
+  }
+  const gone = new Set(urls.map(normalizeUrl));
+  const stored = await read();
+  const finals: string[] = [];
+  let changed = false;
+  for (const [key, target] of Object.entries(stored)) {
+    if (gone.has(key) || gone.has(target)) {
+      finals.push(target);
+      delete stored[key];
+      changed = true;
+    }
+  }
+  if (changed) {
+    await browser.storage.local.set({ [KEY]: stored });
+  }
+  return finals;
+}

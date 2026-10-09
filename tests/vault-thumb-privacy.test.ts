@@ -96,4 +96,44 @@ describe('隱私書籤的縮圖', () => {
     expect(body).not.toContain('rememberRedirect');
     expect(body).toContain('findOpenTabResolving(url, false)');
   });
+
+  /**
+   * 「全站共用圖」的學習紀錄（`siteImageStats`）把**頁面網址**明文寫進 `storage.local`。
+   * 封面判定與伺服器端 og 兩條路都會記，所以隱私空間的每一個呼叫點都要傳 `learn: false`。
+   * 2026-10-09 實機發現這三處原本都會記。
+   */
+  it('隱私空間的抓圖不寫進全站共用圖的學習紀錄', () => {
+    const backfill = readFileSync('src/background/backfill.ts', 'utf8');
+    for (const body of [
+      bodyOf(refresh, 'export async function refreshVaultThumbnail'),
+      bodyOf(backfill, 'export async function backfillVaultThumbnails'),
+    ]) {
+      expect(body).toContain('learn: false');
+      expect(body).not.toContain('learn: true');
+    }
+  });
+
+  /** 右鍵指定封面：隱私書籤成功失敗都不記診斷，只有經過 `note`（一般書籤才寫）才能記 */
+  it('右鍵指定封面對隱私書籤不記診斷', () => {
+    const pick = readFileSync('src/background/pick-cover.ts', 'utf8');
+    const body = bodyOf(pick, 'async function applyManualCover');
+    // 隱私那一段（從判斷到 return）沒有記診斷
+    const branch = body.slice(body.indexOf('if (priv !== null)'));
+    expect(branch.slice(0, branch.indexOf('return;'))).not.toContain('recordCapture');
+    // 失敗（隱私或一般都可能走到）只能經過 note
+    expect(body).not.toMatch(/recordCapture\(\{\s*\.\.\.stamp,\s*stage: 'manual:failed'/);
+    expect(body).toContain('if (priv === null)');
+  });
+
+  /** 移進隱私空間（單筆、整個資料夾）與每次解鎖，都要清掉明文快取裡的痕跡 */
+  it('移入與解鎖都清明文快取', () => {
+    const vault = readFileSync('src/background/vault.ts', 'utf8');
+    for (const signature of [
+      'async function importOneLocked',
+      'async function importFolderLocked',
+      'async function unlockWith(opener',
+    ]) {
+      expect(bodyOf(vault, signature), signature).toContain('forgetTraces(');
+    }
+  });
 });

@@ -79,6 +79,7 @@ import {
   writeLayout,
   writeMeta,
 } from '@/storage/vault-store';
+import { forgetPlaintextTraces } from './vault-traces';
 import { t } from '@/shared/i18n';
 
 /**
@@ -478,7 +479,20 @@ async function unlockWith(opener: Opener): Promise<void> {
     key = dataKey;
     layout = await openLayout(dataKey);
     prune();
+    await forgetTraces(alive(opened.bookmarks).map((record) => record.url));
   });
+}
+
+/**
+ * 清掉這些網址在明文快取裡的痕跡（`vault-traces.ts`）。**失敗不往上丟**：
+ * 書籤已經移進來、隱私空間已經解開，為了清快取讓這兩件事報錯不划算 —— 下次解鎖會再清一次。
+ */
+async function forgetTraces(urls: readonly string[]): Promise<void> {
+  try {
+    await forgetPlaintextTraces(urls);
+  } catch {
+    // 見上
+  }
 }
 
 /**
@@ -1200,6 +1214,7 @@ async function importOneLocked(bookmarkId: string, purgeHistory: boolean): Promi
 
     // 這一步不可逆：書籤從此不在 Firefox 的書籤樹裡
     await browser.bookmarks.remove(bookmarkId);
+    await forgetTraces([node.url]);
 
     const outcome = purgeHistory ? await purgeHistoryFor(node.url) : 'skipped';
     return {
@@ -1283,6 +1298,7 @@ async function importFolderLocked(folderId: string, purgeHistory: boolean): Prom
   await persist();
   // 這一步不可逆，而且一定要在 persist 之後
   await browser.bookmarks.removeTree(folderId);
+  await forgetTraces(records.map((record) => record.url));
 
   let historyPurged = 0;
   let historyUnavailable = false;

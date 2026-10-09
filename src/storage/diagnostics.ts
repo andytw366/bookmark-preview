@@ -1,3 +1,4 @@
+import { normalizeUrl } from '@/shared/url';
 import { t } from '@/shared/i18n';
 
 /**
@@ -37,6 +38,18 @@ const KEY = 'lastCapture';
 
 export async function recordCapture(diagnostic: CaptureDiagnostic): Promise<void> {
   await browser.storage.local.set({ [KEY]: diagnostic });
+}
+
+/** 最後一次的診斷正好是這些網址之一就刪掉（書籤移進隱私空間時） */
+export async function forgetCapture(urls: readonly string[]): Promise<void> {
+  const last = await getLastCapture();
+  if (last === null) {
+    return;
+  }
+  const gone = new Set(urls.map(normalizeUrl));
+  if (gone.has(normalizeUrl(last.url))) {
+    await browser.storage.local.remove(KEY);
+  }
 }
 
 export async function getLastCapture(): Promise<CaptureDiagnostic | null> {
