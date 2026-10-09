@@ -42,6 +42,20 @@ def snappy(b):
         for _ in range(l): out.append(out[-off])
     return bytes(out)
 needles = sys.argv[1:]
+
+
+def encodings(n: str) -> list[bytes]:
+    """UTF-16 與 Latin-1（能編才編）。**不能用 `encode('latin1', 'ignore')`**：中文會變成空位元組，
+    空位元組「出現在」每一列裡 —— 2026-10-09 就是這樣，中文對照組 11 列全中，等於沒有對照。"""
+    out = [n.encode('utf-16-le')]
+    try:
+        out.append(n.encode('latin1'))
+    except UnicodeEncodeError:
+        pass
+    return out
+
+
+forms = {n: encodings(n) for n in needles}
 for db in glob.glob('.test-profile/storage/default/moz-extension*/idb/*.sqlite'):
     # 複製一份再開：Firefox 開著時直接讀會撞到鎖，WAL 也要一起帶走
     tmp = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'idb-grep.sqlite')
@@ -56,5 +70,5 @@ for db in glob.glob('.test-profile/storage/default/moz-extension*/idb/*.sqlite')
         try: plain = snappy(data); ok += 1
         except Exception: plain = data
         for n in needles:
-            if n.encode('latin1', 'ignore') in plain or n.encode('utf-16-le') in plain: found[n] += 1
+            if any(e in plain for e in forms[n]): found[n] += 1
     print(os.path.basename(os.path.dirname(os.path.dirname(db)))[:40], 'rows', len(rows), 'decoded', ok, found)

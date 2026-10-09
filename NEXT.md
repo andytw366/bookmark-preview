@@ -1,6 +1,6 @@
 # 接手指南 / 待辦
 
-最後更新：2026-10-08（**1.2.0 的送審文案、截圖、打包都做好了，等使用者自己上傳送審**）
+最後更新：2026-10-09（**1.2.0 送審資料都備好了；但驗證時發現隱私空間有明文網址殘留（1.1.x 就有），送審前要使用者決定先修還是先送**）
 
 ## 下一個 session 從這裡開始：1.2.0 送審
 
@@ -21,6 +21,34 @@
 
 **剩下要使用者自己做的**：把 `web-ext-artifacts/bookmark-preview-vault-1.2.0.zip` 與 `…-1.2.0-source.zip` 上傳到 AMO、
 貼文案（先 `python3 scripts/amo-paste.py`）、換兩張截圖與說明文字。送出後照「上架狀態」那段的 `curl` 查結果，結果寫回這裡。
+
+**2026-10-09 實機驗證：書籤群組的同步不會帶出隱私空間的東西**（使用者問「group 不加密，隱私空間的 group 會不會變明文」）。
+`storage.sync` 直接讀 profile 的 `storage-sync-v2.sqlite`（`storage_sync_data.data` 是明文 JSON，比從背景頁 console 讀快得多）：
+
+| 操作 | `storage.sync` 的 `grid:toolbar_____` |
+|---|---|
+| 起點 | 「開發文件」（MDN、SO）、「查資料」（Wikipedia、Google） |
+| 「查資料」兩個成員一起移進隱私空間 | 「查資料」整組消失，成員 GUID 也不在了 ✅ |
+| 「開發文件」只移 SO 進去 | 群組還在，成員只剩 MDN 的 GUID ✅ |
+| 在隱私空間建群組、取名 `VaultSecretTag7` | 沒出現；`storage.local` 用（修好的）`idb-grep.py` 也是 0 筆，對照組「開發文件」1 筆 ✅ |
+
+移進隱私空間時群組**不會跟著帶進去**（兩個書籤進去後是散的）—— 不是洩漏，但使用者可能預期會帶；要不要做另外問。
+
+⚠️ **同一趟發現的隱私空間缺口（與群組無關，1.1.x 就有，已上架的版本也有）**：`storage.local` 有三份**明文**快取記著網址，
+書籤移進隱私空間後不會清：
+
+- `siteImageStats`（`src/storage/site-image-stats.ts`，host → 圖片網址 → **頁面網址**）：移進去之後 Wikipedia 的頁面網址還在。
+  而且**隱私書籤「重新抓預覽圖」也會寫進來**（`refreshVaultThumbnail` → `coverThumbnailFor` / `fetchOgThumbnail` →
+  `noteDeclaredImages(url)`）—— 讀程式碼確認的，還沒實機重現。`cover-grab.ts` 的註解明說隱私那條路「不記診斷、也不寫入」，這一處漏了。
+- `redirectTargets`（書籤網址 → 轉址目標）：SO 移進去之後那筆還在。
+- `lastCapture`（最後一次造訪的擷取診斷）：記的是最後造訪的頁面；造訪隱私書籤的網址時會不會記下、記的內容會不會透露「它在隱私空間」，沒查。
+
+修法方向：隱私的那幾條路不呼叫 `noteDeclaredImages`、不寫 `redirectTargets` / `lastCapture`；移入隱私空間時（`vault.ts` 刪原生書籤那裡）
+從這三份裡刪掉該網址；啟動時一次性清掉已在隱私空間裡的網址（舊版本留下的）。驗法：`idb-grep.py` 對隱私書籤的網址要 0 筆。
+**要不要擋 1.2.0 送審由使用者決定**（見對話）。
+
+順手修：`scripts/idb-grep.py` 的對照組對中文無效 —— `encode('latin1', 'ignore')` 把中文變成空位元組，每一列都「找得到」（11/11）。
+已改成 Latin-1 編不了就不比。之前用中文當對照組的結論要重看（第 3 期以前的紀錄）。
 
 **這次發現、沒修的**：側邊欄寬 240px 時，底部工具列（密度三鈕＋選取＋全頁瀏覽＋⋯）比頁面寬約 6px，
 `⋯` 被切掉一截，而且焦點一移動整個側邊欄文件會往左捲 6px（左邊被切掉）。1.0 的截圖就已經這樣，不是 1.2.0 的回歸。
