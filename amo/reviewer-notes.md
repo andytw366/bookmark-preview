@@ -21,18 +21,18 @@ limited to 3000 characters**, so this is deliberately terse — run
 
 ---
 
-## New in 1.2.0
+## New in 1.3.0
 
-Folder Back/Up, drag-and-drop ordering, bookmark groups. No new permissions, requests or deps.
+Site icons as previews, a redesigned UI, settings in a tab. No new permissions or deps.
 
-- `storage.sync` now also holds bookmark groups, **on by default**: `grid:<folder guid>` =
-  group names, colours, member GUIDs, random device ID. Not encrypted by us (like the
-  bookmark titles Sync already carries); in the privacy policy; turning it off in settings
-  removes the keys. Fixed 20 KB budget (`grid-sync.ts`). Vault groups stay in vault ciphertext.
-- `history.pushState` for folders: bookmarks use `#folder=<guid>`; vault folders store only a
-  random token, mapped in memory and cleared on lock (`gallery-history.ts`).
-- Vault drag data has no URL, internal type only (`useGridDrag.ts`).
-- Fix: vault URLs are kept out of plaintext caches and cleared on move-in/unlock (`vault-traces.ts`).
+- A bookmark pointing to a whole site (path depth ≤ 1, no query) gets the site's icon. New
+  requests, all to that site: icon URLs its HTML declares (`<link rel=icon>`,
+  `apple-touch-icon`), its Web App manifest, `/apple-touch-icon.png` and `/favicon.ico`
+  (`site-icon.ts`). With no tab open, `credentials: 'omit'`; with the page open the
+  manifest is fetched like the page does (some, e.g. Google Maps, need its cookies).
+- Per-bookmark "Use site icon / page preview" is kept in `storage.local` keyed by a SHA-256
+  of the URL; for vault bookmarks inside the vault ciphertext. In the privacy policy.
+- `options_ui.open_in_tab` is now `true` (the new layout needs the width).
 
 ## Source and build
 
@@ -46,7 +46,7 @@ npm run build
 `vite build` runs twice (the pages, then `vite.config.background.ts`) because an MV3
 background script must be one IIFE. The `.zip` is `npm run package`.
 
-Verified for 1.2.0: those commands reproduce the submitted `dist/`, all 24 files identical.
+Verified for 1.3.0: those commands reproduce the submitted `dist/`, all 25 files identical.
 
 ## No remote code
 

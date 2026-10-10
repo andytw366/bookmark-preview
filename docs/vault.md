@@ -32,8 +32,24 @@ may well be an ordinary word.
 
 **The entrance is hidden by default.** A visible "Vault" tab by itself reveals that you
 have something to hide, which defeats the purpose. In the default state the sidebar shows
-no trace of it — no tab, no button. Creating the vault and switching the entrance mode
-live in the settings page, not in the sidebar.
+no trace of it — no tab, no button, no tooltip that mentions it. In hidden mode the vault is
+**created by typing the trigger** too; the settings page never shows a create form there.
+
+The password screen is deliberately plain: the heading only says "Enter password", the
+button says "Continue" (not "Unlock"), and nothing on it mentions a vault.
+
+**The settings page must not give the vault away either** — it opens without a password.
+In hidden mode, while the vault is not unlocked, it shows exactly what someone who never
+created one would see: previews, bookmark layout sync, the entrance mode and the trigger
+string, and *Clear all previews*. The vault's status, move-out folder, auto-lock, its cloud
+copy, password and backup, and the vault's danger-zone items are left out without a gap or
+a "unlock to see more" hint. Status lines and open confirmations are cleared the moment it
+locks. Numbers follow the same rule: the preview count and size, and the "cleared N
+previews" message, leave out the vault's (encrypted) previews (`visibleThumbs` in the
+background page). The entrance mode and the trigger string stay visible because they exist
+whether or not a vault does, and a forgotten trigger can be looked up there; the password is
+the real barrier. With the entrance set to "Show tab" everything is shown, including the
+create form.
 
 A wrong password **does show an error**. The earlier silent failure was camouflage (it
 looked like a search returning nothing), but once the user has deliberately opened a

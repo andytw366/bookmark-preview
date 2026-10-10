@@ -28,9 +28,11 @@
 
 ■ 縮圖預覽
 
-側邊欄以縮圖列出書籤，三種顯示密度可切換（大卡／小列／純文字）。想一次看過幾十個封面時，用「全頁瀏覽」在整個視窗寬度下並排。
+側邊欄以縮圖列出書籤，三種顯示密度可切換（大卡／小列／純文字）。想一次看過幾十個封面時，用「全頁瀏覽」在整個視窗寬度下並排；資料夾卡片會用裡面前四個書籤拼成預覽。
 
-預覽圖以「內容封面」為優先 —— 漫畫與書籍封面、影片縮圖 —— 找不到才用網頁截圖。對內容頁來說封面比截圖更能代表那個書籤，截圖裡通常只看得到導覽列。封面維持原始長寬比不裁切。
+預覽圖以「內容封面」為優先 —— 漫畫與書籍封面、影片縮圖 —— 找不到才用網頁截圖。對內容頁來說封面比截圖更能代表那個書籤，截圖裡通常只看得到導覽列。封面完整顯示、不裁切。
+
+書籤指向整個網站而不是其中一頁時（例如 github.com、google.com/maps），預覽改用網站自己的圖示。右鍵選單可以個別切換「改用頁面預覽」「改用網站圖示」，選了就會記住。
 
 判定完全不看網域，沒有站台清單，所以不需要為個別網站做調整。自動判定不可能對所有站台都準，因此也提供直接的出口：在任何頁面對著圖片按右鍵 →「設為這個書籤的預覽圖」。
 
@@ -40,7 +42,7 @@
 
 群組就是 tag：同一個資料夾裡的幾個書籤用彩色框線圈在一起，加上名稱與顏色。之後可以改名、換色、整組搬動、轉成子資料夾，或反過來把資料夾攤平成群組。在搜尋框輸入「#名稱」就能跨資料夾找出所有同名群組的書籤；一般搜尋也找得到資料夾。
 
-全頁瀏覽支援瀏覽器的上一頁（Alt+←、滑鼠側鍵）回到剛才的資料夾，另有「↑」回上一層。
+全頁瀏覽支援瀏覽器的上一頁（Alt+←、滑鼠側鍵）回到剛才的資料夾，另有「上一層」按鈕。
 
 書籤群組預設會透過 Firefox 同步到你的其他裝置，可以在設定頁關掉。
 
@@ -103,9 +105,11 @@ The interface is available in English and Traditional Chinese, and follows your 
 
 ■ Visual previews
 
-A sidebar that lists bookmarks with thumbnails, in three densities (card / row / text-only). When you want to scan dozens of covers at once, "Full page" lays them out as a grid across the whole window.
+A sidebar that lists bookmarks with thumbnails, in three densities (card / row / text-only). When you want to scan dozens of covers at once, "Full page" lays them out as a grid across the whole window; folder cards preview the first four bookmarks inside.
 
-Previews prefer the page's own cover art — comic and book covers, video thumbnails — and fall back to a screenshot only when there isn't one. For content pages a cover represents the bookmark far better than a screenshot, which usually just shows a navigation bar. Covers keep their original aspect ratio instead of being cropped.
+Previews prefer the page's own cover art — comic and book covers, video thumbnails — and fall back to a screenshot only when there isn't one. For content pages a cover represents the bookmark far better than a screenshot, which usually just shows a navigation bar. Covers are shown whole, never cropped.
+
+A bookmark that points to a whole site rather than one page (github.com, google.com/maps) shows the site's own icon instead. Right-click to switch a single bookmark between "Use page preview" and "Use site icon"; the choice sticks.
 
 The heuristics never look at the domain, so there is no site list to maintain and no per-site tweaking. Automatic detection can't be right everywhere, so there is a direct override: right-click any image on any page and choose "Use as this bookmark's preview".
 
@@ -115,7 +119,7 @@ Drag to reorder in the full-page view and the sidebar — the order is written b
 
 A group is a tag: a few bookmarks in one folder framed together with a coloured outline, a name and a colour. Rename it, recolour it, move it as a whole, turn it into a subfolder, or flatten a folder into a group. Type "#name" in the search box to find every bookmark tagged with that name across all folders; plain search now finds folders too.
 
-The full-page view supports the browser's Back (Alt+←, the mouse back button) to return to the folder you were just in, and "↑" to go up a level.
+The full-page view supports the browser's Back (Alt+←, the mouse back button) to return to the folder you were just in, and an Up button to go up a level.
 
 Bookmark groups sync to your other devices through Firefox Sync by default; you can turn that off in settings.
 
@@ -151,6 +155,41 @@ The whole flow works without a mouse: arrow keys to move between bookmarks, Ente
 
 ```
 bookmarks, thumbnails, preview, privacy, encryption
+```
+
+---
+
+## 版本說明（1.3.0）
+
+送審表單的「版本說明」欄，中英各一份。沒有新權限。
+
+```
+・書籤指向整個網站時（例如 github.com、google.com/maps），預覽改用網站自己的圖示。
+　右鍵「改用頁面預覽」「改用網站圖示」可以個別切換，選了就會記住。
+・介面重新設計：側邊欄、全頁瀏覽與設定頁改成同一套像 Firefox 自己的面板的樣式，
+　淺色與深色都有。工具列改成圖示鈕，選單加上圖示並分組，刪除類動作集中在最後。
+・全頁瀏覽：搜尋框置中（按 / 聚焦）、資料夾卡片用裡面前四個書籤拼成預覽（可關）、
+　卡片右上角的 ⋯ 是右鍵選單的另一個入口。
+・補抓完成後可以「查看缺的」，列出還是沒有預覽圖的書籤。
+・設定頁改在分頁開啟，左側有目錄。隱藏模式又上鎖時，設定頁不顯示任何和隱私空間
+　有關的內容（包括預覽圖數量裡的隱私書籤），看起來和沒有建立過一樣。
+・修正：刪除有內容的資料夾會失敗；直式封面在預覽框裡被裁掉。
+```
+
+```
+・A bookmark that points to a whole site (github.com, google.com/maps) now shows the
+  site's own icon. Right-click "Use page preview" / "Use site icon" to switch a single
+  bookmark; the choice sticks.
+・Redesigned interface: the sidebar, full-page view and settings share one look that
+  matches Firefox's own panels, in light and dark. Icon toolbars, grouped menus with
+  icons, destructive actions always last.
+・Full-page view: centred search (press / to focus), folder cards preview the first four
+  bookmarks inside (can be turned off), and a ⋯ on each card opens its menu.
+・After fetching missing previews, "Show missing" lists the bookmarks that still have none.
+・Settings open in a tab with a section list. In hidden mode while locked, the settings
+  page shows nothing about the vault (preview counts leave out the vault's too), exactly
+  as if none had been created.
+・Fixed: deleting a folder that had bookmarks in it failed; portrait covers were cropped.
 ```
 
 ---

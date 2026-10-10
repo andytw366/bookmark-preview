@@ -30,8 +30,9 @@ All of it lives in your browser's local storage:
 
 | Data | Location |
 |---|---|
-| Preview images (screenshots and cover art) | IndexedDB (`bookmark-preview` database) |
+| Preview images (screenshots, cover art and site icons) | IndexedDB (`bookmark-preview` database) |
 | Preferences (density, preview source, trigger string, …) | `storage.local` |
+| The preview choice for individual bookmarks ("Use site icon / page preview") | `storage.local`, keyed by a SHA-256 hash of the URL rather than the URL itself; for vault bookmarks it is stored inside the encrypted vault |
 | The vault (encrypted bookmarks and preview images) | `storage.local`, encrypted with AES-GCM |
 | Bookmark groups and pinned column counts (full-page view) | `storage.local`, and by default also `storage.sync` (see below) |
 
@@ -95,7 +96,7 @@ transmits your browsing history.
 ## How to delete your data
 
 - **Preview images**: Settings → "Clear all previews".
-- **The vault**: Vault page → "Delete the entire vault" (irreversible).
+- **The vault**: once unlocked, the `⋯` menu on the sidebar's vault tab → "Delete the whole vault…", or "Danger zone" in settings (irreversible).
 - **The synced copy of the vault**: Settings → "Remove the cloud copy and turn off sync".
 - **Synced bookmark groups**: Settings → untick "Sync bookmark layout and groups" (removes
   them from sync; this device keeps its own copy).

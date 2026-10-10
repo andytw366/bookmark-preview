@@ -231,6 +231,7 @@ export function VaultGate({
         placeholder={t('vault_password_placeholder', MIN_PASSWORD_LENGTH)}
         aria-label={t('vault_password_placeholder', MIN_PASSWORD_LENGTH)}
         autoComplete="new-password"
+        autoFocus
         value={password}
         onChange={(event) => {
           setPassword(event.target.value);

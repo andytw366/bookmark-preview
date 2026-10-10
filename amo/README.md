@@ -47,17 +47,17 @@ python3 scripts/amo-paste.py     # → amo/paste/*.txt
 
 | 檔案 | 中文 | English |
 |---|---|---|
-| `01-sidebar.png` | 側邊欄以縮圖列出書籤，取代一排看不出內容的文字；群組以色條與標籤標出 | Bookmarks as visual previews in the sidebar, instead of a wall of text — groups marked with a colour bar and tag |
-| `02-gallery.png` | 全頁瀏覽：以整個視窗的寬度並排看過所有封面，拖拽排序、用框線把書籤圈成群組 | Full-page view: scan every cover at once, drag to reorder, and frame bookmarks into groups |
-| `03-vault-unlock.png` | 隱私空間的入口是隱藏的 —— 在搜尋框打自訂的觸發字串才會跳出密碼畫面 | The vault entrance is hidden — type your own trigger string in the search box to bring up the password screen |
-| `04-options.png` | 設定頁：隱私空間的入口方式、移出落點與觸發字串都在這裡 | Settings: the vault's entrance mode, where bookmarks land when moved out, and the trigger string |
+| `01-sidebar.png` | 側邊欄以縮圖列出書籤，取代一排看不出內容的文字；群組以同色框標出，指向整個網站的書籤顯示網站圖示 | Bookmarks as visual previews in the sidebar instead of a wall of text — groups framed in colour, whole-site bookmarks shown with the site's icon |
+| `02-gallery.png` | 全頁瀏覽：以整個視窗的寬度並排看過所有預覽，拖拽排序、把書籤框成群組，資料夾卡片預覽裡面的書籤 | Full-page view: scan every preview at once, drag to reorder, frame bookmarks into groups, and see what is inside each folder |
+| `03-vault-unlock.png` | 隱私空間的入口是隱藏的 —— 在搜尋框打自訂的觸發字串才會跳出密碼框 | The vault entrance is hidden — type your own trigger string in the search box to bring up the password prompt |
+| `04-options.png` | 設定頁：隱私空間的入口方式、觸發字串、移出落點與自動上鎖 | Settings: the vault's entrance mode, trigger string, where bookmarks land when moved out, and auto-lock |
 
 ## 送審表單要填的值
 
 | 欄位 | 值 |
 |---|---|
 | 名稱 | `書籤預覽`（zh-TW）／`Bookmark Preview`（en-US） |
-| 版本 | `1.2.0` |
+| 版本 | `1.3.0` |
 | 擴充套件 ID | `bookmark-preview@andytw366.github.io`（**發布後不能再改**） |
 | 授權條款 | **Mozilla Public License 2.0**（下拉選單裡選 MPL-2.0，與版本庫的 `LICENSE` 一致） |
 | 首頁 | `https://github.com/andytw366/bookmark-preview` |
@@ -81,14 +81,14 @@ npm run build && SEED_SHOWCASE=1 ./scripts/ff.sh start   # 乾淨 profile + 展�
 YouTube、Wikipedia、Google 之類的。預設那組是為了**測試**挑的，最上層塞著九筆
 `127.0.0.1` 的封面判定素材，對商店頁的讀者只是雜訊。
 
-**預覽圖必須是真的抓下來的。** 補抓走的是各站自己的 og:image，沒有 og:image 的（Google
-首頁、Hacker News）就造訪一次讓擷取管線截圖。目前的截圖裡有兩筆刻意留成色卡（MDN 與
-Stack Overflow）—— 那是沒有預覽圖時的實際樣子，截圖不該假裝每一筆都有圖。
+**預覽圖必須是真的抓下來的。** 補抓之後展示組幾乎全是首頁，都會變成網站圖示；1.3.0 的截圖
+把 GitHub、ChatGPT、YouTube 右鍵「改用頁面預覽」換成各站的 og:image，讓畫面裡封面和圖示並存。
 
-1.2.0 的 `01`、`02` 要讓群組入鏡：全頁瀏覽進「書籤工具列」，把 Stack Overflow 疊到 MDN、Google 疊到
-Wikipedia（停一下 → Enter 建群組），點標籤 →「重新命名」取名「開發文件」「查資料」。側邊欄用「小列」密度。
-⚠️ 側邊欄在 240px 寬時底部工具列比頁面寬約 6px，焦點一動整個側邊欄會往左捲 6px（左邊被切掉）；
-拍之前看一眼，歪了就在側邊欄上 `xdotool click --repeat 5 6`（往左捲）再拍。
+1.3.0 的 `01`、`02` 讓群組入鏡：側邊欄「小列」密度，把 Stack Overflow 疊到 MDN（加入 tag「開發文件」）、
+Google 疊到 Wikipedia（停一下 → Enter 建群組），點標籤 →「重新命名」取名「查資料」。`01` 主畫面開著
+github.com（先關掉 Firefox 的翻譯提示）。`02` 關掉側邊欄（Ctrl+Shift+.）讓全頁瀏覽吃滿寬度。
+`03` 先建立隱私空間並移入一筆（Hacker News），上鎖後在搜尋框打觸發字串。`04` 是解鎖狀態的設定頁、
+點左側「隱私空間」；觸發字串改成自訂的（`;;open`），不然會出現「建議改掉」的黃色提醒。
 
 `scripts/store-shot.sh` 會把「已停用安全沙盒」那條提示列去掉 —— 那是**容器環境專屬**的
 產物（容器裡建不了 user namespace，測試時只好關掉沙盒），一般使用者不會看到它。

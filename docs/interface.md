@@ -49,9 +49,9 @@ because they arrive asynchronously afterwards.
 
 Design decisions worth knowing:
 
-- **Row heights are measured, not assumed constant.** In card mode covers use their own
-  aspect ratio, so rows genuinely differ in height; assuming a fixed height makes the
-  scrollbar length and the content position disagree. Unmeasured rows use an estimate,
+- **Row heights are measured, not assumed constant.** Previews sit in fixed plates, but
+  folder rows, group title rows and long titles still make rows differ in height; assuming
+  a fixed height makes the scrollbar length and the content position disagree. Unmeasured rows use an estimate,
   which only affects scrollbar length.
 - **The unit of calculation is the row, not the item.** The sidebar has one item per row
   and the grid has N; once the column count is resolved by the caller, both views share
@@ -75,29 +75,45 @@ Keyboard navigation still covers the whole list after virtualisation: `End` jump
 genuinely last item, not the last rendered one — if the target has not been rendered yet,
 it scrolls there first and then moves focus.
 
+## Look and shared components
+
+The redesign (1.3.0, handoff and boards in `bookmark-preview-ui/`) aims for "a panel that
+belongs to Firefox": system font, neutral cool greys, one blue accent. Every colour, size,
+radius and shadow is a CSS variable in `src/ui/tokens.css` (light values, dark values under
+`prefers-color-scheme`); components only reference variables. Shared pieces live in `src/ui/`:
+`IconButton` / `Button`, `SegmentedControl`, `Menu` + items (radio, switch, header,
+separator), the checkbox / radio / switch marks, `Toast` and the 16px `Icon` set.
+
+Rules the design depends on:
+
+- **The accent has four uses only**: current selection, at most one primary button per
+  screen, the keyboard focus ring, text links. Segmented controls show the selected segment
+  as a raised surface, not in blue.
+- **Red is for irreversible actions** (delete, clear, regenerate the recovery key, delete
+  the vault) and is always the last group in a menu; in settings they sit in *Danger zone*.
+- **Text is single-line with an ellipsis** everywhere — English strings run 1.5–2× longer.
+- **Every preview sits in the same plate**: 16:9 for sidebar cards, 4:3 in the full-page
+  view, 40×40 in the row list. The plate fixes the size; the image only decides how it
+  fits — covers `contain` (never cropped), screenshots `cover` from the top, site icons
+  centred at about a third of the width with 20% corners, letter cards filled with one of
+  eight colours picked from the domain (all ≥ 4.5:1 against white, tested).
+
 ## The bottom toolbar
 
-The toolbar originally mixed three different kinds of thing with no hierarchy: preferences
-you set once (preview source, density), actions (backfill, full-page view, select), and up
-to three lines of transient status text. Five controls plus wrapping text crammed into a
-320px column produced something with no discernible focus.
+One 40px row of 28px icon buttons, each with a tooltip: density (segmented: cards / rows /
+text) | Select, Full page … `⋯`. Text buttons would overflow 240px in English.
 
-It is now three layers:
-
-- **Frequently used stays visible** — density (genuinely toggled while browsing; switched
-  to icons because the three labels are nine CJK characters, nearly a third of the width
-  on their own), plus "Full page" and "Select".
-- **Occasionally used moves into an overflow menu (`⋯`)** — preview source and backfill.
-  Set-once or press-rarely items do not deserve permanent width. The active source is
-  ticked.
-- **Status text occupies one line**, showing only the most important message by the
-  priority "in progress → just finished → background diagnostic", and it sits **above** the
-  control row. Below, every message appearing and disappearing would shove the controls up
-  and shift the list with them.
-
-The main toolbar deliberately **does not wrap** (wrapping makes its height jump with
-content); only the multi-select row wraps, because the width of "N selected" changes with
-the number.
+- **Occasionally used things live in `⋯`**: preview source (radio), site icons for home
+  pages (switch), fetch missing previews (with progress on the right while it runs),
+  Settings…, and — only on the vault tab — *Delete the whole vault…* as the last, red group.
+- **Backfill status no longer occupies a line.** While it runs, a 2px progress bar runs along
+  the top edge of the toolbar; when it finishes a toast floats above the toolbar for three
+  seconds (paused while hovered) with *Show missing*, which lists the bookmarks that still
+  have no preview (`BackfillReport.missing`). Notices from menus use the same toast.
+- **While selecting**, the row becomes: exit `✕` · "N selected" … `⋯` (secondary actions such
+  as *Move into the vault* / *Move out to…*) · the primary action. *Select all (N)* is a
+  tri-state checkbox at the top of the list; check boxes sit left of the thumbnail instead
+  of covering it.
 
 ## The full-page view
 
@@ -122,9 +138,9 @@ the sidebar's (`RowMenu` is reused).
 | | Goes to | Triggered by |
 |---|---|---|
 | Back | The folder you were **just in** (after a breadcrumb jump that is not the parent) | The browser's Back, `Alt+←`, the mouse back button |
-| Up a level | The **parent** folder | `Backspace`, the `↑` in front of the breadcrumb |
+| Up a level | The **parent** folder | `Backspace`, the back-arrow button before the breadcrumb |
 
-Every folder change you make (card, breadcrumb, `↑`, `Backspace`, switching between bookmarks
+Every folder change you make (card, breadcrumb, the up button, `Backspace`, switching between bookmarks
 and the vault) is a `history.pushState`. Typing in the search box is not — one entry per
 keystroke would make Back useless. When the folder you are in disappears (deleted elsewhere)
 the view falls back to the top level with `replaceState`, so Back never returns to a folder
@@ -152,9 +168,9 @@ which navigates the active tab instead. Whether other platforms deliver it is un
 
 Cards are always packed left to right, top to bottom — **no gaps**. Dropping a card makes
 the following cards move up one place; taking one away closes the gap. The column count
-follows the window width (*Auto (N columns)* in the toolbar) until you press `−` / `+`;
+follows the window width (*N columns · auto* in the toolbar) until you press `−` / `+`;
 then it is pinned for that folder, cards keep their size (small / medium / large) and the
-grid scrolls sideways when the window is too narrow. *Automatic layout* unpins it again,
+grid scrolls sideways when the window is too narrow. *Auto* next to the count unpins it again,
 also when the folder has groups. While dragging, an extra empty slot after the last card
 is the "put it at the end" target. Search results and Firefox's top-level folders have no
 groups and cannot be dragged.
@@ -201,8 +217,10 @@ open it in a normal window and write it to history. Only an internal type is set
 ### Groups (tags)
 
 A group is a **consecutive run** of bookmarks in one folder's order, drawn as **one
-connected block** with a coloured outline and a small tag on the first member:
-the name, or just a colour chip for an untitled group. **A named group is a tag**: names are
+connected block** with a coloured outline (1.5px, the group colour at 8% as fill) and a
+title row on its top edge: the tag (the name, or just a colour chip for an untitled group),
+the member count, and a `⋯` that appears on hover or focus. The tag carries no `▾` so it is
+not mistaken for a tag picker. **A named group is a tag**: names are
 unique per folder (trimmed, case-insensitive). A bookmark belongs to at most one group;
 folders never do.
 
@@ -226,10 +244,10 @@ the part above), so the group never splits at a row end. Later cards flow into t
 cells around it. Order and screen position therefore differ; drops are converted back
 (`orderIndexAt`), and arrow keys / `Ctrl+Shift+arrow` follow what is on screen.
 **Outline**: each group is drawn as **one SVG path** in a layer under the cards
-(`GroupOutlines`). It measures the rendered member cells, grows each by 4px, bridges the
+(`GroupOutlines`). It measures the rendered member cells, grows each by 6px, bridges the
 gaps between neighbouring members (and the cross-shaped gap inside a 2×2 block), takes the
-union and traces its boundary, then rounds every corner (`src/shared/outline.ts`). Two
-touching groups therefore keep an 8px space between their frames, and inner corners of
+union and traces its boundary, then rounds every corner (16px, `src/shared/outline.ts`). Two
+touching groups therefore keep a 4px space between their frames, and inner corners of
 L-shapes and staircases are as clean as outer ones. An earlier version let every cell draw
 its own piece of the frame; corners then had to be patched case by case and some never
 lined up. Only rendered rows are measured — the part of a group outside the virtual
@@ -247,9 +265,9 @@ neighbour moves away.
 Deleting or moving bookmarks elsewhere is cleaned up via `bookmarks.onRemoved/onMoved`,
 through the same serial queue as the operations.
 
-**In the sidebar** a group is its consecutive rows with a coloured bar on the left; a named
-group shows its tag above the first member, an untitled one a plain colour chip in the same
-place (as in the grid). The tag is the same component as in the grid — click for the menu, drag to move
+**In the sidebar** a group is its consecutive rows drawn as one framed block (each row
+draws its side borders, the first and last add the top and bottom), with the same title
+row above the first member. The tag is the same component as in the grid — click for the menu, drag to move
 the group. Everything in the table above works there too (`useListBoard`).
 
 **Vault** columns and groups live in the encrypted layout document (see
@@ -273,19 +291,23 @@ rearranged. `#name` results still show their groups (bar or outline plus tag, ea
 together, `searchBoard`); since they span folders, clicking a tag opens that group's folder
 instead of the group menu. Plain-text results show no groups.
 
-### The top toolbar
+### The top toolbar and page header
 
-Both modes (bookmarks / vault) share one set of rows in fixed positions:
+1. **Toolbar** (sticky): name, the bookmarks / private switch (only when the vault is
+   shown), search **centred** (`/` focuses it), then card size, column stepper, *Lock* (vault
+   only) and `⋯`. It is a three-column grid with equal side columns so the search box sits in
+   the true centre; when the page is too narrow (container query on the page width) the
+   search moves to its own row.
+2. **Page header**: small breadcrumbs with an up button, the folder name as a 24px heading,
+   "N folders · M bookmarks" (in the vault: count and auto-lock minutes), and on the right
+   *New folder* / *Select*.
+3. **While selecting** the header is replaced by one selection bar: exit `✕` · "N selected
+   in "Folder"" · *Select all N* … *Frame as group* and other actions · the primary *Move to…*.
+   There is no second "Cancel" button any more.
 
-1. Title / search / card size / more options (`⋯`)
-2. Scope switch / select / mode-specific actions ("New folder" and "Lock now" only in the
-   vault)
-3. Multi-select row (only while selecting): count / select all / actions / cancel
-
-"Select" used to be on row 1 in bookmark mode and row 2 in the vault, so the two modes
-looked different. The current mode's selection state and actions are now collapsed into one
-set of values in code, so that row never has to branch on the mode — writing the ternary
-once per button was exactly how the two sides drifted.
+Cards show a `⋯` in their corner on hover — the same menu as right-click. Folder cards show
+the first four bookmarks inside as a 2×2 mosaic; *Preview folder contents* (in `⋯` and in
+settings, `Settings.folderPreviews`) switches that back to a plain folder icon.
 
 **Feature parity with the sidebar is structural, not remembered.** Preview source and
 backfill live in `⋯` using **the same component** (`PreviewOptionsMenu`) and the same state
@@ -295,7 +317,7 @@ structure rather than something to remember on every change — the full-page vi
 originally missing the whole group. Which side backfill targets is decided by the current
 mode.
 
-Multi-select check marks overlay the corner of the thumbnail rather than taking their own
+Multi-select check marks overlay the corner of the card rather than taking their own
 line, so card heights stay uniform and the grid stays aligned.
 
 **The vault is reachable here too**, by the same entrance: type the trigger string into the
@@ -314,4 +336,4 @@ drives the "lock after N minutes idle" deadline. The heartbeat deliberately does
 see [vault.md](vault.md#getting-locked-back-out) for why keeping those two separate matters.
 
 Worth remembering that this is a **window-sized** view of your private bookmarks. Where
-others can see the screen, use "Lock now" or just close the tab.
+others can see the screen, use *Lock* or just close the tab.

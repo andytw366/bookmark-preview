@@ -18,6 +18,10 @@ and fall back to a screenshot only when there isn't one. The heuristics never lo
 domain, so there is no site list to maintain. When they get it wrong, right-click any
 image on any page and choose "Use as this bookmark's preview".
 
+A bookmark that points to a whole site rather than one page (`github.com`,
+`google.com/maps`) shows the site's own icon instead. Right-click → *Use page preview* /
+*Use site icon* switches a single bookmark, and that choice sticks.
+
 **An encrypted vault.** Bookmarks moved into it are removed from Firefox's bookmark
 manager, toolbar and menu; they are only visible after you unlock, and their thumbnails
 are encrypted too (AES-256-GCM). Whole folders move in and out with their structure
