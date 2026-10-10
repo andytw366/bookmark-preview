@@ -263,26 +263,49 @@ export function Options() {
   // 左側目錄：目前捲到哪一組
   const [activeSection, setActiveSection] = useState('previews');
 
+  /*
+   * 隱藏模式下一上鎖，隱私空間相關的訊息、展開的表單、顯示中的救援金鑰全部收掉。
+   * 區塊藏起來了，但「已產生新的救援金鑰」這類留在畫面上的字一樣會說出這台電腦有隱私空間。
+   */
+  const concealedNow = settings?.vaultEntry === 'hidden' && vault.state !== null && vault.state.status !== 'unlocked';
   useEffect(() => {
-    const sections = [...document.querySelectorAll<HTMLElement>('section.sec')];
-    if (sections.length === 0) {
+    if (!concealedNow) {
       return;
     }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        const first = visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (first !== undefined) {
-          setActiveSection(first.target.id);
-        }
-      },
-      { rootMargin: '0px 0px -60% 0px' },
-    );
-    for (const section of sections) {
-      observer.observe(section);
-    }
+    setShownKey(null);
+    setKeyStatus(null);
+    setDangerStatus(null);
+    setConfirming((current) => (current === 'clear' ? current : null));
+    setRegenPassword('');
+    setChangingPassword(false);
+    setCurrentPassword('');
+    setNextPassword('');
+    setNextConfirm('');
+    setBackupText(null);
+    setBackupStatus(null);
+    setRestoreStatus(null);
+    setRestorePassword('');
+    setRestoreRecoveryKey('');
+    setSyncStatusText(null);
+  }, [concealedNow]);
+
+  useEffect(() => {
+    // 目前這一組＝上緣已經捲過視窗高度 30% 的最後一組；捲到底就是最後一組（它可能永遠到不了那條線）
+    const update = (): void => {
+      const sections = [...document.querySelectorAll<HTMLElement>('section.sec')];
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      const line = window.innerHeight * 0.3;
+      const current = atBottom
+        ? sections[sections.length - 1]
+        : sections.filter((section) => section.getBoundingClientRect().top <= line).pop();
+      setActiveSection(current?.id ?? sections[0]?.id ?? 'previews');
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
     return () => {
-      observer.disconnect();
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
     };
     // 哪幾組存在會隨入口設定與解鎖狀態改變（「密碼與備份」可能整組不在）
   }, [usageScope]);
@@ -1270,7 +1293,7 @@ export function Options() {
                             type="password"
                             value={regenPassword}
                             autoComplete="off"
-                            data-autofocus=""
+                            autoFocus
                             onChange={(event) => {
                               setRegenPassword(event.target.value);
                             }}
