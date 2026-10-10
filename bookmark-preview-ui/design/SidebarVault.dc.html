@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>側邊欄隱私空間</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;text-align:left}
+input{font:inherit}
+.th{--font:system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--r-sm:4px;--r-md:6px;--r-lg:8px;--r-xl:12px;--bg:#f9f9fb;--surface:#ffffff;--surface-2:#f0f0f4;--surface-3:#e0e0e6;--plate:#ececf1;--border:#e0e0e6;--border-strong:#c4c4cf;--text:#15141a;--text-2:#5b5b66;--text-3:#8f8f9d;--accent:#0061e0;--on-accent:#ffffff;--accent-tint:rgba(0,97,224,.10);--danger:#c50042;--shadow-1:0 1px 2px rgba(21,20,26,.10);--shadow-menu:0 0 0 1px rgba(21,20,26,.08),0 4px 16px rgba(21,20,26,.16);--shadow-dialog:0 0 0 1px rgba(21,20,26,.08),0 16px 48px rgba(21,20,26,.24);--g-blue:#0061e0;--g-green:#017a40;--on-g:#ffffff;font-family:var(--font);font-size:13px;line-height:1.5;color:var(--text);background:var(--bg)}
+.th.dark{--bg:#1c1b22;--surface:#2b2a33;--surface-2:#3a3944;--surface-3:#52525e;--plate:#33323b;--border:#3f3e48;--border-strong:#5b5b66;--text:#fbfbfe;--text-2:#bfbfc9;--text-3:#8f8f9d;--accent:#00ddff;--on-accent:#15141a;--accent-tint:rgba(0,221,255,.12);--danger:#ff848b;--shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-menu:0 0 0 1px rgba(251,251,254,.10),0 4px 16px rgba(0,0,0,.5);--shadow-dialog:0 0 0 1px rgba(251,251,254,.10),0 16px 48px rgba(0,0,0,.6);--g-blue:#7cb1ff;--g-green:#54d69a;--on-g:#15141a}
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ib{width:28px;height:28px;display:inline-grid;place-items:center;border-radius:var(--r-md);color:var(--text-2);flex:none}
+.ib.on{background:var(--accent-tint);color:var(--accent)}
+.btn{height:28px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r-md);background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap;flex:none}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.seg{display:flex;gap:2px;padding:2px;background:var(--surface-2);border-radius:var(--r-md)}
+.seg>*{height:24px;min-width:24px;padding:0 8px;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:var(--r-sm);color:var(--text-2);font-size:12px;white-space:nowrap}
+.seg>.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1);font-weight:600}
+.dark .seg>.on{background:var(--surface-3)}
+.search{height:28px;display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--surface-2);border:1px solid transparent;border-radius:var(--r-md);color:var(--text-3);min-width:0}
+.field{height:28px;width:100%;padding:0 8px;border-radius:var(--r-md);border:1px solid var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--surface);color:var(--text);display:flex;align-items:center;letter-spacing:2px}
+.menu{position:absolute;width:208px;padding:4px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-menu);display:flex;flex-direction:column;z-index:5}
+.mi{height:28px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:var(--r-sm);white-space:nowrap;color:var(--text);width:100%;flex:none}
+.mi .ico{color:var(--text-2)}
+.mi.hov{background:var(--surface-2)}
+.mi.dis,.mi.dis .ico{color:var(--text-3)}
+.mi.danger,.mi.danger .ico{color:var(--danger)}
+.msep{height:1px;background:var(--border);margin:4px 0;flex:none}
+.mh{padding:6px 8px 2px;font-size:11px;font-weight:600;color:var(--text-2)}
+.tb40{position:relative;width:40px;height:40px;border-radius:var(--r-md);background:var(--plate);overflow:hidden;display:grid;place-items:center;flex:none}
+.fav{width:24px;aspect-ratio:1;border-radius:20%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:10px}
+.shot{position:absolute;inset:0;background:#1f1e25;display:flex;flex-direction:column;padding:6px 5px;gap:3px}
+.shot i{display:block;height:3px;border-radius:2px;background:#4a4953}
+.shot i.h{height:6px;width:62%;background:#e6e6ec}
+.shot i.s{width:44%}
+.board{width:1200px;height:800px;padding:48px;display:flex;gap:48px;background:#e6e6eb;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif}
+.col{display:flex;flex-direction:column;gap:12px}
+.cap{font-size:13px;font-weight:600;color:#15141a;display:flex;gap:8px;align-items:baseline}
+.cap span{font-weight:400;color:#5b5b66;font-size:12px}
+.panel{width:240px;height:640px;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative}
+.native{height:40px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 12px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;color:var(--text);opacity:.45}
+.top{padding:8px 8px 4px;display:flex;flex-direction:column;gap:6px;flex:none}
+.nav{display:flex;align-items:center;gap:2px;height:28px}
+.crumbs{flex:1;min-width:0;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;padding-left:6px}
+.crumbs .cur{color:var(--text);font-weight:600}
+.list{flex:1;min-height:0;overflow:hidden;padding:2px 4px 8px;display:flex;flex-direction:column;gap:4px}
+.row{display:flex;align-items:center;gap:10px;padding:6px;border-radius:6px;min-width:0;width:100%;color:var(--text)}
+.row.ctx{background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border-strong)}
+.tt{flex:1;min-width:0;display:flex;flex-direction:column}
+.t1{font-size:13px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.t2{font-size:11px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-2)}
+.grp{border:1.5px solid var(--g);background:color-mix(in srgb,var(--g) 8%,transparent);border-radius:8px;padding:2px;display:flex;flex-direction:column}
+.grp-h{display:flex;align-items:center;gap:6px;padding:4px 2px 2px 4px}
+.glabel{height:20px;padding:0 8px;border-radius:999px;background:var(--g);color:var(--on-g);font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;display:inline-flex;align-items:center}
+.bar{height:40px;flex:none;display:flex;align-items:center;gap:2px;padding:0 6px;border-top:1px solid var(--border);background:var(--bg)}
+.spacer{flex:1}
+.divider{width:1px;height:16px;background:var(--border);margin:0 4px;flex:none}
+.pop{position:absolute;left:8px;right:8px;top:80px;background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--shadow-dialog);padding:12px;display:flex;flex-direction:column;gap:10px;z-index:4}
+.foot{font-size:12px;color:#5b5b66;max-width:240px}
+a.lnk{color:var(--accent);text-decoration:none;font-size:12px}
+</style>
+</helmet>
+<div class="board">
+
+<div class="col">
+<div class="cap">密碼框 <span>輸入觸發字串後</span></div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋書籤</span></div>
+<div class="nav"><div class="crumbs"><span class="cur">開發</span></div></div>
+</div>
+<div class="list" style="opacity: .5;">
+<button class="row"><span class="tb40"><span class="fav" style="background: #23272f; color: #61dafb;">R</span></span><span class="tt"><span class="t1">React 官方文件</span><span class="t2">react.dev</span></span></button>
+<button class="row"><span class="tb40"><span class="fav" style="background: #3178c6;">TS</span></span><span class="tt"><span class="t1">TypeScript</span><span class="t2">typescriptlang.org</span></span></button>
+</div>
+<div class="pop" role="dialog" aria-label="輸入密碼">
+<div style="font-size: 13px; font-weight: 600;">輸入密碼</div>
+<label style="display: flex; flex-direction: column; gap: 4px;"><span class="field">••••••••</span></label>
+<button class="btn primary" style="width: 100%;">繼續</button>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;"><a class="lnk" href="#">改用救援金鑰</a><span style="font-size: 11px; color: var(--text-3);">Esc 取消</span></div>
+</div>
+<div class="bar">
+<div class="seg" style="padding: 2px;"><button style="padding: 0 4px;" aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button class="on" style="padding: 0 4px;" aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button style="padding: 0 4px;" aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+<span class="divider"></span>
+<button class="ib" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib" aria-label="全頁瀏覽"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="spacer"></span>
+<button class="ib" aria-label="更多"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+<div class="foot">觸發字串一比對成功就從搜尋框清掉，焦點移到密碼框。標題只寫「輸入密碼」，看起來像一般驗證；按鈕是「繼續」而不是「解鎖」。</div>
+</div>
+
+<div class="col">
+<div class="cap">解鎖後 <span>淺色</span></div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div style="display: flex; gap: 4px; align-items: center;">
+<div class="seg" style="flex: 1;" role="tablist"><button role="tab" aria-selected="false" style="flex: 1;">書籤</button><button class="on" role="tab" aria-selected="true" style="flex: 1;">隱私</button></div>
+<button class="ib" aria-label="立即上鎖"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></button>
+</div>
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋隱私書籤</span></div>
+<div class="nav">
+<div class="crumbs"><span class="cur">全部</span><span>3 個書籤</span></div>
+<button class="ib" aria-label="新增資料夾"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/></svg></button>
+</div>
+</div>
+<div class="list">
+<div class="grp" style="--g: var(--g-blue);">
+<div class="grp-h"><button class="glabel">VaultSecretTag7</button><span class="t2">2</span><span class="spacer"></span><button class="ib" style="width: 22px; height: 22px;" aria-label="群組選項"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button></div>
+<button class="row"><span class="tb40"><span class="fav" style="background: #3a3a3a;">W</span></span><span class="tt"><span class="t1">Wikipedia</span><span class="t2">wikipedia.org</span></span></button>
+<button class="row"><span class="tb40"><span class="fav" style="background: #4285f4;">G</span></span><span class="tt"><span class="t1">Google</span><span class="t2">google.com</span></span></button>
+</div>
+<button class="row"><span class="tb40"><span class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></span></span><span class="tt"><span class="t1">MDN Web Docs</span><span class="t2">developer.mozilla.org</span></span></button>
+</div>
+<div class="bar">
+<div class="seg" style="padding: 2px;"><button style="padding: 0 4px;" aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button class="on" style="padding: 0 4px;" aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button style="padding: 0 4px;" aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+<span class="divider"></span>
+<button class="ib" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib" aria-label="全頁瀏覽"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="spacer"></span>
+<button class="ib" aria-label="更多"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+<div class="foot">「書籤｜隱私」分段控制＋鎖頭鈕取代會換行的「隱私空間（已解鎖）」。群組＝同色框＋底色＋標題列。</div>
+</div>
+
+<div class="col">
+<div class="cap">隱私書籤右鍵選單</div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div style="display: flex; gap: 4px; align-items: center;">
+<div class="seg" style="flex: 1;" role="tablist"><button role="tab" aria-selected="false" style="flex: 1;">書籤</button><button class="on" role="tab" aria-selected="true" style="flex: 1;">隱私</button></div>
+<button class="ib" aria-label="立即上鎖"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></button>
+</div>
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋隱私書籤</span></div>
+</div>
+<div class="list">
+<div class="grp" style="--g: var(--g-blue);">
+<div class="grp-h"><button class="glabel">VaultSecretTag7</button><span class="t2">2</span></div>
+<button class="row ctx"><span class="tb40"><span class="fav" style="background: #3a3a3a;">W</span></span><span class="tt"><span class="t1">Wikipedia</span><span class="t2">wikipedia.org</span></span></button>
+<button class="row"><span class="tb40"><span class="fav" style="background: #4285f4;">G</span></span><span class="tt"><span class="t1">Google</span><span class="t2">google.com</span></span></button>
+</div>
+</div>
+<div class="menu" style="left: 24px; top: 150px;" role="menu">
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/></svg>在新分頁開啟</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5a1 1 0 0 0-1-1H3.5a1 1 0 0 0-1 1V10a1 1 0 0 0 1 1H5"/></svg>複製網址</button>
+<div class="msep"></div>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>重新抓預覽圖</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="2.5"/></svg>改用網站圖示</button>
+<div class="msep"></div>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z"/></svg>重新命名</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M6 9.25h4M8.5 7.5l1.75 1.75L8.5 11"/></svg>移動到…</button>
+<button class="mi dis"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4"/></svg>往上移</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4"/></svg>往下移</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".75" fill="currentColor"/></svg>設定 tag…</button>
+<button class="mi hov"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5" stroke-dasharray="2 2"/><path d="M6 8h4"/></svg>移出群組</button>
+<div class="msep"></div>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10 5l3 3-3 3M13 8H6"/></svg>移出隱私空間</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10 5l3 3-3 3M13 8H6"/></svg>移出到…</button>
+<div class="msep"></div>
+<button class="mi danger"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>刪除</button>
+</div>
+<div class="bar">
+<span class="spacer"></span>
+</div>
+</div>
+<div class="foot">13 個項目分 5 組：開啟／預覽圖／整理／移出隱私空間／刪除。「移出」兩項自成一組，和一般的「移動到…」分開，避免搞混。</div>
+</div>
+
+<div class="col">
+<div class="cap">⋯ 選單 <span>深色 · 隱私分頁</span></div>
+<div class="th dark panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div style="display: flex; gap: 4px; align-items: center;">
+<div class="seg" style="flex: 1;" role="tablist"><button role="tab" aria-selected="false" style="flex: 1;">書籤</button><button class="on" role="tab" aria-selected="true" style="flex: 1;">隱私</button></div>
+<button class="ib" aria-label="立即上鎖"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></button>
+</div>
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋隱私書籤</span></div>
+<div class="nav">
+<div class="crumbs"><span class="cur">全部</span><span>3 個書籤</span></div>
+<button class="ib" aria-label="新增資料夾"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/></svg></button>
+</div>
+</div>
+<div class="list">
+<div class="grp" style="--g: var(--g-blue);">
+<div class="grp-h"><button class="glabel">VaultSecretTag7</button><span class="t2">2</span></div>
+<button class="row"><span class="tb40"><span class="fav" style="background: #3a3a3a;">W</span></span><span class="tt"><span class="t1">Wikipedia</span><span class="t2">wikipedia.org</span></span></button>
+<button class="row"><span class="tb40"><span class="fav" style="background: #4285f4;">G</span></span><span class="tt"><span class="t1">Google</span><span class="t2">google.com</span></span></button>
+</div>
+<button class="row"><span class="tb40"><span class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></span></span><span class="tt"><span class="t1">MDN Web Docs</span><span class="t2">developer.mozilla.org</span></span></button>
+</div>
+<div class="menu" style="right: 6px; bottom: 44px;" role="menu">
+<div class="mh">預覽圖來源</div>
+<button class="mi"><span style="width: 16px; height: 16px; border-radius: 50%; border: 5px solid var(--accent); flex: none;"></span>封面優先</button>
+<button class="mi"><span style="width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex: none;"></span>截圖優先</button>
+<div class="msep"></div>
+<button class="mi">首頁用網站圖示<span style="margin-left: auto; width: 28px; height: 16px; border-radius: 999px; background: var(--accent); position: relative; flex: none;"><span style="position: absolute; top: 2px; left: 14px; width: 12px; height: 12px; border-radius: 50%; background: #15141a;"></span></span></button>
+<div class="msep"></div>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>補抓預覽圖</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2"/><path d="M8 1.75v1.5M8 12.75v1.5M1.75 8h1.5M12.75 8h1.5M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/></svg>設定…</button>
+<div class="msep"></div>
+<button class="mi danger hov"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>刪除整個隱私空間…</button>
+</div>
+<div class="bar">
+<div class="seg" style="padding: 2px;"><button style="padding: 0 4px;" aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button class="on" style="padding: 0 4px;" aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button style="padding: 0 4px;" aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+<span class="divider"></span>
+<button class="ib" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib" aria-label="全頁瀏覽"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="spacer"></span>
+<button class="ib on" aria-label="更多" aria-expanded="true"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+<div class="foot">「刪除整個隱私空間…」從清單底部移進 ⋯ 選單最後一組（只在隱私分頁出現），並要求再輸入一次密碼確認。</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

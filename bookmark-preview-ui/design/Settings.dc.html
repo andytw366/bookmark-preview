@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>設定頁</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;text-align:left}
+input,select,textarea{font:inherit;color:inherit}
+.th{--font:system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--mono:ui-monospace,"SF Mono",Consolas,monospace;--r-sm:4px;--r-md:6px;--r-lg:8px;--r-xl:12px;--bg:#f9f9fb;--surface:#ffffff;--surface-2:#f0f0f4;--surface-3:#e0e0e6;--border:#e0e0e6;--border-strong:#c4c4cf;--text:#15141a;--text-2:#5b5b66;--text-3:#8f8f9d;--accent:#0061e0;--on-accent:#ffffff;--accent-tint:rgba(0,97,224,.10);--danger:#c50042;--danger-tint:rgba(197,0,66,.08);--success:#017a40;--success-tint:rgba(1,122,64,.10);--warn:#8a4b00;--warn-tint:rgba(180,95,0,.12);--shadow-1:0 1px 2px rgba(21,20,26,.10);font-family:var(--font);font-size:13px;line-height:1.5;color:var(--text);background:var(--bg)}
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.btn{height:32px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r-md);background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap;flex:none}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.danger{background:var(--danger-tint);color:var(--danger)}
+.btn.out{background:var(--surface);box-shadow:inset 0 0 0 1px var(--border-strong)}
+.seg{display:inline-flex;gap:2px;padding:2px;background:var(--surface-2);border-radius:var(--r-md);flex:none}
+.seg>*{height:28px;padding:0 12px;display:grid;place-items:center;border-radius:var(--r-sm);color:var(--text-2);font-size:13px;white-space:nowrap}
+.seg>.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1);font-weight:600}
+.sw{width:32px;height:18px;border-radius:999px;background:var(--surface-3);position:relative;flex:none;display:inline-block}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:var(--shadow-1)}
+.sw.on{background:var(--accent)}
+.sw.on::after{left:16px}
+.inp{height:32px;padding:0 10px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);font-size:13px;min-width:0}
+.inp.sm{width:64px;text-align:right}
+.lab{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-2);min-width:0}
+.wrap{display:flex;flex-wrap:wrap;gap:40px;max-width:1160px;margin:0 auto;padding:0 24px 64px}
+.nav{flex:0 0 200px;display:flex;flex-direction:column;gap:2px;position:sticky;top:24px;align-self:flex-start}
+.nav a{display:flex;align-items:center;gap:10px;height:36px;padding:0 12px;border-radius:var(--r-md);color:var(--text);text-decoration:none;font-size:14px}
+.nav a .ico{color:var(--text-2)}
+.nav a.on{background:var(--accent-tint);color:var(--accent);font-weight:600}
+.nav a.on .ico{color:var(--accent)}
+.nav a.dg,.nav a.dg .ico{color:var(--danger)}
+.main{flex:999 1 560px;min-width:0;max-width:800px;display:flex;flex-direction:column;gap:40px}
+.sec{display:flex;flex-direction:column;gap:12px}
+.sec>h2{margin:0;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
+.sec>p{margin:-6px 0 0;color:var(--text-2)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden}
+.card.dg{border-color:color-mix(in srgb,var(--danger) 35%,var(--border))}
+.item{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;padding:16px 20px}
+.item+.item{border-top:1px solid var(--border)}
+.lbl{flex:1 1 300px;min-width:0}
+.lbl b{display:block;font-size:15px;font-weight:600}
+.lbl p{margin:2px 0 0;color:var(--text-2)}
+.ctl{flex:none;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sub{flex:1 1 100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:12px;padding:16px;background:var(--bg);border-radius:var(--r-lg)}
+.badge{height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.badge.ok{background:var(--success-tint);color:var(--success)}
+.badge.warn{background:var(--warn-tint);color:var(--warn)}
+.badge.mute{background:var(--surface-2);color:var(--text-2)}
+.meter{height:6px;border-radius:999px;background:var(--surface-3);overflow:hidden;width:160px}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.kv{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 12px;font-size:13px}
+.kv dt{color:var(--text-2)}
+.kv dd{margin:0}
+details summary{cursor:default;color:var(--accent);font-size:13px}
+.note{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:var(--r-lg);font-size:13px}
+.note.warn{background:var(--warn-tint);color:var(--warn)}
+.spacer{flex:1}
+</style>
+</helmet>
+<div class="th" style="min-height: 2480px;">
+<div style="max-width: 1160px; margin: 0 auto; padding: 40px 24px 28px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<div style="font-size: 13px; color: var(--text-2);">書籤預覽</div>
+<h1 style="margin: 0; font-size: 28px; font-weight: 650; letter-spacing: -0.01em;">設定</h1>
+</div>
+<span class="spacer"></span>
+<div style="display: flex; align-items: center; gap: 8px; color: var(--text-2);"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.75 13 3.5v4c0 3-2.2 5.3-5 6.75C5.2 12.8 3 10.5 3 7.5v-4z"/></svg>所有資料都在這台裝置上，不會上傳到任何伺服器。</div>
+</div>
+
+<div class="wrap">
+<nav class="nav" aria-label="設定分類">
+<a href="#" class="on"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><path d="m2.5 12 4-4 3 3 2-2 2.5 2.5"/></svg>預覽圖</a>
+<a href="#"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>同步</a>
+<a href="#"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>隱私空間</a>
+<a href="#"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="11" r="2.5"/><path d="m7 9 6.5-6.5M11 4.5l1.5 1.5"/></svg>密碼與備份</a>
+<a href="#" class="dg"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3M8 11.5v.01"/></svg>危險操作</a>
+</nav>
+
+<main class="main">
+
+<section class="sec">
+<h2>預覽圖</h2>
+<div class="card">
+<div class="item">
+<div class="lbl"><b>瀏覽時自動產生預覽圖</b><p>打開已加入書籤的頁面時，順便擷取一張。</p></div>
+<div class="ctl"><span class="sw on" role="switch" aria-checked="true" aria-label="瀏覽時自動產生預覽圖"></span></div>
+</div>
+<div class="item">
+<div class="lbl"><b>重新擷取間隔</b><p>預覽圖超過這個天數，下次瀏覽時重抓。</p></div>
+<div class="ctl"><input class="inp sm" type="number" value="14" aria-label="天數"><span>天</span></div>
+</div>
+<div class="item">
+<div class="lbl"><b>不擷取的網域</b><p>一行一個，比對主機名稱的一部分。例如網路銀行、公司內網。</p></div>
+<textarea class="inp" style="flex: 1 1 100%; height: 88px; padding: 8px 10px; font-family: var(--mono); font-size: 12px; resize: vertical;" aria-label="不擷取的網域">bank.example.com
+intranet</textarea>
+</div>
+<div class="item">
+<div class="lbl"><b>儲存空間</b><p>28 張預覽圖，共 0.2 MB</p></div>
+<div class="ctl"><button class="btn out">重置全站共用圖的判定</button></div>
+</div>
+</div>
+</section>
+
+<section class="sec">
+<h2>同步</h2>
+<div class="card">
+<div class="item">
+<div class="lbl"><b>同步書籤的排列與群組</b><p>全頁瀏覽的群組（tag）與欄數跟著 Firefox 同步到其他裝置。排列順序本來就會隨書籤同步。固定占用 20 KB，其餘留給隱私空間。</p></div>
+<div class="ctl" style="flex-direction: column; align-items: flex-end; gap: 6px;"><span class="sw on" role="switch" aria-checked="true" aria-label="同步書籤的排列與群組"></span><span style="font-size: 12px; color: var(--text-2);">0.2 / 20 KB</span></div>
+</div>
+<div class="item">
+<div class="lbl"><b>把加密副本放進 Firefox 同步</b><p>其他裝置打開同一個選項、輸入同一組主密碼就能取得；主密碼本身不會被同步。</p></div>
+<div class="ctl"><span class="sw" role="switch" aria-checked="false" aria-label="把加密副本放進 Firefox 同步"></span></div>
+<div style="flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-start; padding: 14px 16px; background: var(--bg); border-radius: var(--r-lg);">
+<dl class="kv" style="margin: 0; flex: 1 1 320px;">
+<dt>雲端副本</dt><dd><span class="badge mute">尚未上傳</span></dd>
+<dt>配額用量</dt><dd style="display: flex; align-items: center; gap: 10px;"><span class="meter"><i style="width: 2%;"></i></span>0.2 / 100 KB</dd>
+<dt>上次同步</dt><dd>尚未同步過<span style="color: var(--text-2);">（同步目前是關閉的）</span></dd>
+</dl>
+<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+<button class="btn out">立刻檢查雲端副本</button>
+<details><summary>其他裝置還沒看到？</summary></details>
+<details><summary>同步的已知限制</summary></details>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section class="sec">
+<h2>隱私空間 <span class="badge ok">已解鎖 · 3 個隱私書籤</span></h2>
+<p>移出、刪除單筆隱私書籤，請在側邊欄解鎖後操作。</p>
+<div class="card">
+<div class="item">
+<div class="lbl"><b>入口</b><p>隱藏時，介面上看不到隱私空間，要在搜尋框打觸發字串才會出現密碼框。</p></div>
+<div class="ctl"><div class="seg" role="radiogroup" aria-label="入口"><button class="on" role="radio" aria-checked="true">隱藏</button><button role="radio" aria-checked="false">顯示分頁</button></div></div>
+</div>
+<div class="item">
+<div class="lbl"><b>觸發字串</b><p>在側邊欄搜尋框輸入這段文字，即可建立或打開隱私空間。任何文字都可以。</p></div>
+<div class="ctl"><input class="inp" type="text" value="###" style="width: 200px; font-family: var(--mono);" aria-label="觸發字串"></div>
+<div class="note warn" style="flex: 1 1 100%;"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3M8 11.5v.01"/></svg><span>建議改掉。預設值是公開的，別人打一次就能看出這台裝置有沒有隱私空間。</span></div>
+</div>
+<div class="item">
+<div class="lbl"><b>移出時的預設資料夾</b><p>「移出隱私空間」放進這個資料夾；「移出到…」每次讓你選。資料夾被刪掉時退回 Firefox 預設位置。</p></div>
+<div class="ctl"><select class="inp" style="width: 220px;" aria-label="預設資料夾"><option>其他書籤（Firefox 預設）</option></select></div>
+</div>
+<div class="item">
+<div class="lbl"><b>自動上鎖</b><p>從最後一次操作隱私空間起算；離開電腦時也會上鎖。關閉側邊欄也會上鎖，但全頁瀏覽和這個設定頁開著時不會。</p></div>
+<div class="ctl"><span>閒置</span><input class="inp sm" type="number" value="5" aria-label="分鐘"><span>分鐘後</span></div>
+</div>
+</div>
+</section>
+
+<section class="sec">
+<h2>密碼與備份</h2>
+<p>主密碼和救援金鑰都能解開同一份資料。忘記主密碼時，救援金鑰是唯一的出路。</p>
+<div class="card">
+<div class="item">
+<div class="lbl"><b>救援金鑰</b><p>建議抄在紙上，放在電腦以外的地方。</p></div>
+<div class="ctl"><button class="btn out">再看一次救援金鑰</button></div>
+</div>
+<div class="item">
+<div class="lbl"><b>主密碼</b><p>更改主密碼不會改變救援金鑰。</p></div>
+<div class="ctl"><button class="btn out" aria-expanded="true">更改主密碼</button></div>
+<div class="sub">
+<label class="lab">目前的主密碼<input class="inp" type="password" value="password"></label>
+<label class="lab">新的主密碼（至少 8 字）<input class="inp" type="password" value=""></label>
+<label class="lab">再輸入一次<input class="inp" type="password" value=""></label>
+<div style="grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end;"><button class="btn">取消</button><button class="btn primary">更改主密碼</button></div>
+</div>
+</div>
+<div class="item">
+<div class="lbl"><b>匯出加密備份</b><p>AES-256-GCM 加密，可放雲端硬碟或隨身碟；不含預覽圖（還原後會重抓）。<strong style="color: var(--text);">忘記主密碼就永遠打不開。</strong></p></div>
+<div class="ctl"><button class="btn primary">匯出加密備份</button></div>
+</div>
+<div class="item">
+<div class="lbl"><b>從備份還原</b><p>這台裝置還沒有隱私空間時，之後就用備份檔的密碼解鎖。已經有的話要先在側邊欄解鎖，還原會逐筆合併（同一筆取較新的）。</p></div>
+<div class="sub">
+<div class="lab">用什麼解開<div class="seg" role="radiogroup" style="align-self: flex-start;"><button class="on" role="radio" aria-checked="true">主密碼</button><button role="radio" aria-checked="false">救援金鑰</button></div></div>
+<label class="lab">備份檔<span class="inp" style="display: flex; align-items: center; gap: 8px; color: var(--text-2);"><span class="btn" style="height: 24px; padding: 0 8px; font-size: 12px;">選擇檔案</span>未選擇檔案</span></label>
+<label class="lab">那個備份檔的主密碼<input class="inp" type="password" value=""></label>
+<div style="grid-column: 1 / -1; display: flex; justify-content: flex-end;"><button class="btn out">還原</button></div>
+</div>
+</div>
+</div>
+</section>
+
+<section class="sec">
+<h2 style="color: var(--danger);">危險操作</h2>
+<p>這些動作做了就不能復原，每一項都會再確認一次。</p>
+<div class="card dg">
+<div class="item">
+<div class="lbl"><b>重新產生救援金鑰</b><p>舊的那串會<strong style="color: var(--text);">立刻失效</strong>。需要目前的主密碼。</p></div>
+<div class="ctl"><button class="btn danger">重新產生…</button></div>
+</div>
+<div class="item">
+<div class="lbl"><b>清除所有預覽圖</b><p>28 張、0.2 MB。之後瀏覽時會重新擷取。</p></div>
+<div class="ctl"><button class="btn danger">清除預覽圖…</button></div>
+</div>
+<div class="item">
+<div class="lbl"><b>刪除整個隱私空間</b><p>3 個隱私書籤和群組會一起刪除，建議先匯出加密備份。</p></div>
+<div class="ctl"><button class="btn danger">刪除隱私空間…</button></div>
+</div>
+</div>
+</section>
+
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2480}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>全頁瀏覽</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;text-align:left}
+.th{--font:system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--r-sm:4px;--r-md:6px;--r-lg:8px;--r-xl:12px;--bg:#f9f9fb;--surface:#ffffff;--surface-2:#f0f0f4;--surface-3:#e0e0e6;--plate:#ececf1;--border:#e0e0e6;--border-strong:#c4c4cf;--text:#15141a;--text-2:#5b5b66;--text-3:#8f8f9d;--accent:#0061e0;--on-accent:#ffffff;--accent-tint:rgba(0,97,224,.10);--danger:#c50042;--shadow-1:0 1px 2px rgba(21,20,26,.10);--shadow-menu:0 0 0 1px rgba(21,20,26,.08),0 4px 16px rgba(21,20,26,.16);font-family:var(--font);font-size:13px;line-height:1.5;color:var(--text);background:var(--bg)}
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ib{width:32px;height:32px;display:inline-grid;place-items:center;border-radius:var(--r-md);color:var(--text-2);flex:none}
+.ib.sm{width:28px;height:28px}
+.btn{height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-md);background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap;flex:none}
+.btn .ico{color:var(--text-2)}
+.seg{display:inline-flex;gap:2px;padding:2px;background:var(--surface-2);border-radius:var(--r-md);flex:none}
+.seg>*{height:28px;min-width:32px;padding:0 10px;display:grid;place-items:center;border-radius:var(--r-sm);color:var(--text-2);font-size:12px;white-space:nowrap}
+.seg>.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1);font-weight:600}
+.search{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--surface-2);border:1px solid transparent;border-radius:var(--r-md);color:var(--text-3);min-width:0}
+.kbd{font-size:11px;color:var(--text-2);border:1px solid var(--border-strong);border-radius:4px;padding:0 5px;line-height:16px}
+.menu{position:absolute;width:208px;padding:4px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-menu);display:flex;flex-direction:column;z-index:5}
+.mi{height:28px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:var(--r-sm);white-space:nowrap;color:var(--text);width:100%;flex:none}
+.mi .ico{color:var(--text-2)}
+.mi.hov{background:var(--surface-2)}
+.mi.dis,.mi.dis .ico{color:var(--text-3)}
+.mi.danger,.mi.danger .ico{color:var(--danger)}
+.msep{height:1px;background:var(--border);margin:4px 0;flex:none}
+.tb16{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--r-lg);background:var(--plate);overflow:hidden;display:grid;place-items:center}
+.fav{width:34%;aspect-ratio:1;border-radius:20%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:20px}
+.let{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-weight:600;font-size:44px}
+.shot{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;gap:7%;padding:9% 10%}
+.shot i{display:block;height:7%;border-radius:2px;background:#d7d7de}
+.shot i.h{height:15%;width:62%;background:#2b2a33}
+.shot i.s{width:44%}
+.cov{height:100%;aspect-ratio:3/4;display:flex;flex-direction:column;justify-content:flex-end;gap:6%;padding:9%}
+.cov b{display:block;height:7%;background:rgba(255,255,255,.85);border-radius:1px}
+.cov b.s{width:60%}
+.vid{position:absolute;inset:0;display:grid;place-items:center}
+.vid span{width:18%;aspect-ratio:1;border-radius:50%;background:rgba(0,0,0,.45);display:grid;place-items:center;color:#fff}
+.vid .ico{width:40%;height:40%;fill:currentColor;stroke:none}
+.mosaic{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:6px}
+.mosaic>span{border-radius:4px;position:relative;overflow:hidden;display:grid;place-items:center;background:var(--surface)}
+.mosaic .fav{width:36%;font-size:10px}
+.mosaic .let{font-size:18px}
+.tbar{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 24px;background:var(--bg);border-bottom:1px solid var(--border)}
+.brand{font-size:15px;font-weight:650;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.grpctl{display:flex;align-items:center;gap:8px;flex:none}
+.stepper{display:inline-flex;align-items:center;gap:2px;padding:2px;background:var(--surface-2);border-radius:var(--r-md);flex:none}
+.stepper .ib{width:28px;height:28px}
+.stepper span{font-size:12px;color:var(--text);padding:0 6px;white-space:nowrap}
+.ph{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;padding:20px 24px 8px}
+.crumbs{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);white-space:nowrap}
+.crumbs a{color:var(--text-2);text-decoration:none}
+h1{margin:0;font-size:24px;font-weight:650;line-height:1.3;letter-spacing:-.01em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:16px;padding:12px 16px 40px}
+.gcard{position:relative;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--r-xl);color:var(--text);width:100%}
+.gcard.hov{background:var(--surface-2)}
+.gcard.ctx{background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border-strong)}
+.tt{display:flex;flex-direction:column;min-width:0;padding:0 2px}
+.t1{font-size:13px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.t2{font-size:11px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-2)}
+.quick{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:var(--r-md);background:var(--surface);box-shadow:var(--shadow-menu);display:grid;place-items:center;color:var(--text)}
+.spacer{flex:1}
+</style>
+</helmet>
+<div class="th" style="min-height: 900px;">
+<div class="tbar">
+<div class="brand">書籤預覽</div>
+<div class="search" style="flex: 1 1 280px; max-width: 560px;"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span style="flex: 1;">搜尋書籤</span><span class="kbd">/</span></div>
+<span class="spacer"></span>
+<div class="grpctl">
+<div class="seg" role="radiogroup" aria-label="卡片大小"><button role="radio" aria-checked="false">小</button><button class="on" role="radio" aria-checked="true">中</button><button role="radio" aria-checked="false">大</button></div>
+<div class="stepper" aria-label="欄數"><button class="ib" aria-label="減少一欄"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9"/></svg></button><span>5 欄 · 自動</span><button class="ib" aria-label="增加一欄"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg></button></div>
+<button class="ib" aria-label="更多選項"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+
+<div class="ph">
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+<div class="crumbs"><button class="ib sm" aria-label="上一層" style="width: 20px; height: 20px;"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button><a href="#">全部</a><span>/</span></div>
+<div style="display: flex; align-items: baseline; gap: 10px;"><h1>書籤工具列</h1><span style="color: var(--text-2); font-size: 13px;">2 個資料夾 · 11 個書籤</span></div>
+</div>
+<span class="spacer"></span>
+<div style="display: flex; gap: 8px;">
+<button class="btn"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/></svg>新增資料夾</button>
+<button class="btn"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg>選取</button>
+</div>
+</div>
+
+<div class="grid">
+<button class="gcard">
+<span class="tb16" style="background: var(--surface-2);"><span class="mosaic"><span><span class="fav" style="background: #23272f; color: #61dafb;">R</span></span><span><span class="shot" style="padding: 8%; gap: 10%;"><i class="h"></i><i></i><i class="s"></i></span></span><span style="background: #8c3b2f;"></span><span><span class="let" style="background: #5b4fc4;">D</span></span></span></span>
+<span class="tt"><span class="t1" style="display: flex; align-items: center; gap: 6px;"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--text-2);"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/></svg>開發</span><span class="t2">7 個書籤</span></span>
+</button>
+<button class="gcard">
+<span class="tb16" style="background: var(--surface-2);"><span class="mosaic"><span style="background: #2f5d50;"><span class="cov" style="background: #2f5d50;"></span></span><span><span class="shot" style="padding: 8%; gap: 10%;"><i class="h"></i><i></i><i class="s"></i></span></span><span><span class="let" style="background: #a14a00;">M</span></span><span></span></span></span>
+<span class="tt"><span class="t1" style="display: flex; align-items: center; gap: 6px;"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--text-2);"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/></svg>閱讀</span><span class="t2">3 個書籤</span></span>
+</button>
+<sc-for list="{{items}}" as="b" hint-placeholder-count="11">
+<button class="gcard {{b.st}}">
+<span class="tb16">
+<sc-if value="{{b.isIcon}}" hint-placeholder-val="{{false}}"><span class="fav" style="background: {{b.color}}; color: {{b.fg}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isLetter}}" hint-placeholder-val="{{false}}"><span class="let" style="background: {{b.color}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isShot}}" hint-placeholder-val="{{false}}"><span class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></span></sc-if>
+<sc-if value="{{b.isCover}}" hint-placeholder-val="{{false}}"><span class="cov" style="background: {{b.color}};"><b></b><b class="s"></b></span></sc-if>
+<sc-if value="{{b.isVideo}}" hint-placeholder-val="{{false}}"><span class="vid" style="background: {{b.color}};"><span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z"/></svg></span></span></sc-if>
+</span>
+<span class="tt"><span class="t1">{{b.title}}</span><span class="t2">{{b.domain}}</span></span>
+<sc-if value="{{b.quick}}" hint-placeholder-val="{{false}}"><span class="quick" aria-hidden="true"><svg class="ico" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></span></sc-if>
+<sc-if value="{{b.menu}}" hint-placeholder-val="{{false}}">
+<span class="menu" style="left: 60%; top: 30%;" role="menu">
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/></svg>在新分頁開啟</span>
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5a1 1 0 0 0-1-1H3.5a1 1 0 0 0-1 1V10a1 1 0 0 0 1 1H5"/></svg>複製網址</span>
+<span class="msep"></span>
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>重新抓預覽圖</span>
+<span class="mi hov"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><path d="m2.5 12 4-4 3 3 2-2 2.5 2.5"/></svg>改用頁面預覽</span>
+<span class="msep"></span>
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z"/></svg>重新命名</span>
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M6 9.25h4M8.5 7.5l1.75 1.75L8.5 11"/></svg>移動到…</span>
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8H3M7 4 3 8l4 4"/></svg>往左移</span>
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>往右移</span>
+<span class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".75" fill="currentColor"/></svg>設定 tag…</span>
+<span class="msep"></span>
+<span class="mi danger"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>刪除</span>
+</span>
+</sc-if>
+</button>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const k = (kind, o) => Object.assign({ isIcon: kind === 'icon', isLetter: kind === 'letter', isShot: kind === 'shot', isCover: kind === 'cover', isVideo: kind === 'video', fg: '#ffffff', st: '', quick: false, menu: false }, o);
+    return {
+      items: [
+        k('icon', { title: 'GitHub', domain: 'github.com', mark: 'GH', color: '#24292f', st: 'hov', quick: true }),
+        k('video', { title: 'Vite 6 發表會（完整版）', domain: 'youtube.com', color: '#2d2a6e' }),
+        k('shot', { title: 'Using the Fetch API', domain: 'developer.mozilla.org', st: 'ctx', menu: true }),
+        k('cover', { title: '《Rust 程式設計》第 2 版', domain: 'kobo.com', color: '#8c3b2f' }),
+        k('icon', { title: 'Stack Overflow', domain: 'stackoverflow.com', mark: 'SO', color: '#e8710a' }),
+        k('icon', { title: 'Wikipedia', domain: 'wikipedia.org', mark: 'W', color: '#3a3a3a' }),
+        k('letter', { title: 'WebExtensions', domain: 'developer.mozilla.org', mark: 'D', color: '#5b4fc4' }),
+        k('icon', { title: 'Hacker News', domain: 'news.ycombinator.com', mark: 'Y', color: '#c74a00' }),
+        k('shot', { title: 'Can I use', domain: 'caniuse.com' }),
+        k('icon', { title: 'Google', domain: 'google.com', mark: 'G', color: '#4285f4' }),
+        k('letter', { title: 'Lobsters', domain: 'lobste.rs', mark: 'L', color: '#8a2f2f' })
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>設計語言</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;text-align:left}
+.th{--font:system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--mono:ui-monospace,"SF Mono",Consolas,monospace;--fs-xs:11px;--fs-sm:12px;--fs-md:13px;--fs-lg:15px;--fs-xl:18px;--fs-2xl:24px;--sp-0:2px;--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;--r-sm:4px;--r-md:6px;--r-lg:8px;--r-xl:12px;--r-full:999px;--ctl-h:28px;--ctl-h-lg:32px;--bg:#f9f9fb;--surface:#ffffff;--surface-2:#f0f0f4;--surface-3:#e0e0e6;--plate:#ececf1;--border:#e0e0e6;--border-strong:#c4c4cf;--text:#15141a;--text-2:#5b5b66;--text-3:#8f8f9d;--accent:#0061e0;--accent-hover:#0250bb;--on-accent:#ffffff;--accent-tint:rgba(0,97,224,.10);--accent-tint-2:rgba(0,97,224,.18);--danger:#c50042;--danger-hover:#a1003a;--danger-tint:rgba(197,0,66,.08);--success:#017a40;--success-tint:rgba(1,122,64,.10);--shadow-1:0 1px 2px rgba(21,20,26,.10);--shadow-menu:0 0 0 1px rgba(21,20,26,.08),0 4px 16px rgba(21,20,26,.16);--shadow-dialog:0 0 0 1px rgba(21,20,26,.08),0 16px 48px rgba(21,20,26,.24);--scrim:rgba(21,20,26,.30);--g-blue:#0061e0;--g-green:#017a40;--g-orange:#a84d00;--g-pink:#b5006c;--g-purple:#6a35d9;--g-cyan:#006f8c;--on-g:#ffffff;font-family:var(--font);font-size:var(--fs-md);line-height:1.5;color:var(--text);background:var(--bg)}
+.th.dark{--bg:#1c1b22;--surface:#2b2a33;--surface-2:#3a3944;--surface-3:#52525e;--plate:#33323b;--border:#3f3e48;--border-strong:#5b5b66;--text:#fbfbfe;--text-2:#bfbfc9;--text-3:#8f8f9d;--accent:#00ddff;--accent-hover:#80ebff;--on-accent:#15141a;--accent-tint:rgba(0,221,255,.12);--accent-tint-2:rgba(0,221,255,.22);--danger:#ff848b;--danger-hover:#ffa4a9;--danger-tint:rgba(255,132,139,.12);--success:#54ffbd;--success-tint:rgba(84,255,189,.12);--shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-menu:0 0 0 1px rgba(251,251,254,.10),0 4px 16px rgba(0,0,0,.5);--shadow-dialog:0 0 0 1px rgba(251,251,254,.10),0 16px 48px rgba(0,0,0,.6);--scrim:rgba(0,0,0,.5);--g-blue:#7cb1ff;--g-green:#54d69a;--g-orange:#ffb066;--g-pink:#ff8ad0;--g-purple:#b99bff;--g-cyan:#5fd8f5;--on-g:#15141a}
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ib{width:var(--ctl-h);height:var(--ctl-h);display:inline-grid;place-items:center;border-radius:var(--r-md);color:var(--text-2);flex:none}
+.ib.hov{background:var(--surface-2);color:var(--text)}
+.ib.on{background:var(--accent-tint);color:var(--accent)}
+.btn{height:var(--ctl-h);padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-md);background:var(--surface-2);color:var(--text);font-size:var(--fs-md);font-weight:500;white-space:nowrap;flex:none}
+.btn.lg{height:var(--ctl-h-lg);padding:0 14px}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent}
+.btn.danger{background:var(--danger-tint);color:var(--danger)}
+.seg{display:inline-flex;gap:2px;padding:2px;background:var(--surface-2);border-radius:var(--r-md);flex:none}
+.seg>*{height:24px;min-width:24px;padding:0 6px;display:grid;place-items:center;border-radius:var(--r-sm);color:var(--text-2);font-size:var(--fs-sm);white-space:nowrap}
+.seg>.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1)}
+.dark .seg>.on{background:var(--surface-3)}
+.search{height:var(--ctl-h);display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--surface-2);border:1px solid transparent;border-radius:var(--r-md);color:var(--text-3);min-width:0}
+.search.focus{background:var(--surface);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);color:var(--text)}
+.menu{width:208px;padding:4px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-menu);display:flex;flex-direction:column}
+.mi{height:28px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:var(--r-sm);white-space:nowrap;color:var(--text);width:100%}
+.mi .ico{color:var(--text-2)}
+.mi.hov{background:var(--surface-2)}
+.mi.dis,.mi.dis .ico{color:var(--text-3)}
+.mi.danger,.mi.danger .ico{color:var(--danger)}
+.msep{height:1px;background:var(--border);margin:4px 0}
+.mh{padding:6px 8px 2px;font-size:var(--fs-xs);font-weight:600;color:var(--text-2)}
+.cb{width:16px;height:16px;border-radius:var(--r-sm);border:1.5px solid var(--border-strong);background:var(--surface);display:grid;place-items:center;flex:none}
+.cb.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.cb .ico{width:12px;height:12px;stroke-width:2.2}
+.rd{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);flex:none}
+.rd.on{border:5px solid var(--accent)}
+.sw{width:28px;height:16px;border-radius:999px;background:var(--surface-3);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:var(--shadow-1)}
+.sw.on{background:var(--accent)}
+.sw.on::after{left:14px}
+.tb16{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--r-lg);background:var(--plate);overflow:hidden;display:grid;place-items:center}
+.tb40{position:relative;width:40px;height:40px;border-radius:var(--r-md);background:var(--plate);overflow:hidden;display:grid;place-items:center;flex:none}
+.fav{width:34%;aspect-ratio:1;border-radius:20%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px}
+.tb40 .fav{width:24px;font-size:10px}
+.let{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-weight:600;font-size:30px}
+.tb40 .let{font-size:17px}
+.shot{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;gap:7%;padding:9% 10%}
+.shot i{display:block;height:7%;border-radius:2px;background:#d7d7de}
+.shot i.h{height:15%;width:62%;background:#2b2a33}
+.shot i.s{width:44%}
+.cov{height:100%;aspect-ratio:3/4;display:flex;flex-direction:column;justify-content:flex-end;gap:6%;padding:9%}
+.cov b{display:block;height:7%;background:rgba(255,255,255,.85);border-radius:1px}
+.cov b.s{width:60%}
+.vid{position:absolute;inset:0;display:grid;place-items:center}
+.vid span{width:22%;aspect-ratio:1;border-radius:50%;background:rgba(0,0,0,.45);display:grid;place-items:center;color:#fff}
+.tb40 .vid span{width:16px}
+/* artboard-only */
+.sheet{width:1360px;min-height:2360px;padding:56px 64px;display:flex;flex-direction:column;gap:40px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:48px;align-items:start}
+.sec{display:flex;flex-direction:column;gap:14px}
+.sec h2{margin:0;font-size:var(--fs-xl);font-weight:600}
+.sec p{margin:0;color:var(--text-2)}
+.pal{border-radius:var(--r-xl);border:1px solid var(--border);overflow:hidden}
+.pal-h{padding:10px 14px;font-weight:600;font-size:var(--fs-sm);background:var(--surface);border-bottom:1px solid var(--border);color:var(--text)}
+.sw-row{display:grid;grid-template-columns:28px 150px 86px minmax(0,1fr);gap:10px;align-items:center;padding:6px 14px;background:var(--bg);color:var(--text);font-size:var(--fs-sm)}
+.chip{width:28px;height:20px;border-radius:var(--r-sm);box-shadow:inset 0 0 0 1px rgba(127,127,140,.35)}
+.mono{font-family:var(--mono);font-size:var(--fs-xs)}
+.muted{color:var(--text-2)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:20px}
+pre{margin:0;font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--text);white-space:pre-wrap}
+</style>
+</helmet>
+<div class="th" style="width: 1360px; min-height: 2360px;">
+<div class="sheet">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div class="muted" style="font-size: 13px;">書籤預覽 · Firefox 擴充套件 · 重新設計</div>
+<h1 style="margin: 0; font-size: 34px; font-weight: 650; letter-spacing: -0.01em;">設計語言</h1>
+<p style="margin: 0; max-width: 760px; color: var(--text-2); font-size: 15px;">方向：「像 Firefox 自己的面板」。系統字型、中性冷灰、只有一個藍色強調色；淺／深色用同一組變數名，跟著系統切換。全部以 CSS 變數定義，React＋純 CSS 可以直接套用。</p>
+</div>
+
+<div class="cols">
+<div style="display: flex; flex-direction: column; gap: 40px; min-width: 0;">
+
+<div class="sec">
+<h2>色彩</h2>
+<p>同一個變數名，兩種主題各一組值。淺色接近 Firefox 淺色主題的面板，深色接近 Firefox 深色主題。</p>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+<div class="th pal">
+<div class="pal-h">淺色</div>
+<sc-for list="{{colors}}" as="c" hint-placeholder-count="20">
+<div class="sw-row"><div class="chip" style="background: var({{c.v}})"></div><span class="mono">{{c.v}}</span><span class="mono muted">{{c.light}}</span><span class="muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{c.use}}</span></div>
+</sc-for>
+</div>
+<div class="th dark pal">
+<div class="pal-h">深色</div>
+<sc-for list="{{colors}}" as="c" hint-placeholder-count="20">
+<div class="sw-row"><div class="chip" style="background: var({{c.v}})"></div><span class="mono">{{c.v}}</span><span class="mono muted">{{c.dark}}</span><span class="muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{c.use}}</span></div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div class="sec">
+<h2>強調色與語意色的用法</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 8px; font-weight: 600;"><span class="chip" style="background: var(--accent); width: 16px; height: 16px; border-radius: 50%;"></span>藍色 accent：只有 4 種用途</div>
+<div class="muted">1. 目前選取（分頁、選取列、勾選）</div>
+<div class="muted">2. 每個畫面最多一顆主要按鈕</div>
+<div class="muted">3. 鍵盤焦點框（2px）</div>
+<div class="muted">4. 文字連結</div>
+</div>
+<div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 8px; font-weight: 600;"><span class="chip" style="background: var(--danger); width: 16px; height: 16px; border-radius: 50%;"></span>紅色 danger：不可逆</div>
+<div class="muted">刪除、清除、重新產生金鑰、解除隱私空間。</div>
+<div class="muted">選單裡一律放最後一組；設定頁集中到「危險操作」。</div>
+</div>
+<div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+<div style="font-weight: 600;">不要用強調色的地方</div>
+<div class="muted">分段控制的選中（用浮起的白底，像原生）、裝飾線、圖示預設色、群組框（群組有自己的 6 色）。</div>
+</div>
+</div>
+<div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+<span class="muted" style="font-size: 12px; width: 80px;">群組 6 色</span>
+<span class="chip" style="background: var(--g-blue); width: 40px; height: 24px;"></span>
+<span class="chip" style="background: var(--g-green); width: 40px; height: 24px;"></span>
+<span class="chip" style="background: var(--g-orange); width: 40px; height: 24px;"></span>
+<span class="chip" style="background: var(--g-pink); width: 40px; height: 24px;"></span>
+<span class="chip" style="background: var(--g-purple); width: 40px; height: 24px;"></span>
+<span class="chip" style="background: var(--g-cyan); width: 40px; height: 24px;"></span>
+<span class="muted" style="font-size: 12px;">框線用原色、底色用 8% 混色（color-mix）、標籤文字用 --on-g，深色主題自動換成亮一階的版本。</span>
+</div>
+</div>
+
+<div class="sec">
+<h2>字級</h2>
+<p>系統字型（Windows：Segoe UI＋微軟正黑體；macOS：系統字＋蘋方）。中文行高 1.5。英文字串比中文長 1.5–2 倍，所以文字一律單行＋刪節號，不靠固定寬度。</p>
+<div class="card" style="display: flex; flex-direction: column; gap: 0; padding: 4px 20px;">
+<sc-for list="{{type}}" as="t" hint-placeholder-count="6">
+<div style="display: grid; grid-template-columns: 110px 70px minmax(0, 1fr) 220px; gap: 12px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border);">
+<span class="mono">{{t.v}}</span><span class="mono muted">{{t.px}}</span><span style="font-size: var({{t.v}}); font-weight: {{t.w}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">書籤工具列 Bookmarks Toolbar</span><span class="muted" style="font-size: 12px;">{{t.use}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div class="sec">
+<h2>間距、圓角、陰影</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<div class="card" style="display: flex; flex-direction: column; gap: 8px;">
+<div style="font-weight: 600; margin-bottom: 4px;">間距（4px 為單位）</div>
+<sc-for list="{{space}}" as="s" hint-placeholder-count="8">
+<div style="display: flex; align-items: center; gap: 10px;"><span class="mono" style="width: 52px;">{{s.v}}</span><span style="height: 10px; width: {{s.px}}px; background: var(--accent-tint-2); border-radius: 2px;"></span><span class="mono muted">{{s.px}}</span></div>
+</sc-for>
+</div>
+<div class="card" style="display: flex; flex-direction: column; gap: 12px;">
+<div style="font-weight: 600;">圓角</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="height: 44px; border: 1.5px solid var(--border-strong); border-radius: 4px;"></div><span class="mono">--r-sm 4</span><span class="muted" style="font-size: 11px;">勾選框、選單項目</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="height: 44px; border: 1.5px solid var(--border-strong); border-radius: 6px;"></div><span class="mono">--r-md 6</span><span class="muted" style="font-size: 11px;">按鈕、輸入框、小縮圖</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="height: 44px; border: 1.5px solid var(--border-strong); border-radius: 8px;"></div><span class="mono">--r-lg 8</span><span class="muted" style="font-size: 11px;">卡片、預覽底板、選單</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="height: 44px; border: 1.5px solid var(--border-strong); border-radius: 12px;"></div><span class="mono">--r-xl 12</span><span class="muted" style="font-size: 11px;">對話框、設定卡片</span></div>
+</div>
+<div class="muted" style="font-size: 12px;">網站圖示固定 20%（隨大小縮放）。</div>
+</div>
+<div class="card" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="font-weight: 600;">陰影（只有 3 層）</div>
+<div style="display: flex; align-items: center; gap: 12px;"><div style="width: 56px; height: 36px; border-radius: 6px; background: var(--surface); box-shadow: var(--shadow-1);"></div><div><div class="mono">--shadow-1</div><div class="muted" style="font-size: 11px;">分段控制的選中塊</div></div></div>
+<div style="display: flex; align-items: center; gap: 12px;"><div style="width: 56px; height: 36px; border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-menu);"></div><div><div class="mono">--shadow-menu</div><div class="muted" style="font-size: 11px;">選單、提示</div></div></div>
+<div style="display: flex; align-items: center; gap: 12px;"><div style="width: 56px; height: 36px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-dialog);"></div><div><div class="mono">--shadow-dialog</div><div class="muted" style="font-size: 11px;">密碼框、對話框</div></div></div>
+<div class="muted" style="font-size: 12px;">卡片平常不加陰影，靠底色區分；hover 才換底色。</div>
+</div>
+</div>
+</div>
+
+<div class="sec">
+<h2>預覽圖底板：四種圖混排</h2>
+<p>規則：所有預覽圖都放進同一個底板（大卡 16:9、小列 40×40），底板決定尺寸，圖只決定怎麼放進去。這樣不同種類並排時，高度和基線永遠對齊。</p>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div class="tb16"><div class="cov" style="background: #3d5a80;"><b></b><b class="s"></b></div></div>
+<div style="display: flex; gap: 8px; align-items: center;"><div class="tb40"><div class="cov" style="background: #3d5a80; padding: 4px;"></div></div><div style="font-weight: 600;">封面圖</div></div>
+<div class="muted" style="font-size: 12px;">contain：原始比例、不裁切，左右露出底板色。橫向封面（影片縮圖）剛好填滿。</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div class="tb16"><div class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></div></div>
+<div style="display: flex; gap: 8px; align-items: center;"><div class="tb40"><div class="shot" style="padding: 6px; gap: 3px;"><i class="h"></i><i></i><i class="s"></i></div></div><div style="font-weight: 600;">網頁截圖</div></div>
+<div class="muted" style="font-size: 12px;">cover：裁成 16:9 填滿，從頂端對齊（object-position: top），保留頁首。</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div class="tb16"><div class="fav" style="background: #24292f;">GH</div></div>
+<div style="display: flex; gap: 8px; align-items: center;"><div class="tb40"><div class="fav" style="background: #24292f;">GH</div></div><div style="font-weight: 600;">網站圖示</div></div>
+<div class="muted" style="font-size: 12px;">底板素色、圖示寬 34%（小列 24px）、20% 圓角，置中。</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div class="tb16"><div class="let" style="background: #5b4fc4;">D</div></div>
+<div style="display: flex; gap: 8px; align-items: center;"><div class="tb40"><div class="let" style="background: #5b4fc4;">D</div></div><div style="font-weight: 600;">字母色卡</div></div>
+<div class="muted" style="font-size: 12px;">整塊填色＋白字；顏色由網域雜湊挑自 8 色色票（都達 4.5:1）。</div>
+</div>
+</div>
+</div>
+
+<div class="sec">
+<h2>元件樣本</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+<div class="card" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+<button class="btn primary">移動到…</button><button class="btn">全選</button><button class="btn ghost">取消</button><button class="btn danger">刪除</button>
+</div>
+<div style="display: flex; gap: 6px; align-items: center;">
+<button class="ib" aria-label="新增資料夾"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/></svg></button>
+<button class="ib hov" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib on" aria-label="已開啟"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="muted" style="font-size: 12px;">圖示鈕 28×28：一般／hover／開啟中</span>
+</div>
+<div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+<div class="seg"><button class="on">小</button><button>中</button><button>大</button></div>
+<div class="seg"><button class="on" aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+</div>
+<div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+<label style="display: flex; gap: 6px; align-items: center;"><span class="cb on"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg></span>勾選</label>
+<label style="display: flex; gap: 6px; align-items: center;"><span class="rd on"></span>單選</label>
+<label style="display: flex; gap: 6px; align-items: center;"><span class="sw on"></span>開關</label>
+</div>
+<div class="search" style="width: 260px;"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋書籤</span></div>
+<div class="search focus" style="width: 260px;"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>hub</span></div>
+</div>
+<div class="card" style="display: flex; gap: 16px; align-items: flex-start; background: var(--bg);">
+<div class="menu">
+<div class="mh">開啟</div>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/></svg>在新分頁開啟</button>
+<button class="mi hov"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5a1 1 0 0 0-1-1H3.5a1 1 0 0 0-1 1V10a1 1 0 0 0 1 1H5"/></svg>複製網址</button>
+<div class="msep"></div>
+<button class="mi dis"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4"/></svg>往上移</button>
+<div class="msep"></div>
+<button class="mi danger"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>刪除</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;" class="muted">
+<div>選單寬 208px（160–220 範圍內），項目高 28px。</div>
+<div>每項有 16px 圖示，文字不換行。</div>
+<div>分組用細線；小標題只在「單選組」使用。</div>
+<div>停用項目保留位置、降為 --text-3。</div>
+<div>危險項目永遠放在最後一組。</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="sec" style="position: sticky; top: 0;">
+<h2>落地用 CSS 變數</h2>
+<p>放在 :root，深色用 media query 覆寫同名變數。側邊欄與全頁瀏覽共用。</p>
+<div class="card" style="background: var(--surface); padding: 18px 20px;">
+<pre>:root {
+  color-scheme: light dark;
+  /* 字型與字級 */
+  --font: system-ui, -apple-system, "Segoe UI",
+    "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", sans-serif;
+  --fs-xs: 11px;  /* 網域、說明、計數 */
+  --fs-sm: 12px;  /* 麵包屑、分段控制 */
+  --fs-md: 13px;  /* 內文、清單標題、選單 */
+  --fs-lg: 15px;  /* 設定項標題、側欄標題 */
+  --fs-xl: 18px;  /* 設定分組標題 */
+  --fs-2xl: 24px; /* 全頁資料夾名、頁標題 */
+
+  /* 間距 */
+  --sp-0: 2px;  --sp-1: 4px;  --sp-2: 8px;
+  --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+  --sp-6: 32px; --sp-7: 48px;
+
+  /* 圓角 */
+  --r-sm: 4px; --r-md: 6px; --r-lg: 8px;
+  --r-xl: 12px; --r-full: 999px;
+  --r-favicon: 20%;
+
+  /* 尺寸 */
+  --ctl-h: 28px;     /* 側欄控制項 */
+  --ctl-h-lg: 32px;  /* 全頁、設定頁 */
+  --menu-w: 208px;
+  --thumb-row: 40px;
+
+  /* 色彩：淺色 */
+  --bg: #f9f9fb;
+  --surface: #ffffff;
+  --surface-2: #f0f0f4;   /* hover、輸入框 */
+  --surface-3: #e0e0e6;   /* pressed、軌道 */
+  --plate: #ececf1;       /* 預覽圖底板 */
+  --border: #e0e0e6;
+  --border-strong: #c4c4cf;
+  --text: #15141a;
+  --text-2: #5b5b66;
+  --text-3: #8f8f9d;      /* 只給停用 */
+  --accent: #0061e0;
+  --accent-hover: #0250bb;
+  --on-accent: #ffffff;
+  --accent-tint: rgb(0 97 224 / .10);
+  --accent-tint-2: rgb(0 97 224 / .18);
+  --danger: #c50042;
+  --danger-tint: rgb(197 0 66 / .08);
+  --success: #017a40;
+  --focus-ring: 0 0 0 2px var(--accent);
+
+  /* 群組 */
+  --g-blue: #0061e0;  --g-green: #017a40;
+  --g-orange: #a84d00; --g-pink: #b5006c;
+  --g-purple: #6a35d9; --g-cyan: #006f8c;
+  --on-g: #ffffff;
+
+  /* 陰影 */
+  --shadow-1: 0 1px 2px rgb(21 20 26 / .10);
+  --shadow-menu: 0 0 0 1px rgb(21 20 26 / .08),
+    0 4px 16px rgb(21 20 26 / .16);
+  --shadow-dialog: 0 0 0 1px rgb(21 20 26 / .08),
+    0 16px 48px rgb(21 20 26 / .24);
+  --scrim: rgb(21 20 26 / .30);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1b22;  --surface: #2b2a33;
+    --surface-2: #3a3944; --surface-3: #52525e;
+    --plate: #33323b;
+    --border: #3f3e48; --border-strong: #5b5b66;
+    --text: #fbfbfe; --text-2: #bfbfc9;
+    --accent: #00ddff; --accent-hover: #80ebff;
+    --on-accent: #15141a;
+    --accent-tint: rgb(0 221 255 / .12);
+    --accent-tint-2: rgb(0 221 255 / .22);
+    --danger: #ff848b;
+    --danger-tint: rgb(255 132 139 / .12);
+    --success: #54ffbd;
+    --g-blue: #7cb1ff;  --g-green: #54d69a;
+    --g-orange: #ffb066; --g-pink: #ff8ad0;
+    --g-purple: #b99bff; --g-cyan: #5fd8f5;
+    --on-g: #15141a;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / .4);
+    --shadow-menu: 0 0 0 1px rgb(251 251 254 / .10),
+      0 4px 16px rgb(0 0 0 / .5);
+    --shadow-dialog: 0 0 0 1px rgb(251 251 254 / .10),
+      0 16px 48px rgb(0 0 0 / .6);
+    --scrim: rgb(0 0 0 / .5);
+  }
+}
+
+/* 群組：一個顏色變數推出框、底、標籤 */
+.group {
+  border: 1.5px solid var(--g);
+  background: color-mix(in srgb, var(--g) 8%, transparent);
+  border-radius: var(--r-lg);
+}
+.group-label { background: var(--g); color: var(--on-g); }
+
+/* 焦點：只在鍵盤操作時出現 */
+:focus-visible { outline: none; box-shadow: var(--focus-ring); }</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":2360}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      colors: [
+        { v: '--bg', light: '#f9f9fb', dark: '#1c1b22', use: '側欄、頁面底色' },
+        { v: '--surface', light: '#ffffff', dark: '#2b2a33', use: '選單、對話框、設定卡片' },
+        { v: '--surface-2', light: '#f0f0f4', dark: '#3a3944', use: 'hover、輸入框、次要按鈕' },
+        { v: '--surface-3', light: '#e0e0e6', dark: '#52525e', use: '按下、開關軌道' },
+        { v: '--plate', light: '#ececf1', dark: '#33323b', use: '預覽圖底板' },
+        { v: '--border', light: '#e0e0e6', dark: '#3f3e48', use: '分隔線、卡片框' },
+        { v: '--border-strong', light: '#c4c4cf', dark: '#5b5b66', use: '勾選框、單選框外框' },
+        { v: '--text', light: '#15141a', dark: '#fbfbfe', use: '主要文字' },
+        { v: '--text-2', light: '#5b5b66', dark: '#bfbfc9', use: '網域、說明、圖示' },
+        { v: '--text-3', light: '#8f8f9d', dark: '#8f8f9d', use: '只用在停用項目' },
+        { v: '--accent', light: '#0061e0', dark: '#00ddff', use: '選取、主要按鈕、焦點' },
+        { v: '--accent-tint', light: 'blue 10%', dark: 'cyan 12%', use: '選取列底色' },
+        { v: '--danger', light: '#c50042', dark: '#ff848b', use: '刪除、不可逆操作' },
+        { v: '--danger-tint', light: 'red 8%', dark: 'red 12%', use: '危險按鈕底色' },
+        { v: '--success', light: '#017a40', dark: '#54ffbd', use: '已解鎖、已同步' }
+      ],
+      type: [
+        { v: '--fs-2xl', px: '24px', w: 650, use: '全頁的資料夾名稱' },
+        { v: '--fs-xl', px: '18px', w: 600, use: '設定分組標題' },
+        { v: '--fs-lg', px: '15px', w: 600, use: '設定項名稱、對話框標題' },
+        { v: '--fs-md', px: '13px', w: 400, use: '清單標題、選單、按鈕、內文' },
+        { v: '--fs-sm', px: '12px', w: 400, use: '麵包屑、分段控制' },
+        { v: '--fs-xs', px: '11px', w: 400, use: '網域、計數、說明（最小字）' }
+      ],
+      space: [
+        { v: '--sp-0', px: 2 }, { v: '--sp-1', px: 4 }, { v: '--sp-2', px: 8 }, { v: '--sp-3', px: 12 },
+        { v: '--sp-4', px: 16 }, { v: '--sp-5', px: 24 }, { v: '--sp-6', px: 32 }, { v: '--sp-7', px: 48 }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

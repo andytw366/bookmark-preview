@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>側邊欄狀態</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box}
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;text-align:left}
+.th{--font:system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--r-sm:4px;--r-md:6px;--r-lg:8px;--r-xl:12px;--bg:#f9f9fb;--surface:#ffffff;--surface-2:#f0f0f4;--surface-3:#e0e0e6;--plate:#ececf1;--border:#e0e0e6;--border-strong:#c4c4cf;--text:#15141a;--text-2:#5b5b66;--text-3:#8f8f9d;--accent:#0061e0;--on-accent:#ffffff;--accent-tint:rgba(0,97,224,.10);--accent-tint-2:rgba(0,97,224,.18);--danger:#c50042;--success:#017a40;--shadow-1:0 1px 2px rgba(21,20,26,.10);--shadow-menu:0 0 0 1px rgba(21,20,26,.08),0 4px 16px rgba(21,20,26,.16);font-family:var(--font);font-size:13px;line-height:1.5;color:var(--text);background:var(--bg)}
+.th.dark{--bg:#1c1b22;--surface:#2b2a33;--surface-2:#3a3944;--surface-3:#52525e;--plate:#33323b;--border:#3f3e48;--border-strong:#5b5b66;--text:#fbfbfe;--text-2:#bfbfc9;--text-3:#8f8f9d;--accent:#00ddff;--on-accent:#15141a;--accent-tint:rgba(0,221,255,.12);--accent-tint-2:rgba(0,221,255,.22);--danger:#ff848b;--success:#54ffbd;--shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-menu:0 0 0 1px rgba(251,251,254,.10),0 4px 16px rgba(0,0,0,.5)}
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ib{width:28px;height:28px;display:inline-grid;place-items:center;border-radius:var(--r-md);color:var(--text-2);flex:none}
+.ib.on{background:var(--accent-tint);color:var(--accent)}
+.btn{height:28px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-md);background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap;flex:none}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent}
+.seg{display:inline-flex;gap:2px;padding:2px;background:var(--surface-2);border-radius:var(--r-md);flex:none}
+.seg>*{height:24px;min-width:24px;padding:0 4px;display:grid;place-items:center;border-radius:var(--r-sm);color:var(--text-2)}
+.seg>.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1)}
+.search{height:28px;display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--surface-2);border:1px solid transparent;border-radius:var(--r-md);color:var(--text-3);min-width:0}
+.search.focus{background:var(--surface);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);color:var(--text)}
+.menu{position:absolute;width:208px;padding:4px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-menu);display:flex;flex-direction:column;z-index:5}
+.mi{height:28px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:var(--r-sm);white-space:nowrap;color:var(--text);width:100%;flex:none}
+.mi .ico{color:var(--text-2)}
+.mi.hov{background:var(--surface-2)}
+.mi.dis,.mi.dis .ico{color:var(--text-3)}
+.mi.danger,.mi.danger .ico{color:var(--danger)}
+.mi .end{margin-left:auto;color:var(--text-2);font-size:11px}
+.msep{height:1px;background:var(--border);margin:4px 0;flex:none}
+.mh{padding:6px 8px 2px;font-size:11px;font-weight:600;color:var(--text-2)}
+.cb{width:16px;height:16px;border-radius:var(--r-sm);border:1.5px solid var(--border-strong);background:var(--surface);display:grid;place-items:center;flex:none;color:var(--on-accent)}
+.cb.on{background:var(--accent);border-color:var(--accent)}
+.cb .ico{width:12px;height:12px;stroke-width:2.2}
+.cb.mix::after{content:"";width:8px;height:2px;border-radius:1px;background:var(--on-accent)}
+.cb.mix{background:var(--accent);border-color:var(--accent)}
+.rd{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);flex:none}
+.rd.on{border:5px solid var(--accent)}
+.sw{width:28px;height:16px;border-radius:999px;background:var(--surface-3);position:relative;flex:none;margin-left:auto}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:var(--shadow-1)}
+.sw.on{background:var(--accent)}
+.sw.on::after{left:14px}
+.tb40{position:relative;width:40px;height:40px;border-radius:var(--r-md);background:var(--plate);overflow:hidden;display:grid;place-items:center;flex:none}
+.fav{width:24px;aspect-ratio:1;border-radius:20%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:10px}
+.let{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-weight:600;font-size:17px}
+.shot{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;padding:6px 5px;gap:3px}
+.shot i{display:block;height:3px;border-radius:2px;background:#d7d7de}
+.shot i.h{height:6px;width:62%;background:#2b2a33}
+.shot i.s{width:44%}
+.cov{height:100%;aspect-ratio:3/4}
+.vid{position:absolute;inset:0;display:grid;place-items:center}
+.vid span{width:18px;aspect-ratio:1;border-radius:50%;background:rgba(0,0,0,.45);display:grid;place-items:center;color:#fff}
+.vid .ico{width:40%;height:40%;fill:currentColor;stroke:none}
+.board{width:1488px;height:800px;padding:48px;display:flex;gap:48px;background:#e6e6eb;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif}
+.col{display:flex;flex-direction:column;gap:12px}
+.cap{font-size:13px;font-weight:600;color:#15141a;display:flex;gap:8px;align-items:baseline}
+.cap span{font-weight:400;color:#5b5b66;font-size:12px}
+.panel{width:240px;height:640px;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative}
+.native{height:40px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 12px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;color:var(--text);opacity:.45}
+.top{padding:8px 8px 4px;display:flex;flex-direction:column;gap:4px;flex:none}
+.nav{display:flex;align-items:center;gap:2px;height:28px}
+.crumbs{flex:1;min-width:0;display:flex;align-items:center;font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden}
+.crumbs a{color:var(--text-2);text-decoration:none;padding:2px 4px;border-radius:4px;flex:none}
+.crumbs .sl{color:var(--text-3);flex:none}
+.crumbs .cur{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;padding:2px 4px}
+.list{flex:1;min-height:0;overflow:hidden;padding:2px 4px 8px;display:flex;flex-direction:column;gap:1px}
+.row{display:flex;align-items:center;gap:10px;padding:6px;border-radius:6px;min-width:0;width:100%;color:var(--text)}
+.row.hov{background:var(--surface-2)}
+.row.sel{background:var(--accent-tint)}
+.row.ctx{background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border-strong)}
+.tt{flex:1;min-width:0;display:flex;flex-direction:column}
+.t1{font-size:13px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.t2{font-size:11px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-2)}
+mark{background:var(--accent-tint-2);color:inherit;border-radius:2px;padding:0 1px}
+.bar{height:40px;flex:none;display:flex;align-items:center;gap:2px;padding:0 6px;border-top:1px solid var(--border);position:relative;background:var(--bg)}
+.bar.sel{gap:6px;padding:0 6px 0 4px}
+.prog{position:absolute;left:0;top:-1px;height:2px;background:var(--accent);border-radius:0 2px 2px 0}
+.spacer{flex:1}
+.divider{width:1px;height:16px;background:var(--border);margin:0 4px;flex:none}
+.toast{position:absolute;left:8px;right:8px;bottom:48px;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 12px;border-radius:var(--r-lg);background:#2b2a33;color:#fbfbfe;font-size:12px;box-shadow:var(--shadow-menu)}
+.toast a{color:#80ebff;text-decoration:none;font-weight:600;white-space:nowrap}
+.selhead{display:flex;align-items:center;gap:10px;padding:4px 6px;font-size:12px;color:var(--text-2)}
+.foot{font-size:12px;color:#5b5b66;max-width:240px}
+.scrim{position:absolute;inset:0;background:transparent}
+</style>
+</helmet>
+<div class="board">
+
+<div class="col">
+<div class="cap">右鍵選單 <span>書籤列</span></div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋書籤</span></div>
+<div class="nav">
+<button class="ib" aria-label="上一層"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+<div class="crumbs"><a href="#">…</a><span class="sl">/</span><a href="#">書籤工具列</a><span class="sl">/</span><span class="cur">開發</span></div>
+<button class="ib" aria-label="新增資料夾"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/></svg></button>
+</div>
+</div>
+<div class="list">
+<sc-for list="{{rowsA}}" as="b" hint-placeholder-count="6">
+<button class="row {{b.st}}">
+<span class="tb40">
+<sc-if value="{{b.isIcon}}" hint-placeholder-val="{{false}}"><span class="fav" style="background: {{b.color}}; color: {{b.fg}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isLetter}}" hint-placeholder-val="{{false}}"><span class="let" style="background: {{b.color}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isShot}}" hint-placeholder-val="{{false}}"><span class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></span></sc-if>
+<sc-if value="{{b.isCover}}" hint-placeholder-val="{{false}}"><span class="cov" style="background: {{b.color}};"></span></sc-if>
+<sc-if value="{{b.isVideo}}" hint-placeholder-val="{{false}}"><span class="vid" style="background: {{b.color}};"><span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z"/></svg></span></span></sc-if>
+</span>
+<span class="tt"><span class="t1">{{b.title}}</span><span class="t2">{{b.domain}}</span></span>
+</button>
+</sc-for>
+</div>
+<div class="menu" style="left: 24px; top: 140px;" role="menu">
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/></svg>在新分頁開啟</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5a1 1 0 0 0-1-1H3.5a1 1 0 0 0-1 1V10a1 1 0 0 0 1 1H5"/></svg>複製網址</button>
+<div class="msep"></div>
+<button class="mi hov"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>重新抓預覽圖</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><path d="m2.5 12 4-4 3 3 2-2 2.5 2.5"/></svg>改用頁面預覽</button>
+<div class="msep"></div>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z"/></svg>重新命名</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M6 9.25h4M8.5 7.5l1.75 1.75L8.5 11"/></svg>移動到…</button>
+<button class="mi dis"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4"/></svg>往上移</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4"/></svg>往下移</button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".75" fill="currentColor"/></svg>設定 tag…</button>
+<div class="msep"></div>
+<button class="mi danger"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>刪除</button>
+</div>
+<div class="bar">
+<div class="seg"><button aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button class="on" aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+<span class="divider"></span>
+<button class="ib" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib" aria-label="全頁瀏覽"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="spacer"></span>
+<button class="ib" aria-label="更多"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+<div class="foot">被右鍵的那列加框保持標示，使用者知道選單作用在哪一筆。</div>
+</div>
+
+<div class="col">
+<div class="cap">⋯ 更多選項 <span>補抓進行中</span></div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋書籤</span></div>
+<div class="nav">
+<button class="ib" aria-label="上一層"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+<div class="crumbs"><a href="#">…</a><span class="sl">/</span><a href="#">書籤工具列</a><span class="sl">/</span><span class="cur">開發</span></div>
+<button class="ib" aria-label="新增資料夾"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/></svg></button>
+</div>
+</div>
+<div class="list">
+<sc-for list="{{rows}}" as="b" hint-placeholder-count="6">
+<button class="row">
+<span class="tb40">
+<sc-if value="{{b.isIcon}}" hint-placeholder-val="{{false}}"><span class="fav" style="background: {{b.color}}; color: {{b.fg}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isLetter}}" hint-placeholder-val="{{false}}"><span class="let" style="background: {{b.color}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isShot}}" hint-placeholder-val="{{false}}"><span class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></span></sc-if>
+<sc-if value="{{b.isCover}}" hint-placeholder-val="{{false}}"><span class="cov" style="background: {{b.color}};"></span></sc-if>
+<sc-if value="{{b.isVideo}}" hint-placeholder-val="{{false}}"><span class="vid" style="background: {{b.color}};"><span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z"/></svg></span></span></sc-if>
+</span>
+<span class="tt"><span class="t1">{{b.title}}</span><span class="t2">{{b.domain}}</span></span>
+</button>
+</sc-for>
+</div>
+<div class="menu" style="right: 6px; bottom: 44px;" role="menu">
+<div class="mh">預覽圖來源</div>
+<button class="mi" role="menuitemradio" aria-checked="true"><span class="rd on"></span>封面優先</button>
+<button class="mi" role="menuitemradio" aria-checked="false"><span class="rd"></span>截圖優先</button>
+<div class="msep"></div>
+<button class="mi hov" role="menuitemcheckbox" aria-checked="true">首頁用網站圖示<span class="sw on"></span></button>
+<div class="msep"></div>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>補抓預覽圖<span class="end">5 / 8</span></button>
+<button class="mi"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2"/><path d="M8 1.75v1.5M8 12.75v1.5M1.75 8h1.5M12.75 8h1.5M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/></svg>設定…</button>
+</div>
+<div class="bar">
+<span class="prog" style="width: 62%;"></span>
+<div class="seg"><button aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button class="on" aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+<span class="divider"></span>
+<button class="ib" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib" aria-label="全頁瀏覽"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="spacer"></span>
+<button class="ib on" aria-label="更多" aria-expanded="true"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+<div class="foot">單選用圓點、開關用 switch。補抓中工具列上緣有細進度條；數字在選單裡。新增「設定…」入口。</div>
+</div>
+
+<div class="col">
+<div class="cap">補抓完成 <span>3 秒後自動消失</span></div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋書籤</span></div>
+<div class="nav">
+<div class="crumbs"><span class="cur" style="padding-left: 6px;">全部書籤</span></div>
+<button class="ib" aria-label="新增資料夾"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/><path d="M8 7.5v3.5M6.25 9.25h3.5"/></svg></button>
+</div>
+</div>
+<div class="list">
+<button class="row"><span class="tb40" style="background: var(--surface-2); color: var(--text-2);"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/></svg></span><span class="tt"><span class="t1">書籤選單</span><span class="t2">1 個書籤</span></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--text-3);"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></button>
+<button class="row"><span class="tb40" style="background: var(--surface-2); color: var(--text-2);"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/></svg></span><span class="tt"><span class="t1">書籤工具列</span><span class="t2">16 個書籤</span></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--text-3);"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></button>
+<button class="row"><span class="tb40" style="background: var(--surface-2); color: var(--text-2);"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.55.45-1 1-1h3.5l1.5 1.5h5.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z"/></svg></span><span class="tt"><span class="t1">其他書籤</span><span class="t2">0 個書籤</span></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--text-3);"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></button>
+</div>
+<div class="toast" role="status"><span style="flex: 1; min-width: 0;">補抓完成：7 / 8 有預覽圖</span><a href="#">查看缺的</a></div>
+<div class="bar">
+<div class="seg"><button aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button class="on" aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+<span class="divider"></span>
+<button class="ib" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib" aria-label="全頁瀏覽"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="spacer"></span>
+<button class="ib" aria-label="更多"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+<div class="foot">最上層：只有資料夾。完成訊息改成浮在工具列上方的提示，不佔工具列的位置；「查看缺的」直接篩出沒預覽圖的書籤。</div>
+</div>
+
+<div class="col">
+<div class="cap">多選 <span>已選 2</span></div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div class="search"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span>搜尋書籤</span></div>
+<div class="nav">
+<button class="ib" aria-label="上一層"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+<div class="crumbs"><a href="#">…</a><span class="sl">/</span><a href="#">書籤工具列</a><span class="sl">/</span><span class="cur">開發</span></div>
+</div>
+</div>
+<div class="list">
+<label class="selhead"><span class="cb mix"></span>全選（7）</label>
+<sc-for list="{{rowsSel}}" as="b" hint-placeholder-count="6">
+<button class="row {{b.st}}" style="gap: 8px;">
+<span class="cb {{b.cb}}"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg></span>
+<span class="tb40">
+<sc-if value="{{b.isIcon}}" hint-placeholder-val="{{false}}"><span class="fav" style="background: {{b.color}}; color: {{b.fg}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isLetter}}" hint-placeholder-val="{{false}}"><span class="let" style="background: {{b.color}};">{{b.mark}}</span></sc-if>
+<sc-if value="{{b.isShot}}" hint-placeholder-val="{{false}}"><span class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></span></sc-if>
+<sc-if value="{{b.isCover}}" hint-placeholder-val="{{false}}"><span class="cov" style="background: {{b.color}};"></span></sc-if>
+<sc-if value="{{b.isVideo}}" hint-placeholder-val="{{false}}"><span class="vid" style="background: {{b.color}};"><span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z"/></svg></span></span></sc-if>
+</span>
+<span class="tt"><span class="t1">{{b.title}}</span><span class="t2">{{b.domain}}</span></span>
+</button>
+</sc-for>
+</div>
+<div class="bar sel">
+<button class="ib" aria-label="結束選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button>
+<span style="font-weight: 600; white-space: nowrap;">已選 2 個</span>
+<span class="spacer"></span>
+<button class="btn primary">移動到…</button>
+</div>
+</div>
+<div class="foot">勾選框移到縮圖左邊，不再蓋住 40px 的小圖。「全選」移到清單頂端成為三態勾選框，底部只剩一個主要動作，英文版也放得下。</div>
+</div>
+
+<div class="col">
+<div class="cap">搜尋 <span>結果附上所在資料夾</span></div>
+<div class="th panel">
+<div class="native"><span>書籤預覽</span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="spacer"></span><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></div>
+<div class="top">
+<div class="search focus"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span style="flex: 1;">hub</span><button class="ib" style="width: 20px; height: 20px;" aria-label="清除搜尋"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></div>
+<div class="nav" style="padding: 0 6px; font-size: 12px; color: var(--text-2);">在全部書籤中找到 2 筆</div>
+</div>
+<div class="list">
+<button class="row hov"><span class="tb40"><span class="fav" style="background: #24292f;">GH</span></span><span class="tt"><span class="t1">Git<mark>Hub</mark></span><span class="t2">github.com · 書籤工具列</span></span></button>
+<button class="row"><span class="tb40"><span class="shot"><i class="h"></i><i></i><i></i><i class="s"></i></span></span><span class="tt"><span class="t1">Docker <mark>Hub</mark> 官方映像</span><span class="t2">hub.docker.com · 開發</span></span></button>
+</div>
+<div class="bar">
+<div class="seg"><button aria-label="大卡"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="11" height="7" rx="1.5"/><path d="M2.5 11.5h11M2.5 14h7"/></svg></button><button class="on" aria-label="小列"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="4" height="4" rx="1"/><rect x="2" y="9" width="4" height="4" rx="1"/><path d="M8 4.5h6M8 10.5h6"/></svg></button><button aria-label="純文字"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button></div>
+<span class="divider"></span>
+<button class="ib" aria-label="選取"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8 2 2 4-4"/></svg></button>
+<button class="ib" aria-label="全頁瀏覽"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg></button>
+<span class="spacer"></span>
+<button class="ib" aria-label="更多"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1" fill="currentColor" stroke="none"/></svg></button>
+</div>
+</div>
+<div class="foot">符合的字加底色；第二行補上所在資料夾，不用點進去才知道書籤在哪。有內容時出現清除鈕。</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1488,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const k = (kind, o) => Object.assign({ isIcon: kind === 'icon', isLetter: kind === 'letter', isShot: kind === 'shot', isCover: kind === 'cover', isVideo: kind === 'video', fg: '#ffffff', st: '', cb: '' }, o);
+    const base = [
+      k('icon', { title: 'React 官方文件', domain: 'react.dev', mark: 'R', color: '#23272f', fg: '#61dafb' }),
+      k('shot', { title: 'Using the Fetch API', domain: 'developer.mozilla.org' }),
+      k('cover', { title: '《Rust 程式設計》第 2 版', domain: 'kobo.com', color: '#8c3b2f' }),
+      k('video', { title: 'Vite 6 發表會（完整版）', domain: 'youtube.com', color: '#2d2a6e' }),
+      k('letter', { title: 'WebExtensions', domain: 'developer.mozilla.org', mark: 'D', color: '#5b4fc4' }),
+      k('icon', { title: 'TypeScript', domain: 'typescriptlang.org', mark: 'TS', color: '#3178c6' }),
+      k('shot', { title: 'Can I use', domain: 'caniuse.com' })
+    ];
+    const rowsA = base.map((b, i) => Object.assign({}, b, { st: i === 1 ? 'ctx' : '' }));
+    const rowsSel = base.map((b, i) => Object.assign({}, b, { st: (i === 0 || i === 3) ? 'sel' : '', cb: (i === 0 || i === 3) ? 'on' : '' }));
+    return { rows: base, rowsA: rowsA, rowsSel: rowsSel };
+  }
+}
+</script>
+</body>
+</html>
