@@ -7,7 +7,7 @@
 |---|---|
 | [listing.md](listing.md) | 名稱、摘要、完整描述、分類、標籤、版本說明（zh-TW 與 en-US 各一份） |
 | [privacy-policy.zh-TW.md](privacy-policy.zh-TW.md)、[privacy-policy.en.md](privacy-policy.en.md) | Privacy Policy（AMO 可分語系填） |
-| [permissions.md](permissions.md) | Permissions justification |
+| [permissions.md](permissions.md) | Permissions justification。**上傳新版本的表單沒有這個欄位**（1.3.0 送審時確認）；權限或對外請求有變時，把要點寫進審查備註的「New in」那一節 |
 | [reviewer-notes.md](reviewer-notes.md) | Notes to Reviewer（含原始碼與建置步驟）。**該欄位上限 3000 字元**，`scripts/amo-paste.py` 會檢查並在超過時失敗 |
 | [screenshots/](screenshots/) | Screenshots（1280×800） |
 | [icon-512.png](icon-512.png) | 附加元件圖示。**不填也可以** —— manifest 已宣告 48/96/128，AMO 會自己採用；上傳這張只是為了高解析度螢幕更清楚 |
