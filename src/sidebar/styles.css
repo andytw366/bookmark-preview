@@ -294,6 +294,11 @@ body {
   width: min(var(--icon-limit, 48px), 55cqmin);
   height: min(var(--icon-limit, 48px), 55cqmin);
   object-fit: contain;
+  /*
+   * 像 App 圖示那樣的圓角。自帶底色的方形圖示（touch icon 多半是）四個直角在圓角卡片裡很突兀；
+   * 透明底的圖示四角本來就是空的，裁掉也看不出來。
+   */
+  border-radius: 20%;
 }
 
 .thumb--placeholder {
