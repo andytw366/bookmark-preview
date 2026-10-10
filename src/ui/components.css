@@ -666,17 +666,25 @@ textarea.input {
   display: block;
 }
 
-/* 封面圖：不裁切，兩側露出底板 */
-.thumb--contain img {
+/*
+ * 封面與截圖的 <img> 鋪滿整塊底板（絕對定位）。不能只寫 height: 100%：底板是 grid，
+ * 它的列高是 auto，百分比高度解不出來，圖會維持原本的高度 —— 直式封面就被裁成只剩上半截。
+ */
+.thumb--contain img,
+.thumb--fill img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+}
+
+/* 封面圖：不裁切，兩側露出底板 */
+.thumb--contain img {
   object-fit: contain;
 }
 
 /* 網頁截圖：裁成底板的比例，從頂端對齊保留頁首 */
 .thumb--fill img {
-  width: 100%;
-  height: 100%;
   object-fit: cover;
   object-position: top center;
 }
