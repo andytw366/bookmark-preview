@@ -121,10 +121,10 @@ const GRID_GAP = 16;
 /**
  * 一張卡片大概多高（還沒量到的列用這個估）。
  *
- * 縮圖區是 `--card-min * 0.72`，其餘是標題、網域、內距與列間距。只影響捲軸
+ * 底板是卡片寬度的 4:3（約 `--card-min * 0.75`），其餘是標題、網域、內距與列間距。只影響捲軸
  * 長度與第一次要畫幾列，量到之後就以實際值為準。
  */
-const cardEstimate = (size: ColumnSize): number => size * 0.5625 + 72;
+const cardEstimate = (size: ColumnSize): number => size * 0.75 + 72;
 
 /** 隱私空間的資料夾與書籤在畫面上是同一份清單（順序由版面決定，見 `vaultChildren`） */
 type VaultGridRow = VaultChild<PrivateFolder, PrivateBookmark>;

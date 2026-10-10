@@ -371,9 +371,13 @@
   outline-offset: 2px;
 }
 
+/*
+ * 全頁瀏覽的底板是 4:3（側邊欄的大卡是 16:9）：卡片寬度固定，16:9 讓預覽矮了約 20%，
+ * 直式封面縮得太小。四種預覽圖仍然同高。
+ */
 .gcard .thumb {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   border-radius: var(--r-lg);
 }
 
