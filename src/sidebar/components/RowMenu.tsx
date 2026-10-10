@@ -62,7 +62,10 @@ export function RowMenu({
         onChanged();
         onClose();
       },
-      () => {
+      (cause: unknown) => {
+        // 失敗要說出來：原本這裡只關掉選單，看起來就像按了沒反應
+        onNotice(cause instanceof Error ? cause.message : String(cause));
+        onChanged();
         onClose();
       },
     );

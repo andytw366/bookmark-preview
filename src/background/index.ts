@@ -137,6 +137,12 @@ serve({
     await browser.bookmarks.update(id, { title });
   },
   'bookmarks/delete': async ({ id }) => {
+    // `remove` 只刪得掉空資料夾（有內容時直接丟錯）；資料夾一律整棵刪 —— 確認提示已經說了會連同裡面一起刪
+    const [node] = await browser.bookmarks.get(id);
+    if (node !== undefined && node.url === undefined) {
+      await browser.bookmarks.removeTree(id);
+      return;
+    }
     await browser.bookmarks.remove(id);
   },
   'bookmarks/move': async ({ id, parentId }) => {
