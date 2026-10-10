@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Popover } from './Popover';
+import { Button } from '../../ui/Button';
+import { Menu, MenuHeader, MenuItem } from '../../ui/Menu';
 import { t } from '@/shared/i18n';
 
 interface MergeMenuProps {
@@ -27,9 +28,9 @@ export function MergeMenu({ x, y, onClose, onCreateFolder, onCreateGroup }: Merg
 
   if (naming) {
     return (
-      <Popover x={x} y={y} onClose={onClose}>
+      <Menu x={x} y={y} onClose={onClose}>
         <form
-          className="rowmenu__form"
+          className="menu__form"
           onSubmit={(event) => {
             event.preventDefault();
             const trimmed = name.trim();
@@ -38,7 +39,7 @@ export function MergeMenu({ x, y, onClose, onCreateFolder, onCreateGroup }: Merg
           }}
         >
           <input
-            className="rowmenu__input"
+            className="input"
             value={name}
             data-autofocus=""
             aria-label={t('folder_name_label')}
@@ -49,42 +50,36 @@ export function MergeMenu({ x, y, onClose, onCreateFolder, onCreateGroup }: Merg
               event.target.select();
             }}
           />
-          <button type="submit" className="chip chip--primary">
+          <Button type="submit" variant="primary">
             {t('action_save')}
-          </button>
+          </Button>
         </form>
-      </Popover>
+      </Menu>
     );
   }
 
   return (
-    <Popover x={x} y={y} role="menu" onClose={onClose}>
-      <p className="rowmenu__heading">{t('merge_heading')}</p>
+    <Menu x={x} y={y} role="menu" onClose={onClose}>
+      <MenuHeader>{t('merge_heading')}</MenuHeader>
       {onCreateGroup !== undefined ? (
-        <button
-          type="button"
-          role="menuitem"
-          className="rowmenu__item"
-          data-autofocus=""
+        <MenuItem
+          icon="frame"
+          label={t('merge_create_group')}
+          autoFocus
           onClick={() => {
             onCreateGroup();
             onClose();
           }}
-        >
-          {t('merge_create_group')}
-        </button>
+        />
       ) : null}
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
-        {...(onCreateGroup === undefined ? { 'data-autofocus': '' } : {})}
+      <MenuItem
+        icon="folder-plus"
+        label={t('merge_create_folder')}
+        autoFocus={onCreateGroup === undefined}
         onClick={() => {
           setNaming(true);
         }}
-      >
-        {t('merge_create_folder')}
-      </button>
-    </Popover>
+      />
+    </Menu>
   );
 }

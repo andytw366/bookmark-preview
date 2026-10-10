@@ -2,6 +2,7 @@ import { broadcast, serve } from '@/shared/messages';
 import { getSettings, patchSettings } from '@/storage/settings';
 import { clearSiteImageStats } from '@/storage/site-image-stats';
 import { getThumb, pruneOlderThan, usage } from '@/storage/thumbs-db';
+import { VAULT_THUMB_PREFIX } from '@/shared/url';
 import { backfillThumbnails, backfillVaultThumbnails } from './backfill';
 import {
   applyBookmarkGrid,
@@ -40,6 +41,7 @@ import {
   importBackup,
   importManyNativeBookmarks,
   importNativeBookmark,
+  isUnlocked,
   listBookmarks,
   listFolders,
   lockVault,
@@ -104,6 +106,18 @@ async function announceVault() {
 async function acted<T>(work: Promise<T>): Promise<T> {
   noteVaultActivity();
   return work;
+}
+
+
+/**
+ * 設定頁看得到的預覽圖（「儲存空間」的張數與容量、「清除所有預覽圖」動到的那些）。
+ *
+ * 隱藏模式又上鎖時不算隱私書籤的預覽圖：別人可以拿這些數字和看得到的書籤數比對，
+ * 推算出這台電腦有隱私書籤。清除時也不動它們 —— 那時介面上本來就不存在它們。
+ */
+async function visibleThumbs(): Promise<(key: string) => boolean> {
+  const concealed = (await getSettings()).vaultEntry === 'hidden' && !isUnlocked();
+  return (key) => !concealed || !key.startsWith(VAULT_THUMB_PREFIX);
 }
 
 serve({
@@ -192,9 +206,9 @@ serve({
       source: record.source,
     };
   },
-  'thumbs/usage': async () => usage(),
+  'thumbs/usage': async () => usage(await visibleThumbs()),
   'thumbs/clear': async () => {
-    const removed = await pruneOlderThan(Date.now());
+    const removed = await pruneOlderThan(Date.now(), await visibleThumbs());
     // 開著的頁面各自有一份記憶體快取，清空 IndexedDB 不會動到它們
     broadcast('thumbs/cleared', undefined);
     return { removed };

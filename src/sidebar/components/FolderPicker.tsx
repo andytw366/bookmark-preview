@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { request, type FolderChoice } from '@/shared/messages';
-import { Popover } from './Popover';
+import { Menu, MenuHeader, MenuItem, MenuNote } from '../../ui/Menu';
 import { t } from '@/shared/i18n';
 
 interface FolderPickerProps {
@@ -36,28 +36,26 @@ export function FolderPicker({
   }, []);
 
   return (
-    <Popover x={x} y={y} className="rowmenu rowmenu--list" onClose={onClose}>
-      <p className="rowmenu__heading">{heading}</p>
+    <Menu x={x} y={y} variant="list" onClose={onClose}>
+      <MenuHeader>{heading}</MenuHeader>
       {folders === null ? (
-        <p className="rowmenu__note">{t('folders_loading')}</p>
+        <MenuNote>{t('folders_loading')}</MenuNote>
       ) : folders.length === 0 ? (
-        <p className="rowmenu__note">{t('folders_none')}</p>
+        <MenuNote>{t('folders_none')}</MenuNote>
       ) : (
         folders.map((folder) => (
-          <button
+          <MenuItem
             key={folder.id}
-            type="button"
-            className="rowmenu__item"
+            icon="folder"
+            label={`${'\u2003'.repeat(folder.depth)}${folder.title}`}
+            title={folder.title}
             disabled={folder.id === disabledId}
             onClick={() => {
               onPick(folder.id);
             }}
-          >
-            {' '.repeat(folder.depth * 2)}
-            {folder.title}
-          </button>
+          />
         ))
       )}
-    </Popover>
+    </Menu>
   );
 }

@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   captureEnabled: true,
   previewSource: 'cover-first',
   entryIcons: true,
+  folderPreviews: true,
   captureBlocklist: [],
   thumbMaxAgeDays: 14,
   density: 'card',

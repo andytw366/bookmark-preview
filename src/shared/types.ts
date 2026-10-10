@@ -188,6 +188,11 @@ export interface Settings {
    * 關掉時不主動把既有的圖示換回來，要等過期或手動「重新抓預覽圖」。
    */
   entryIcons: boolean;
+  /**
+   * 全頁瀏覽的資料夾卡片：`true` 用裡面前 4 個書籤拼成 2×2 預覽，`false` 只畫資料夾圖示。
+   * 預設開。
+   */
+  folderPreviews: boolean;
   /** 不擷取的網域樣式（子字串比對主機名稱） */
   captureBlocklist: string[];
   /** 縮圖多久後視為過期而重新擷取 */

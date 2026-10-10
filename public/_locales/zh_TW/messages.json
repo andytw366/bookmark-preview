@@ -404,9 +404,6 @@
   "action_move_in": {
     "message": "移入"
   },
-  "action_select_all": {
-    "message": "全選"
-  },
   "action_new_folder": {
     "message": "新增資料夾"
   },
@@ -630,9 +627,6 @@
   "tab_vault": {
     "message": "隱私空間"
   },
-  "tab_vault_unlocked": {
-    "message": "隱私空間（已解鎖）"
-  },
   "toolbar_selected_one": {
     "message": "已選 $COUNT$ 個",
     "placeholders": {
@@ -721,25 +715,11 @@
   "backfill_needs_permission_hint": {
     "message": "需要先授予網站存取權限"
   },
-  "backfill_progress": {
-    "message": "補抓中 $DONE$ / $TOTAL$（成功 $OK$）",
-    "placeholders": {
-      "done": {
-        "content": "$1"
-      },
-      "total": {
-        "content": "$2"
-      },
-      "ok": {
-        "content": "$3"
-      }
-    }
-  },
   "backfill_all_done": {
     "message": "每個書籤都已經有預覽圖了。"
   },
   "backfill_finished": {
-    "message": "補抓完成：$OK$ / $TOTAL$ 個書籤取得預覽圖。",
+    "message": "補抓完成：$OK$ / $TOTAL$ 有預覽圖",
     "placeholders": {
       "ok": {
         "content": "$1"
@@ -830,14 +810,6 @@
     "message": "「$NAME$」群組的選項",
     "placeholders": {
       "name": {
-        "content": "$1"
-      }
-    }
-  },
-  "group_color_n": {
-    "message": "顏色 $N$",
-    "placeholders": {
-      "n": {
         "content": "$1"
       }
     }
@@ -1082,29 +1054,20 @@
   "vault_created_title": {
     "message": "隱私空間已建立"
   },
-  "vault_locked_title": {
-    "message": "隱私空間已上鎖"
-  },
   "vault_create_title": {
     "message": "建立隱私空間"
-  },
-  "vault_unlock_action": {
-    "message": "解鎖"
   },
   "vault_lock_now": {
     "message": "立即上鎖"
   },
   "vault_unlock_recovery_title": {
-    "message": "用救援金鑰解鎖"
+    "message": "輸入救援金鑰"
   },
   "vault_unlock_recovery_hint": {
     "message": "就是建立時要你抄下來的那 8 組字元。大小寫與分隔符號都不重要。"
   },
   "vault_use_password_instead": {
     "message": "改用主密碼"
-  },
-  "vault_forgot_password": {
-    "message": "忘記主密碼？用救援金鑰"
   },
   "vault_password_placeholder": {
     "message": "主密碼（至少 $MIN$ 字）",
@@ -1401,26 +1364,17 @@
   "options_lede_sync": {
     "message": "所有資料都在這台裝置上。隱私空間另有一份加密副本在 Firefox 同步裡，只有主密碼解得開。"
   },
-  "options_entry_title": {
-    "message": "隱私空間的入口"
-  },
   "options_entry_hint": {
-    "message": "隱藏時，要在搜尋框打下面那段觸發字串才會跳出密碼畫面。"
+    "message": "隱藏時，介面上看不到隱私空間，要在搜尋框打觸發字串才會出現密碼框。"
   },
   "options_entry_hidden": {
-    "message": "隱藏（用觸發字串進入）"
+    "message": "隱藏"
   },
   "options_entry_tab": {
     "message": "顯示分頁"
   },
-  "options_export_target_title": {
-    "message": "移出隱私空間的落點"
-  },
   "options_export_target_hint": {
     "message": "「移出隱私空間」會放進這個資料夾；「移出到…」則每次讓你選。"
-  },
-  "options_default_folder": {
-    "message": "預設資料夾"
   },
   "options_firefox_default_folder": {
     "message": "（Firefox 預設：其他書籤）"
@@ -1432,7 +1386,7 @@
     "message": "觸發字串"
   },
   "options_trigger_hint": {
-    "message": "在搜尋框打這段字就會跳出密碼畫面。任何文字都可以。"
+    "message": "在側邊欄搜尋框輸入這段文字，即可建立或打開隱私空間。任何文字都可以。"
   },
   "options_trigger_advice": {
     "message": "*建議改掉。*預設值是公開的，別人打一次就能看出這台裝置有沒有隱私空間。"
@@ -1443,25 +1397,11 @@
   "options_remote_awaiting_restore": {
     "message": "雲端已經有一份加密副本。到下面的「跨裝置同步」按「從雲端還原到這台裝置」，再用*同一組主密碼*解鎖。*不要在這裡另外建立* —— 金鑰會不同，兩份從此合不起來。"
   },
-  "options_status_label": {
-    "message": "狀態："
-  },
-  "options_status_unlocked": {
-    "message": "已解鎖，$BOOKMARKS$",
-    "placeholders": {
-      "bookmarks": {
-        "content": "$1"
-      }
-    }
-  },
   "options_status_locked": {
     "message": "已上鎖"
   },
   "options_vault_manage_hint": {
     "message": "隱私書籤的管理（移出、刪除）在側邊欄解鎖後進行。"
-  },
-  "options_keys_title": {
-    "message": "主密碼與救援金鑰"
   },
   "options_keys_hint": {
     "message": "主密碼與救援金鑰都能解開同一份資料。忘記主密碼時，救援金鑰是唯一的出路。"
@@ -1495,17 +1435,11 @@
   "options_password_changed": {
     "message": "主密碼已更改。下次解鎖請用新的密碼。"
   },
-  "options_need_current_password": {
-    "message": "請先在上面輸入目前的主密碼"
-  },
   "options_regenerate_title": {
     "message": "重新產生救援金鑰"
   },
   "options_regenerate_hint": {
     "message": "舊的那一串會*立刻失效*，記得把抄在紙上的丟掉。"
-  },
-  "options_regenerate_action": {
-    "message": "重新產生（需要目前的主密碼）"
   },
   "options_regenerated": {
     "message": "已產生新的救援金鑰（顯示在上面），舊的那一串已失效。"
@@ -1583,9 +1517,6 @@
   },
   "options_restore_needs_unlock": {
     "message": "這台裝置已經有隱私空間但目前上鎖。還原到現有的隱私空間需要先解鎖 —— 合併時得用這台裝置的金鑰把結果寫回去。"
-  },
-  "options_sync_title": {
-    "message": "跨裝置同步"
   },
   "options_sync_hint": {
     "message": "把一份*已加密*的副本放進 Firefox 同步。其他裝置勾選同一個選項、輸入同一組主密碼就能取得；主密碼不會被同步。"
@@ -1754,18 +1685,6 @@
   "options_autolock_hint2": {
     "message": "關閉側邊欄也會上鎖。全頁瀏覽與這個設定頁也算「開著」—— 它們開著時關掉側邊欄不會立刻上鎖，改由上面的計時收尾。"
   },
-  "options_capture_title": {
-    "message": "預覽圖擷取"
-  },
-  "options_capture_enabled": {
-    "message": "瀏覽已加入書籤的頁面時自動產生預覽圖"
-  },
-  "options_recapture_before": {
-    "message": "預覽圖超過"
-  },
-  "options_recapture_after": {
-    "message": "天後重新擷取"
-  },
   "options_blocklist_title": {
     "message": "不擷取的網域"
   },
@@ -1824,9 +1743,6 @@
   "gallery_scope": {
     "message": "瀏覽範圍"
   },
-  "action_deselect": {
-    "message": "取消選取"
-  },
   "gallery_select_hint": {
     "message": "勾選多個項目，一次搬到其他資料夾"
   },
@@ -1862,14 +1778,8 @@
       }
     }
   },
-  "grid_auto": {
-    "message": "恢復自動排列"
-  },
   "grid_auto_hint": {
     "message": "不再固定欄數，改回跟著視窗寬度換行（群組會跟著換行，不會被拆散）"
-  },
-  "options_grid_sync_title": {
-    "message": "書籤的排列與群組"
   },
   "options_grid_sync_hint": {
     "message": "全頁瀏覽裡的群組（tag）與定下來的欄數跟著 Firefox 同步到其他裝置（排列順序本來就隨書籤同步）。固定佔用同步空間的 20 KB，其餘留給隱私空間。"
@@ -1925,7 +1835,7 @@
     }
   },
   "grid_columns_auto": {
-    "message": "自動（$N$ 欄）",
+    "message": "$N$ 欄 · 自動",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -1952,5 +1862,282 @@
   },
   "group_tag_search_hint": {
     "message": "點一下開啟這個群組所在的資料夾"
+  },
+  "group_count_one": {
+    "message": "$COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_count_other": {
+    "message": "$COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_color_0": {
+    "message": "藍"
+  },
+  "group_color_1": {
+    "message": "綠"
+  },
+  "group_color_2": {
+    "message": "橘"
+  },
+  "group_color_3": {
+    "message": "粉紅"
+  },
+  "group_color_4": {
+    "message": "紫"
+  },
+  "group_color_5": {
+    "message": "青"
+  },
+  "search_clear": {
+    "message": "清除搜尋"
+  },
+  "crumbs_all_bookmarks": {
+    "message": "全部書籤"
+  },
+  "menu_settings": {
+    "message": "設定…"
+  },
+  "selection_exit": {
+    "message": "結束選取"
+  },
+  "selection_more": {
+    "message": "其他動作"
+  },
+  "vault_prompt_title": {
+    "message": "輸入密碼"
+  },
+  "action_continue": {
+    "message": "繼續"
+  },
+  "vault_use_recovery_instead": {
+    "message": "改用救援金鑰"
+  },
+  "vault_prompt_esc": {
+    "message": "Esc 取消"
+  },
+  "select_all_n": {
+    "message": "全選（$COUNT$）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "search_found_all_one": {
+    "message": "在全部書籤中找到 $COUNT$ 筆",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "search_found_all_other": {
+    "message": "在全部書籤中找到 $COUNT$ 筆",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "tab_vault_short": {
+    "message": "隱私"
+  },
+  "missing_previews_one": {
+    "message": "$COUNT$ 個書籤沒有預覽圖",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "missing_previews_other": {
+    "message": "$COUNT$ 個書籤沒有預覽圖",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "missing_previews_clear": {
+    "message": "顯示全部"
+  },
+  "backfill_show_missing": {
+    "message": "查看缺的"
+  },
+  "card_more_named": {
+    "message": "「$NAME$」的選項",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "gallery_search_heading": {
+    "message": "搜尋結果"
+  },
+  "gallery_missing_heading": {
+    "message": "沒有預覽圖的書籤"
+  },
+  "gallery_autolock_one": {
+    "message": "$COUNT$ 分鐘未操作自動上鎖",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "gallery_autolock_other": {
+    "message": "$COUNT$ 分鐘未操作自動上鎖",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "grid_auto_short": {
+    "message": "自動"
+  },
+  "vault_lock_short": {
+    "message": "上鎖"
+  },
+  "selection_toolbar": {
+    "message": "已選取的書籤"
+  },
+  "selection_in_folder": {
+    "message": "在「$NAME$」",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_title": {
+    "message": "設定"
+  },
+  "options_nav_label": {
+    "message": "設定分類"
+  },
+  "options_nav_previews": {
+    "message": "預覽圖"
+  },
+  "options_nav_sync": {
+    "message": "同步"
+  },
+  "options_keys_section": {
+    "message": "密碼與備份"
+  },
+  "options_danger_title": {
+    "message": "危險操作"
+  },
+  "options_danger_hint": {
+    "message": "這些動作做了就不能復原，每一項都會再確認一次。"
+  },
+  "options_capture_label": {
+    "message": "瀏覽時自動產生預覽圖"
+  },
+  "options_capture_desc": {
+    "message": "打開已加入書籤的頁面時，順便擷取一張。"
+  },
+  "options_recapture_label": {
+    "message": "重新擷取間隔"
+  },
+  "options_recapture_desc": {
+    "message": "預覽圖超過這個天數，下次瀏覽時重抓。"
+  },
+  "options_days": {
+    "message": "天"
+  },
+  "options_badge_unlocked": {
+    "message": "已解鎖 · $BOOKMARKS$",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_entry_label": {
+    "message": "入口"
+  },
+  "options_entry_hidden_hint": {
+    "message": "介面上看不到，在搜尋框打觸發字串才會出現"
+  },
+  "options_export_target_label": {
+    "message": "移出時的預設資料夾"
+  },
+  "options_error_label": {
+    "message": "發生問題"
+  },
+  "options_recovery_label": {
+    "message": "救援金鑰"
+  },
+  "options_recovery_desc": {
+    "message": "建議抄在紙上，放在電腦以外的地方。"
+  },
+  "options_password_label": {
+    "message": "主密碼"
+  },
+  "options_restore_with": {
+    "message": "用什麼解開"
+  },
+  "options_regenerate_needs_password": {
+    "message": "需要目前的主密碼。"
+  },
+  "options_regenerate_button": {
+    "message": "重新產生…"
+  },
+  "options_regenerate_confirm": {
+    "message": "重新產生"
+  },
+  "options_clear_previews_desc": {
+    "message": "。之後瀏覽時會重新擷取。"
+  },
+  "options_clear_previews_button": {
+    "message": "清除預覽圖…"
+  },
+  "options_clear_previews_confirm": {
+    "message": "確定要清除？目前有 $USAGE$。",
+    "placeholders": {
+      "usage": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_clear_previews_confirm_action": {
+    "message": "清除"
+  },
+  "options_destroy_label": {
+    "message": "刪除整個隱私空間"
+  },
+  "options_destroy_desc": {
+    "message": "$BOOKMARKS$和群組會一起刪除，建議先匯出加密備份。",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_destroy_button": {
+    "message": "刪除隱私空間…"
+  },
+  "options_forget_button": {
+    "message": "放棄…"
+  },
+  "options_forget_button_confirm": {
+    "message": "確定放棄"
+  },
+  "preview_folder_contents": {
+    "message": "資料夾顯示內容預覽"
+  },
+  "preview_folder_contents_hint": {
+    "message": "全頁瀏覽的資料夾卡片用裡面前 4 個書籤拼成預覽；關掉就只顯示資料夾圖示"
   }
 }

@@ -404,9 +404,6 @@
   "action_move_in": {
     "message": "Move in"
   },
-  "action_select_all": {
-    "message": "Select all"
-  },
   "action_new_folder": {
     "message": "New folder"
   },
@@ -630,9 +627,6 @@
   "tab_vault": {
     "message": "Vault"
   },
-  "tab_vault_unlocked": {
-    "message": "Vault (unlocked)"
-  },
   "toolbar_selected_one": {
     "message": "$COUNT$ selected",
     "placeholders": {
@@ -692,7 +686,7 @@
     "message": "Prefer a screenshot of the page and fall back to a cover image"
   },
   "preview_entry_icons": {
-    "message": "Site icons for home pages"
+    "message": "Icons for home pages"
   },
   "preview_entry_icons_hint": {
     "message": "When a bookmark points to a site rather than a page in it (a path at most one level deep and no query, like google.com/maps or twitch.tv), use the site's icon as its preview. Turning this off keeps existing icons until they expire or you refresh the preview."
@@ -721,25 +715,11 @@
   "backfill_needs_permission_hint": {
     "message": "Needs permission to access websites first"
   },
-  "backfill_progress": {
-    "message": "Fetching $DONE$ / $TOTAL$ ($OK$ so far)",
-    "placeholders": {
-      "done": {
-        "content": "$1"
-      },
-      "total": {
-        "content": "$2"
-      },
-      "ok": {
-        "content": "$3"
-      }
-    }
-  },
   "backfill_all_done": {
     "message": "Every bookmark already has a preview."
   },
   "backfill_finished": {
-    "message": "Done: $OK$ of $TOTAL$ bookmarks got a preview.",
+    "message": "Done: $OK$ of $TOTAL$ got a preview",
     "placeholders": {
       "ok": {
         "content": "$1"
@@ -834,14 +814,6 @@
       }
     }
   },
-  "group_color_n": {
-    "message": "Colour $N$",
-    "placeholders": {
-      "n": {
-        "content": "$1"
-      }
-    }
-  },
   "merge_heading": {
     "message": "Combine"
   },
@@ -889,7 +861,7 @@
     }
   },
   "row_import_folder": {
-    "message": "Move the whole folder into the vault"
+    "message": "Move folder into the vault"
   },
   "row_import_folder_named": {
     "message": "Move the folder “$NAME$” into the vault",
@@ -1082,29 +1054,20 @@
   "vault_created_title": {
     "message": "The vault is ready"
   },
-  "vault_locked_title": {
-    "message": "The vault is locked"
-  },
   "vault_create_title": {
     "message": "Create a vault"
-  },
-  "vault_unlock_action": {
-    "message": "Unlock"
   },
   "vault_lock_now": {
     "message": "Lock now"
   },
   "vault_unlock_recovery_title": {
-    "message": "Unlock with the recovery key"
+    "message": "Enter the recovery key"
   },
   "vault_unlock_recovery_hint": {
     "message": "The eight groups of characters you were told to write down. Case and separators do not matter."
   },
   "vault_use_password_instead": {
     "message": "Use the master password instead"
-  },
-  "vault_forgot_password": {
-    "message": "Forgotten the master password? Use the recovery key"
   },
   "vault_password_placeholder": {
     "message": "Master password (at least $MIN$ characters)",
@@ -1401,26 +1364,17 @@
   "options_lede_sync": {
     "message": "Everything stays on this device. The vault also has an encrypted copy in Firefox Sync that only your master password can open."
   },
-  "options_entry_title": {
-    "message": "How to reach the vault"
-  },
   "options_entry_hint": {
-    "message": "When it is hidden, typing the trigger string below into the search box is what brings up the password screen."
+    "message": "When hidden, nothing in the interface shows the vault; typing the trigger in the search box brings up the password box."
   },
   "options_entry_hidden": {
-    "message": "Hidden — reached with the trigger string"
+    "message": "Hidden"
   },
   "options_entry_tab": {
     "message": "Show a tab"
   },
-  "options_export_target_title": {
-    "message": "Where bookmarks land when moved out"
-  },
   "options_export_target_hint": {
     "message": "“Move out of the vault” puts them in this folder. “Move out to…” asks each time."
-  },
-  "options_default_folder": {
-    "message": "Default folder"
   },
   "options_firefox_default_folder": {
     "message": "(Firefox default: Other Bookmarks)"
@@ -1432,7 +1386,7 @@
     "message": "Trigger string"
   },
   "options_trigger_hint": {
-    "message": "Typing this into the search box brings up the password screen. Any text will do."
+    "message": "Type this into the sidebar's search box to create or open the vault. Any text works."
   },
   "options_trigger_advice": {
     "message": "*Change this.* The default is public, so anyone who types it once can tell whether this device has a vault."
@@ -1443,25 +1397,11 @@
   "options_remote_awaiting_restore": {
     "message": "There is already an encrypted copy in the cloud. Under “Sync across devices” below, press “Restore from the cloud to this device” and unlock with *the same master password*. *Do not create a second one here* — the keys would differ and the two could never be merged."
   },
-  "options_status_label": {
-    "message": "State: "
-  },
-  "options_status_unlocked": {
-    "message": "unlocked, $BOOKMARKS$",
-    "placeholders": {
-      "bookmarks": {
-        "content": "$1"
-      }
-    }
-  },
   "options_status_locked": {
     "message": "locked"
   },
   "options_vault_manage_hint": {
     "message": "Vault bookmarks are managed — moved out, deleted — from the sidebar once it is unlocked."
-  },
-  "options_keys_title": {
-    "message": "Master password and recovery key"
   },
   "options_keys_hint": {
     "message": "Either one opens the same data. If you forget the master password, the recovery key is the only way back."
@@ -1495,17 +1435,11 @@
   "options_password_changed": {
     "message": "The master password has been changed. Use the new one next time you unlock."
   },
-  "options_need_current_password": {
-    "message": "Enter the current master password above first"
-  },
   "options_regenerate_title": {
     "message": "Generate a new recovery key"
   },
   "options_regenerate_hint": {
     "message": "The old one *stops working immediately* — throw away the copy you wrote down."
-  },
-  "options_regenerate_action": {
-    "message": "Generate a new one (needs the current master password)"
   },
   "options_regenerated": {
     "message": "A new recovery key has been generated and is shown above. The old one no longer works."
@@ -1583,9 +1517,6 @@
   },
   "options_restore_needs_unlock": {
     "message": "This device already has a vault and it is locked. Restoring into an existing vault needs it unlocked, because the merged result has to be written back with this device's key."
-  },
-  "options_sync_title": {
-    "message": "Sync across devices"
   },
   "options_sync_hint": {
     "message": "Put an *encrypted* copy into Firefox Sync. Other devices get it by ticking the same box and entering the same master password. The password itself is never synced."
@@ -1754,18 +1685,6 @@
   "options_autolock_hint2": {
     "message": "Closing the sidebar locks it too. The full-page view and this settings page also count as “open” — with either of them open, closing the sidebar does not lock immediately, and the timer above takes over."
   },
-  "options_capture_title": {
-    "message": "Capturing previews"
-  },
-  "options_capture_enabled": {
-    "message": "Make a preview automatically when you visit a page you have bookmarked"
-  },
-  "options_recapture_before": {
-    "message": "Capture again when a preview is older than"
-  },
-  "options_recapture_after": {
-    "message": "days"
-  },
   "options_blocklist_title": {
     "message": "Domains never captured"
   },
@@ -1824,9 +1743,6 @@
   "gallery_scope": {
     "message": "What to show"
   },
-  "action_deselect": {
-    "message": "Cancel"
-  },
   "gallery_select_hint": {
     "message": "Tick several items and move them all into a folder at once"
   },
@@ -1862,14 +1778,8 @@
       }
     }
   },
-  "grid_auto": {
-    "message": "Automatic layout"
-  },
   "grid_auto_hint": {
     "message": "Stop pinning the column count; wrap with the window width again (groups wrap along, they don't break up)"
-  },
-  "options_grid_sync_title": {
-    "message": "Bookmark layout and groups"
   },
   "options_grid_sync_hint": {
     "message": "Groups (tags) and pinned column counts from the full-page view sync to your other devices through Firefox (the order already syncs with the bookmarks). They always use 20 KB of the sync space; the rest is left for the private space."
@@ -1925,7 +1835,7 @@
     }
   },
   "grid_columns_auto": {
-    "message": "Auto ($N$ columns)",
+    "message": "$N$ columns · auto",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -1952,5 +1862,282 @@
   },
   "group_tag_search_hint": {
     "message": "Click to open the folder this group is in"
+  },
+  "group_count_one": {
+    "message": "$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_count_other": {
+    "message": "$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "group_color_0": {
+    "message": "Blue"
+  },
+  "group_color_1": {
+    "message": "Green"
+  },
+  "group_color_2": {
+    "message": "Orange"
+  },
+  "group_color_3": {
+    "message": "Pink"
+  },
+  "group_color_4": {
+    "message": "Purple"
+  },
+  "group_color_5": {
+    "message": "Teal"
+  },
+  "search_clear": {
+    "message": "Clear search"
+  },
+  "crumbs_all_bookmarks": {
+    "message": "All bookmarks"
+  },
+  "menu_settings": {
+    "message": "Settings…"
+  },
+  "selection_exit": {
+    "message": "Stop selecting"
+  },
+  "selection_more": {
+    "message": "More actions"
+  },
+  "vault_prompt_title": {
+    "message": "Enter password"
+  },
+  "action_continue": {
+    "message": "Continue"
+  },
+  "vault_use_recovery_instead": {
+    "message": "Use the recovery key"
+  },
+  "vault_prompt_esc": {
+    "message": "Esc to cancel"
+  },
+  "select_all_n": {
+    "message": "Select all ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "search_found_all_one": {
+    "message": "$COUNT$ found in all bookmarks",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "search_found_all_other": {
+    "message": "$COUNT$ found in all bookmarks",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "tab_vault_short": {
+    "message": "Private"
+  },
+  "missing_previews_one": {
+    "message": "$COUNT$ bookmark without a preview",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "missing_previews_other": {
+    "message": "$COUNT$ bookmarks without a preview",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "missing_previews_clear": {
+    "message": "Show all"
+  },
+  "backfill_show_missing": {
+    "message": "Show missing"
+  },
+  "card_more_named": {
+    "message": "Options for “$NAME$”",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "gallery_search_heading": {
+    "message": "Search results"
+  },
+  "gallery_missing_heading": {
+    "message": "Bookmarks without a preview"
+  },
+  "gallery_autolock_one": {
+    "message": "locks after $COUNT$ idle minute",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "gallery_autolock_other": {
+    "message": "locks after $COUNT$ idle minutes",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "grid_auto_short": {
+    "message": "Auto"
+  },
+  "vault_lock_short": {
+    "message": "Lock"
+  },
+  "selection_toolbar": {
+    "message": "Selected bookmarks"
+  },
+  "selection_in_folder": {
+    "message": "in “$NAME$”",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_title": {
+    "message": "Settings"
+  },
+  "options_nav_label": {
+    "message": "Settings sections"
+  },
+  "options_nav_previews": {
+    "message": "Previews"
+  },
+  "options_nav_sync": {
+    "message": "Sync"
+  },
+  "options_keys_section": {
+    "message": "Password and backup"
+  },
+  "options_danger_title": {
+    "message": "Danger zone"
+  },
+  "options_danger_hint": {
+    "message": "These cannot be undone. Each one asks you to confirm first."
+  },
+  "options_capture_label": {
+    "message": "Create previews while browsing"
+  },
+  "options_capture_desc": {
+    "message": "When you open a bookmarked page, a preview is taken from it."
+  },
+  "options_recapture_label": {
+    "message": "Refresh interval"
+  },
+  "options_recapture_desc": {
+    "message": "Previews older than this are taken again the next time you visit the page."
+  },
+  "options_days": {
+    "message": "days"
+  },
+  "options_badge_unlocked": {
+    "message": "Unlocked · $BOOKMARKS$",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_entry_label": {
+    "message": "Entry"
+  },
+  "options_entry_hidden_hint": {
+    "message": "Nothing shows until you type the trigger in the search box"
+  },
+  "options_export_target_label": {
+    "message": "Default folder for moving out"
+  },
+  "options_error_label": {
+    "message": "Problem"
+  },
+  "options_recovery_label": {
+    "message": "Recovery key"
+  },
+  "options_recovery_desc": {
+    "message": "Write it on paper and keep it away from the computer."
+  },
+  "options_password_label": {
+    "message": "Master password"
+  },
+  "options_restore_with": {
+    "message": "Open it with"
+  },
+  "options_regenerate_needs_password": {
+    "message": "Needs your current master password."
+  },
+  "options_regenerate_button": {
+    "message": "Regenerate…"
+  },
+  "options_regenerate_confirm": {
+    "message": "Regenerate"
+  },
+  "options_clear_previews_desc": {
+    "message": ". They are taken again as you browse."
+  },
+  "options_clear_previews_button": {
+    "message": "Clear previews…"
+  },
+  "options_clear_previews_confirm": {
+    "message": "Clear them? There are $USAGE$.",
+    "placeholders": {
+      "usage": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_clear_previews_confirm_action": {
+    "message": "Clear"
+  },
+  "options_destroy_label": {
+    "message": "Delete the whole vault"
+  },
+  "options_destroy_desc": {
+    "message": "$BOOKMARKS$ and their groups are deleted with it. Export an encrypted backup first.",
+    "placeholders": {
+      "bookmarks": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_destroy_button": {
+    "message": "Delete vault…"
+  },
+  "options_forget_button": {
+    "message": "Discard…"
+  },
+  "options_forget_button_confirm": {
+    "message": "Discard"
+  },
+  "preview_folder_contents": {
+    "message": "Preview folder contents"
+  },
+  "preview_folder_contents_hint": {
+    "message": "In the full-page view, show the first four bookmarks inside each folder card; turn off to show a plain folder icon"
   }
 }

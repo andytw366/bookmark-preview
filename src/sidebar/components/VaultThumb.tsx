@@ -1,7 +1,7 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { request, subscribe } from '@/shared/messages';
-import { hueFromString, initialOf, vaultThumbKey } from '@/shared/url';
-import { IconThumb } from './Thumb';
+import { vaultThumbKey } from '@/shared/url';
+import { ThumbImage } from './Thumb';
 import {
   holdThumb,
   peekThumb,
@@ -91,35 +91,5 @@ export function VaultThumb({ id, hostname }: VaultThumbProps) {
     };
   }, [id]);
 
-  if (loaded !== null && loaded.source === 'icon') {
-    return <IconThumb src={loaded.src} width={loaded.width} height={loaded.height} />;
-  }
-
-  if (loaded !== null) {
-    const isCover = loaded.source === 'cover' || loaded.source === 'og';
-    return (
-      <div
-        className={`thumb thumb--image ${isCover ? 'thumb--contain' : 'thumb--fill'}`}
-        style={
-          isCover
-            ? ({
-                '--thumb-ratio': `${String(loaded.width)} / ${String(loaded.height)}`,
-              } as CSSProperties)
-            : undefined
-        }
-      >
-        <img src={loaded.src} alt="" loading="lazy" decoding="async" />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="thumb thumb--placeholder"
-      style={{ '--thumb-hue': String(hueFromString(hostname)) } as CSSProperties}
-      aria-hidden="true"
-    >
-      <span className="thumb__initial">{initialOf(hostname)}</span>
-    </div>
-  );
+  return <ThumbImage image={loaded} hostname={hostname} />;
 }

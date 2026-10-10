@@ -57,6 +57,7 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
     const total = targets.length;
     let done = 0;
     let ok = 0;
+    const missing: string[] = [];
     broadcast('backfill/progress', { done, total, ok });
 
     // 併發上限 3：這是對外部網站發請求，不該一次打上百個
@@ -83,6 +84,9 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
           });
           broadcast('thumbs/updated', { key: item.key });
           ok += 1;
+        } else if (!item.iconOnly) {
+          // 只是想換成網站圖示卻沒換成的，原本的預覽圖還在，不算缺
+          missing.push(item.url);
         }
         done += 1;
         broadcast('backfill/progress', { done, total, ok });
@@ -90,7 +94,7 @@ export async function backfillThumbnails(): Promise<BackfillReport> {
     });
     await Promise.all(workers);
 
-    return { total, ok };
+    return { total, ok, missing };
   } finally {
     running = false;
   }
@@ -133,6 +137,7 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
     const total = targets.length;
     let done = 0;
     let ok = 0;
+    const missing: string[] = [];
     broadcast('backfill/progress', { done, total, ok });
 
     // 併發上限與一般補抓相同：對外部網站發請求，不該一次打上百個
@@ -152,6 +157,8 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
           await storeVaultThumbnail(item.id, found.thumbnail, found.source);
           broadcast('thumbs/updated', { key: vaultThumbKey(item.id) });
           ok += 1;
+        } else if (!item.iconOnly) {
+          missing.push(item.id);
         }
         done += 1;
         broadcast('backfill/progress', { done, total, ok });
@@ -159,7 +166,7 @@ export async function backfillVaultThumbnails(): Promise<BackfillReport> {
     });
     await Promise.all(workers);
 
-    return { total, ok };
+    return { total, ok, missing };
   } finally {
     running = false;
   }

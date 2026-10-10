@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type {
   Density,
   OpenTarget,
@@ -14,7 +14,11 @@ import { useListNav } from '../hooks/useListNav';
 import { useVirtualRows } from '../hooks/useVirtualRows';
 import { contextMenuHandlers } from '../lib/keys';
 import { searchVault, vaultPathTo } from '../lib/vault-tree';
-import { Breadcrumb } from './Breadcrumb';
+import { IconButton } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
+import { CheckMark } from '../../ui/Toggles';
+import { Breadcrumb, UpButton } from './Breadcrumb';
+import { Highlight } from './Highlight';
 import { ListCell } from './ListCell';
 import { NewFolderForm } from './NewFolderForm';
 import { SearchBar } from './SearchBar';
@@ -28,7 +32,7 @@ type VaultRow =
   | { kind: 'bookmark'; record: PrivateBookmark };
 
 /** 還沒量到的列高用這個估。與 `BookmarkList` 同一組值，兩邊的列是同一套樣式 */
-const ESTIMATE: Record<Density, number> = { card: 210, row: 55, text: 28 };
+const ESTIMATE: Record<Density, number> = { card: 170, row: 52, text: 44 };
 
 interface VaultViewProps {
   state: Extract<VaultState, { status: 'unlocked' }>;
@@ -38,8 +42,6 @@ interface VaultViewProps {
   layout: VaultLayout;
   density: Density;
   onOpenLink: (url: string, where: OpenTarget) => void;
-  onLock: () => void;
-  onDestroy: () => void;
   onCreateFolder: (name: string, parentId: string | null) => void;
   onBookmarkMenu: (record: PrivateBookmark, x: number, y: number) => void;
   onFolderMenu: (folder: PrivateFolder, x: number, y: number) => void;
@@ -57,6 +59,13 @@ interface VaultViewProps {
    * 只畫出群組的（App 用同一份 `searchVault` 建）。
    */
   grouping?: { board: ListBoard; drag: GridDrag } | undefined;
+  /** 右鍵選單正開在哪一列（留外框） */
+  activeId?: string | null | undefined;
+  /** 多選時清單頂端的「全選」（App 算好範圍） */
+  selectAll?: ReactNode;
+  /** 補抓完的「查看缺的」：只列出這些隱私書籤（跨資料夾、不能排） */
+  onlyIds?: ReadonlySet<string> | undefined;
+  onClearOnly?: (() => void) | undefined;
 }
 
 export function VaultView({
@@ -66,8 +75,6 @@ export function VaultView({
   layout,
   density,
   onOpenLink,
-  onLock,
-  onDestroy,
   onCreateFolder,
   onBookmarkMenu,
   onFolderMenu,
@@ -79,8 +86,11 @@ export function VaultView({
   query,
   onQueryChange,
   grouping,
+  activeId,
+  selectAll,
+  onlyIds,
+  onClearOnly,
 }: VaultViewProps) {
-  const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const parentId = folders.find((folder) => folder.id === folderId)?.parentId ?? null;
 
@@ -102,9 +112,12 @@ export function VaultView({
    * 虛擬滾動的單位是「第幾列」，兩段各自 map 的話就沒有一個共同的索引可以切 ——
    * 而且「先資料夾後書籤」本來就是同一份清單的順序，只是原本分兩段畫。
    */
+  const filtered = onlyIds !== undefined && !searching;
   const listed: VaultRow[] = searching
     ? searchVault(folders, bookmarks, layout, query)
-    : vaultChildren(folders, bookmarks, folderId, layout);
+    : filtered
+      ? bookmarks.filter((record) => onlyIds.has(record.id)).map((record) => ({ kind: 'bookmark' as const, record }))
+      : vaultChildren(folders, bookmarks, folderId, layout);
   // 有版面時照版面的順序（群組聚成連續的幾列）；App 建版面用的是同一份清單
   const byId = new Map(listed.map((row) => [vaultChildId(row), row]));
   const rows: VaultRow[] =
@@ -133,7 +146,7 @@ export function VaultView({
     count: rows.length,
     columns: 1,
     estimate: ESTIMATE[density],
-    resetKey: `${searching ? `search:${query}` : (folderId ?? 'root')}/${density}/${String(selecting)}`,
+    resetKey: `${searching ? `search:${query}` : filtered ? 'missing' : (folderId ?? 'root')}/${density}/${String(selecting)}`,
     item: '[data-cell]',
   });
   const nav = useListNav(
@@ -162,77 +175,87 @@ export function VaultView({
    * 抽成函式是因為虛擬滾動之後兩者必須在**同一次 map** 裡畫出來（切片的索引
    * 橫跨資料夾與書籤），而把兩段 JSX 直接塞進一個三元運算會難以閱讀。
    */
-  const folderRow = (folder: PrivateFolder) => (
-    <div
-      className={`vault__row row-wrap${selecting ? ' row-wrap--selecting' : ''}${
-        selecting && selected.has(folder.id) ? ' row-wrap--selected' : ''
-      }`}
-      {...listGrouping?.drag.cardProps(folder.id)}
-      {...contextMenuHandlers(({ x, y }) => {
-        onFolderMenu(folder, x, y);
-      })}
-    >
-      <button
-        type="button"
-        className={`row row--folder${selecting ? ' row--select' : ''}`}
-        data-nav=""
-        data-folder={folder.id}
-        {...(selecting ? { role: 'checkbox', 'aria-checked': selected.has(folder.id) } : {})}
-        onClick={() => {
-          if (selecting) {
-            onToggleSelect(folder.id);
-            return;
-          }
-          onNavigate(folder.id);
-        }}
+  const wrapClass = (id: string): string =>
+    [
+      'row-wrap',
+      selecting ? 'row-wrap--selecting' : '',
+      selecting && selected.has(id) ? 'row-wrap--selected' : '',
+      activeId === id ? 'row-wrap--ctx' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+  const folderRow = (folder: PrivateFolder) => {
+    const count = countIn.get(folder.id) ?? 0;
+    return (
+      <div
+        className={wrapClass(folder.id)}
+        {...listGrouping?.drag.cardProps(folder.id)}
+        {...contextMenuHandlers(({ x, y }) => {
+          onFolderMenu(folder, x, y);
+        })}
       >
-        <FolderThumb />
-        <span className="row__text">
-          <span className="row__title">{folder.name || t('folder_untitled_folder')}</span>
-          <span className="row__meta">{tn('unit_bookmarks', countIn.get(folder.id) ?? 0)}</span>
-        </span>
-        {selecting ? null : (
-          <span className="row__chevron" aria-hidden="true">
-            ›
+        <button
+          type="button"
+          className={`row row--folder${selecting ? ' row--select' : ''}`}
+          data-nav=""
+          data-folder={folder.id}
+          {...(selecting ? { role: 'checkbox', 'aria-checked': selected.has(folder.id) } : {})}
+          onClick={() => {
+            if (selecting) {
+              onToggleSelect(folder.id);
+              return;
+            }
+            onNavigate(folder.id);
+          }}
+        >
+          {selecting ? <CheckMark state={selected.has(folder.id)} /> : null}
+          <FolderThumb />
+          <span className="row__text">
+            <span className="row__title">
+              <Highlight text={folder.name || t('folder_untitled_folder')} query={searching ? query : undefined} />
+            </span>
+            <span className="row__meta">{tn('unit_bookmarks', count)}</span>
           </span>
-        )}
-      </button>
-      {selecting ? (
-        <>
-          <span
-            className={`row__check${selected.has(folder.id) ? ' row__check--on' : ''}`}
-            aria-hidden="true"
-          >
-            {selected.has(folder.id) ? '✓' : ''}
-          </span>
-          <button
-            type="button"
+          {selecting ? null : <Icon name="chevron" className="row__chevron" />}
+        </button>
+        {selecting ? (
+          <IconButton
+            icon="chevron"
             className="row__enter"
-            title={t('row_open_folder')}
-            aria-label={t('row_open_folder_named', folder.name || t('folder_untitled'))}
+            label={t('row_open_folder_named', folder.name || t('folder_untitled'))}
+            hint={t('row_open_folder')}
             onClick={() => {
               onNavigate(folder.id);
             }}
-          >
-            ›
-          </button>
-        </>
-      ) : null}
-    </div>
-  );
+          />
+        ) : null}
+      </div>
+    );
+  };
 
-  const bookmarkRow = (record: PrivateBookmark) => (
-    <div
-      className={`vault__row row-wrap${selecting ? ' row-wrap--selecting' : ''}${
-        selecting && selected.has(record.id) ? ' row-wrap--selected' : ''
-      }`}
-      {...listGrouping?.drag.cardProps(record.id)}
-      {...contextMenuHandlers(({ x, y }) => {
-        onBookmarkMenu(record, x, y);
-      })}
-    >
-      {selecting ? (
-        <>
+  const bookmarkRow = (record: PrivateBookmark) => {
+    const hostname = hostnameOf(record.url);
+    const body = (
+      <>
+        <VaultThumb id={record.id} hostname={hostname} />
+        <span className="row__text">
+          <span className="row__title">
+            <Highlight text={record.title || hostname} query={searching ? query : undefined} />
+          </span>
+          <span className="row__meta">{hostname}</span>
+        </span>
+      </>
+    );
+    return (
+      <div
+        className={wrapClass(record.id)}
+        {...listGrouping?.drag.cardProps(record.id)}
+        {...contextMenuHandlers(({ x, y }) => {
+          onBookmarkMenu(record, x, y);
+        })}
+      >
+        {selecting ? (
           <button
             type="button"
             className="row row--link row--select"
@@ -244,152 +267,114 @@ export function VaultView({
               onToggleSelect(record.id);
             }}
           >
-            <VaultThumb id={record.id} hostname={hostnameOf(record.url)} />
-            <span className="row__text">
-              <span className="row__title">{record.title || hostnameOf(record.url)}</span>
-              <span className="row__meta">{hostnameOf(record.url)}</span>
-            </span>
+            <CheckMark state={selected.has(record.id)} />
+            {body}
           </button>
-          <span
-            className={`row__check${selected.has(record.id) ? ' row__check--on' : ''}`}
-            aria-hidden="true"
-          >
-            {selected.has(record.id) ? '✓' : ''}
-          </span>
-        </>
-      ) : (
-        <a
-          className="row row--link"
-          data-nav=""
-          href={record.url}
-          title={record.url}
-          onClick={(event) => {
-            event.preventDefault();
-            const newTab = event.ctrlKey || event.metaKey;
-            onOpenLink(record.url, newTab ? 'newTabBackground' : 'current');
-          }}
-        >
-          <VaultThumb id={record.id} hostname={hostnameOf(record.url)} />
-          <span className="row__text">
-            <span className="row__title">{record.title || hostnameOf(record.url)}</span>
-            <span className="row__meta">{hostnameOf(record.url)}</span>
-          </span>
-        </a>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="vault">
-      <div className="vault__bar">
-        <span className="vault__count">{tn('unit_vault_bookmarks', state.bookmarkCount)}</span>
-        <button
-          type="button"
-          className="toolbar__action"
-          onClick={() => {
-            setCreatingFolder(true);
-          }}
-        >
-          {t('action_new_folder')}
-        </button>
-        <button type="button" className="toolbar__action" onClick={onLock}>
-          {t('vault_lock_now')}
-        </button>
-      </div>
-
-      <SearchBar value={query} onChange={onQueryChange} placeholder={t('vault_search_placeholder')} />
-
-      {searching ? (
-        <p className="head__hint">{tn('search_results', rows.length)}</p>
-      ) : (
-        <Breadcrumb
-          path={vaultPathTo(folders, folderId)}
-          onNavigate={onNavigate}
-          drop={
-            grouping === undefined
-              ? undefined
-              : { props: (id) => grouping.drag.crumbProps(id, true), className: grouping.drag.crumbClass }
-          }
-        />
-      )}
-
-      {creatingFolder ? (
-        <NewFolderForm
-          onCancel={() => {
-            setCreatingFolder(false);
-          }}
-          onCreate={(name) => {
-            setCreatingFolder(false);
-            onCreateFolder(name, folderId);
-          }}
-        />
-      ) : null}
-
-      {searching && rows.length === 0 ? (
-        <p className="empty">{t('search_no_match')}</p>
-      ) : !searching && empty ? (
-        <p className="empty">
-          {folderId === null
-            ? t('vault_empty_hint')
-            : t('folder_empty')}
-        </p>
-      ) : (
-        <div
-          ref={virtual.ref}
-          onKeyDown={listGrouping === undefined ? nav.onKeyDown : listGrouping.board.onKeyDown(nav.onKeyDown)}
-          {...listGrouping?.drag.gridProps}
-          className={`list list--${density}${listGrouping?.drag.dragging === true ? ' list--dragging' : ''}`}
-          // 墊高用 padding 而不是墊兩個空 div：`.list` 有 gap，空 div 會多出兩道
-          // 間距，讓內容比計算出來的位置多偏移幾個像素
-          style={{ paddingTop: virtual.padTop, paddingBottom: virtual.padBottom }}
-        >
-          {rows.slice(virtual.start, virtual.end).map((row, offset) => {
-            const id = vaultChildId(row);
-            return (
-              <ListCell key={id} id={id} at={virtual.start + offset} grouping={listGrouping}>
-                {row.kind === 'folder' ? folderRow(row.folder) : bookmarkRow(row.record)}
-              </ListCell>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="vault__danger">
-        {confirmDestroy ? (
-          <div className="notice notice--error">
-            <p>
-              <strong>{t('vault_destroy_confirm')}</strong>
-            </p>
-            <p className="notice__body">
-              {t('vault_destroy_warning', tn('unit_vault_bookmarks', state.bookmarkCount))}
-            </p>
-            <div className="vault__actions">
-              <button type="button" className="chip chip--danger" onClick={onDestroy}>
-                {t('action_delete_confirm')}
-              </button>
-              <button
-                type="button"
-                className="chip"
-                onClick={() => {
-                  setConfirmDestroy(false);
-                }}
-              >
-                {t('action_cancel')}
-              </button>
-            </div>
-          </div>
         ) : (
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => {
-              setConfirmDestroy(true);
+          <a
+            className="row row--link"
+            data-nav=""
+            href={record.url}
+            title={record.url}
+            onClick={(event) => {
+              event.preventDefault();
+              const newTab = event.ctrlKey || event.metaKey;
+              onOpenLink(record.url, newTab ? 'newTabBackground' : 'current');
             }}
           >
-            {t('vault_destroy_action')}
-          </button>
+            {body}
+          </a>
         )}
       </div>
-    </div>
+    );
+  };
+
+  return (
+    <>
+      <header className="head">
+        <SearchBar value={query} onChange={onQueryChange} placeholder={t('vault_search_placeholder')} />
+        <div className="nav">
+          {searching ? (
+            <p className="nav__info">{tn('search_results', rows.length)}</p>
+          ) : filtered ? (
+            <>
+              <p className="nav__info">{tn('missing_previews', rows.length)}</p>
+              <IconButton icon="close" label={t('missing_previews_clear')} onClick={onClearOnly} />
+            </>
+          ) : folderId === null ? (
+            <p className="nav__info">
+              <strong>{t('crumbs_all')}</strong>
+              {tn('unit_bookmarks', state.bookmarkCount)}
+            </p>
+          ) : (
+            <>
+              <UpButton
+                onUp={() => {
+                  onNavigate(parentId);
+                }}
+              />
+              <Breadcrumb
+                path={vaultPathTo(folders, folderId)}
+                onNavigate={onNavigate}
+                rootLabel={t('crumbs_all')}
+                drop={
+                  grouping === undefined
+                    ? undefined
+                    : { props: (id) => grouping.drag.crumbProps(id, true), className: grouping.drag.crumbClass }
+                }
+              />
+            </>
+          )}
+          {searching || filtered ? null : (
+            <IconButton
+              icon="folder-plus"
+              label={t('action_new_folder')}
+              hint={t('new_folder_hint_nested')}
+              onClick={() => {
+                setCreatingFolder(true);
+              }}
+            />
+          )}
+        </div>
+        {creatingFolder ? (
+          <NewFolderForm
+            onCancel={() => {
+              setCreatingFolder(false);
+            }}
+            onCreate={(name) => {
+              setCreatingFolder(false);
+              onCreateFolder(name, folderId);
+            }}
+          />
+        ) : null}
+      </header>
+
+      <main className="body">
+        {selecting ? selectAll : null}
+        {(searching || filtered) && rows.length === 0 ? (
+          <p className="empty">{t('search_no_match')}</p>
+        ) : !searching && empty ? (
+          <p className="empty">{folderId === null ? t('vault_empty_hint') : t('folder_empty')}</p>
+        ) : (
+          <div
+            ref={virtual.ref}
+            onKeyDown={listGrouping === undefined ? nav.onKeyDown : listGrouping.board.onKeyDown(nav.onKeyDown)}
+            {...listGrouping?.drag.gridProps}
+            className={`list list--${density}${listGrouping?.drag.dragging === true ? ' list--dragging' : ''}`}
+            // 墊高用 padding 而不是墊兩個空 div：多出來的元素會讓內容比計算出來的位置偏移幾個像素
+            style={{ paddingTop: virtual.padTop, paddingBottom: virtual.padBottom }}
+          >
+            {rows.slice(virtual.start, virtual.end).map((row, offset) => {
+              const id = vaultChildId(row);
+              return (
+                <ListCell key={id} id={id} at={virtual.start + offset} grouping={listGrouping}>
+                  {row.kind === 'folder' ? folderRow(row.folder) : bookmarkRow(row.record)}
+                </ListCell>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </>
   );
 }

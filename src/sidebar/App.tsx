@@ -2,24 +2,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBoard, searchBoard, type GridOp } from '@/shared/board';
 import { tagQuery } from '@/shared/groups';
 import { request } from '@/shared/messages';
-import type { BookmarkNode, OpenTarget } from '@/shared/types';
+import type { BookmarkNode, Density, OpenTarget, PreviewSource } from '@/shared/types';
 import { matchesVaultTrigger } from '@/shared/vault-entry';
 import { vaultChildId, vaultChildren, vaultGroupOf, vaultGroups } from '@/shared/vault-layout';
 import { useGridDrag } from '../gallery/useGridDrag';
+import { Button, IconButton } from '../ui/Button';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import { Toast } from '../ui/Toast';
 import { BookmarkList } from './components/BookmarkList';
-import { Breadcrumb } from './components/Breadcrumb';
+import { Breadcrumb, UpButton } from './components/Breadcrumb';
 import { FolderPicker } from './components/FolderPicker';
 import { MoveInPrompt } from './components/MoveInPrompt';
 import { NewFolderForm } from './components/NewFolderForm';
 import { PermissionNotice } from './components/PermissionNotice';
 import { RowMenu, type MenuTarget } from './components/RowMenu';
 import { SearchBar } from './components/SearchBar';
+import { SelectAllRow } from './components/SelectAllRow';
 import { Toolbar } from './components/Toolbar';
 import { VaultGate } from './components/VaultGate';
 import { VaultFolderPicker } from './components/VaultFolderPicker';
 import { VaultPrompt } from './components/VaultPrompt';
 import { VaultRowMenu, type VaultMenuTarget } from './components/VaultRowMenu';
 import { VaultView } from './components/VaultView';
+import { useBackfill } from './hooks/useBackfill';
 import { useBookmarkGrid } from './hooks/useBookmarkGrid';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useHostPermission } from './hooks/useHostPermission';
@@ -27,13 +32,24 @@ import { useListBoard } from './hooks/useListBoard';
 import { useSettings } from './hooks/useSettings';
 import { useTagSearch } from './hooks/useTagSearch';
 import { useVault } from './hooks/useVault';
-import { buildIndex, countLinks, pathTo, searchTree } from './lib/tree';
+import { buildIndex, countLinks, pathTo, searchTree, type TreeIndex } from './lib/tree';
 import { searchVault, vaultTagHits } from './lib/vault-tree';
 import { t, tn } from '@/shared/i18n';
 
 type Tab = 'bookmarks' | 'vault';
 
 const NO_SELECTION: ReadonlySet<string> = new Set();
+
+/** 補抓完的「查看缺的」：只列出這次試過還是沒有預覽圖的（一般書籤是網址，隱私書籤是 id） */
+interface MissingFilter {
+  tab: Tab;
+  keys: ReadonlySet<string>;
+}
+
+/** 整棵樹裡網址在 `urls` 裡的書籤，照樹的順序 */
+function linksWithUrls(index: TreeIndex, urls: ReadonlySet<string>): BookmarkNode[] {
+  return [...index.byId.values()].filter((node) => node.kind === 'link' && urls.has(node.url));
+}
 
 export function App() {
   const { roots, error, reload } = useBookmarks();
@@ -79,6 +95,8 @@ export function App() {
   const [vaultSelectedIds, setVaultSelectedIds] = useState<ReadonlySet<string>>(new Set());
   /** 隱私空間的搜尋字。只在記憶體裡，上鎖時清掉 */
   const [vaultQuery, setVaultQuery] = useState('');
+  const [missing, setMissing] = useState<MissingFilter | null>(null);
+  const backfill = useBackfill();
   const liveGrid = useBookmarkGrid(folderId);
   /** 拖拽中。拖拽期間資料凍結（見下面的 `frozen`） */
   const [dragging, setDragging] = useState(false);
@@ -223,6 +241,7 @@ export function App() {
         return;
       }
       setQuery(value);
+      setMissing(null);
     },
     [settings, vault],
   );
@@ -233,6 +252,9 @@ export function App() {
 
   const tagHits = useTagSearch(trimmed, index);
   const search = trimmed === '' ? null : searchTree(view.roots ?? [], trimmed, tagHits);
+  // 「查看缺的」：和搜尋一樣是一份跨資料夾的清單，不能排、沒有群組
+  const missingNodes =
+    search === null && missing !== null && missing.tab === 'bookmarks' ? linksWithUrls(index, missing.keys) : null;
   const folderNodes: BookmarkNode[] = currentFolder?.children ?? view.roots ?? [];
 
   // 勾選是跨資料夾保留的，所以要從整棵樹的索引還原成節點，而不是只看目前這一層。
@@ -262,7 +284,7 @@ export function App() {
       }
       return;
     }
-    if (search === null && currentFolder !== undefined) {
+    if (search === null && missingNodes === null && currentFolder !== undefined) {
       setFolderId(index.parentOf.get(currentFolder.id) ?? null);
     }
   };
@@ -288,7 +310,7 @@ export function App() {
    * （只影響還沒定欄數的資料夾怎麼算「上下」，側邊欄用不到）。
    * 搜尋結果與最上層（Firefox 的永久資料夾）不能排、沒有群組。
    */
-  const inFolderView = search === null && currentFolder !== undefined;
+  const inFolderView = search === null && missingNodes === null && currentFolder !== undefined;
   const bookmarkGroupOf = new Map(
     (inFolderView ? (view.grid?.groups ?? []) : []).flatMap((group) =>
       group.members.map((member) => [member, group.id] as const),
@@ -314,7 +336,9 @@ export function App() {
   // 版面還在讀（undefined）時先不讓拖：落點會算在還沒有群組的順序上
   const canArrange = inFolderView && view.grid !== undefined;
   const nodes: BookmarkNode[] =
-    search !== null && !tagResults
+    missingNodes !== null
+      ? missingNodes
+      : search !== null && !tagResults
       ? search.nodes
       : bookmarkBoard.grid.cells.flatMap((id) => {
           const node = index.byId.get(id);
@@ -476,9 +500,7 @@ export function App() {
       <div className="shell">
         <div className="notice notice--error">
           <p>{t('bookmarks_read_failed', error)}</p>
-          <button type="button" onClick={reload}>
-            {t('action_retry')}
-          </button>
+          <Button onClick={reload}>{t('action_retry')}</Button>
         </div>
       </div>
     );
@@ -494,113 +516,144 @@ export function App() {
 
   const vaultUnlocked = vault.state.status === 'unlocked';
   // 根層列出的就是那幾個永久資料夾本身；進到任何一層之後就不會再出現它們
-  const showingRoots = search === null && currentFolder === undefined;
-  // 隱密模式下只有解鎖後才顯示分頁列；否則側邊欄完全沒有隱私空間的痕跡
+  const showingRoots = search === null && missingNodes === null && currentFolder === undefined;
+  // 隱密模式下只有解鎖後才顯示分頁；否則側邊欄完全沒有隱私空間的痕跡（連提示文字都不能提）
   const showTabs = settings.vaultEntry === 'tab' || vaultUnlocked;
+
+  const switchTab = (next: Tab): void => {
+    // 切換分頁時先退出多選：勾選的是另一頁的項目，帶著它切過去只會留下一排無處可用的動作按鈕
+    if (next === 'vault') {
+      exitSelection();
+    } else {
+      exitVaultSelection();
+    }
+    setMissing(null);
+    setTab(next);
+  };
+
+  const toolbarCommon = {
+    density: settings.density,
+    onDensityChange: (density: Density) => {
+      update({ density });
+    },
+    previewSource: settings.previewSource,
+    onPreviewSourceChange: (previewSource: PreviewSource) => {
+      update({ previewSource });
+    },
+    entryIcons: settings.entryIcons,
+    onEntryIconsChange: (entryIcons: boolean) => {
+      update({ entryIcons });
+    },
+    backfill,
+    canBackfill: permission.granted === true,
+  };
+
+  const backfillResult = backfill.result;
+  const vaultMissing = missing !== null && missing.tab === 'vault' ? missing.keys : undefined;
 
   return (
     <div className="shell">
       {showTabs ? (
-        <nav className="tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'bookmarks'}
-            className={`tabs__item${tab === 'bookmarks' ? ' tabs__item--active' : ''}`}
-            onClick={() => {
-              exitVaultSelection();
-              setTab('bookmarks');
-            }}
-          >
-            {t('tab_bookmarks')}
-          </button>
-          {/* 切換分頁時先退出多選：勾選的是書籤那一頁的項目，
-              帶著它切到隱私空間只會留下一排無處可用的動作按鈕 */}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'vault'}
-            className={`tabs__item${tab === 'vault' ? ' tabs__item--active' : ''}`}
-            onClick={() => {
-              exitSelection();
-              setTab('vault');
-            }}
-          >
-            {vaultUnlocked ? t('tab_vault_unlocked') : t('tab_vault')}
-          </button>
-        </nav>
-      ) : null}
-
-      {vault.error !== null ? (
-        <div className="notice notice--error">
-          <p>{vault.error}</p>
-          <button type="button" onClick={vault.clearError}>
-            {t('action_close')}
-          </button>
+        <div className="head head--tabs">
+          <div className="head__tabs">
+            <SegmentedControl
+              role="tablist"
+              fill
+              label={t('gallery_scope')}
+              options={[
+                { value: 'bookmarks', label: t('tab_bookmarks') },
+                { value: 'vault', label: t('tab_vault_short') },
+              ]}
+              value={tab}
+              onChange={switchTab}
+            />
+            {vaultUnlocked ? (
+              <IconButton
+                icon="lock"
+                label={t('vault_lock_now')}
+                onClick={() => {
+                  void vault.lock();
+                }}
+              />
+            ) : null}
+          </div>
         </div>
       ) : null}
 
-      {/*
-        通知框放在分頁列外面，兩個分頁都看得到。
-
-        原本只寫在「書籤」分頁那個分支裡，於是所有從隱私空間觸發的訊息
-        （重新抓預覽圖的結果、移出的結果、批量移動的錯誤）都設進了 state 卻
-        沒有地方顯示 —— 使用者看到的是「按了完全沒反應」，切到書籤分頁才會
-        看到那則早就過時的訊息。訊息要出現在**觸發它的那個畫面**上。
-      */}
-      {moveResult !== null ? (
-        <div className="notice notice--info">
-          <p>{moveResult}</p>
-          <button
-            type="button"
-            onClick={() => {
-              setMoveResult(null);
-            }}
-          >
+      {vault.error !== null && !vaultPrompt ? (
+        <div className="notice notice--error">
+          <p>{vault.error}</p>
+          <Button variant="ghost" onClick={vault.clearError}>
             {t('action_close')}
-          </button>
+          </Button>
         </div>
       ) : null}
 
       {tab === 'vault' ? (
-        <>
-        <main className="body">
-          {vault.state.status === 'unlocked' ? (
-            <VaultView
-              state={vault.state}
-              bookmarks={view.bookmarks}
-              folders={view.folders}
-              layout={view.layout}
-              density={settings.density}
-              onOpenLink={openLink}
-              onLock={() => {
-                void vault.lock();
-              }}
-              onDestroy={() => {
-                void vault.destroy();
-              }}
-              onCreateFolder={(name, parentId) => {
-                void vault.createFolder(name, parentId);
-              }}
-              onBookmarkMenu={(record, x, y) => {
-                setVaultMenu({ kind: 'bookmark', record, x, y });
-              }}
-              onFolderMenu={(folder, x, y) => {
-                setVaultMenu({ kind: 'folder', folder, x, y });
-              }}
-              folderId={vaultFolderId}
-              onNavigate={(id) => {
-                setVaultFolderId(id);
-                setVaultQuery('');
-              }}
-              selecting={vaultSelecting}
-              selected={vaultSelectedIds}
-              onToggleSelect={toggleVaultSelect}
-              query={vaultQuery}
-              onQueryChange={setVaultQuery}
-              grouping={!vaultSearching || vaultTagResults ? { board: vaultList, drag: vaultDrag } : undefined}
-            />
-          ) : (
+        vault.state.status === 'unlocked' ? (
+          <VaultView
+            state={vault.state}
+            bookmarks={view.bookmarks}
+            folders={view.folders}
+            layout={view.layout}
+            density={settings.density}
+            onOpenLink={openLink}
+            onCreateFolder={(name, parentId) => {
+              void vault.createFolder(name, parentId);
+            }}
+            onBookmarkMenu={(record, x, y) => {
+              setVaultMenu({ kind: 'bookmark', record, x, y });
+            }}
+            onFolderMenu={(folder, x, y) => {
+              setVaultMenu({ kind: 'folder', folder, x, y });
+            }}
+            folderId={vaultFolderId}
+            onNavigate={(id) => {
+              setVaultFolderId(id);
+              setVaultQuery('');
+              setMissing(null);
+            }}
+            selecting={vaultSelecting}
+            selected={vaultSelectedIds}
+            onToggleSelect={toggleVaultSelect}
+            query={vaultQuery}
+            onQueryChange={(value) => {
+              setVaultQuery(value);
+              setMissing(null);
+            }}
+            onlyIds={vaultMissing}
+            onClearOnly={() => {
+              setMissing(null);
+            }}
+            grouping={
+              vaultMissing === undefined && (!vaultSearching || vaultTagResults)
+                ? { board: vaultList, drag: vaultDrag }
+                : undefined
+            }
+            activeId={
+              vaultMenu === null ? null : vaultMenu.kind === 'bookmark' ? vaultMenu.record.id : vaultMenu.folder.id
+            }
+            selectAll={
+              <SelectAllRow
+                total={vaultRows.length}
+                selected={vaultRows.filter((row) => vaultSelectedIds.has(vaultChildId(row))).length}
+                onSelectAll={() => {
+                  setVaultSelectedIds((current) => new Set([...current, ...vaultRows.map(vaultChildId)]));
+                }}
+                onClearAll={() => {
+                  setVaultSelectedIds((current) => {
+                    const next = new Set(current);
+                    for (const row of vaultRows) {
+                      next.delete(vaultChildId(row));
+                    }
+                    return next;
+                  });
+                }}
+              />
+            }
+          />
+        ) : (
+          <main className="body">
             <VaultGate
               state={vault.state}
               onCreate={vault.create}
@@ -614,31 +667,244 @@ export function App() {
                 void vault.forget();
               }}
             />
-          )}
-        </main>
+          </main>
+        )
+      ) : (
+        <>
+          <header className="head">
+            <SearchBar value={query} onChange={handleQueryChange} />
+            <div className="nav">
+              {search !== null ? (
+                <p className="nav__info">
+                  {tn('search_found_all', search.nodes.length)}
+                  {search.truncated ? t('search_truncated') : ''}
+                </p>
+              ) : missingNodes !== null ? (
+                <>
+                  <p className="nav__info">{tn('missing_previews', missingNodes.length)}</p>
+                  <IconButton
+                    icon="close"
+                    label={t('missing_previews_clear')}
+                    onClick={() => {
+                      setMissing(null);
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <UpButton
+                    onUp={
+                      currentFolder === undefined
+                        ? undefined
+                        : () => {
+                            setFolderId(index.parentOf.get(currentFolder.id) ?? null);
+                          }
+                    }
+                  />
+                  <Breadcrumb
+                    path={currentFolder === undefined ? [] : pathTo(index, currentFolder.id)}
+                    onNavigate={setFolderId}
+                    rootLabel={t('crumbs_all_bookmarks')}
+                    drop={
+                      canArrange
+                        ? {
+                            // 「全部」那一層只能放 Firefox 的永久資料夾，不接受拖放
+                            props: (id) => bookmarkDrag.crumbProps(id, id !== null),
+                            className: bookmarkDrag.crumbClass,
+                          }
+                        : undefined
+                    }
+                  />
+                  {/* 放在麵包屑旁邊而不是底部工具列：它建在「目前這個資料夾」裡，
+                      放在路徑旁邊才看得出那個「目前」是哪裡 */}
+                  <IconButton
+                    icon="folder-plus"
+                    label={t('action_new_folder')}
+                    hint={folderId === null ? t('new_folder_hint_root') : t('new_folder_hint_nested')}
+                    onClick={() => {
+                      setNewFolder(true);
+                    }}
+                  />
+                </>
+              )}
+            </div>
+            {newFolder ? (
+              <NewFolderForm
+                hint={folderId === null ? t('new_folder_root_note') : undefined}
+                onCancel={() => {
+                  setNewFolder(false);
+                }}
+                onCreate={(name) => {
+                  setNewFolder(false);
+                  void request('bookmarks/folder-create', {
+                    ...(folderId === null ? {} : { parentId: folderId }),
+                    title: name,
+                  }).then(reload, (cause: unknown) => {
+                    setMoveResult(cause instanceof Error ? cause.message : String(cause));
+                  });
+                }}
+              />
+            ) : null}
+          </header>
 
-        {/*
+          <main className="body">
+            {permission.granted === false && !noticeDismissed ? (
+              <PermissionNotice
+                onGrant={permission.request}
+                onDismiss={() => {
+                  setNoticeDismissed(true);
+                }}
+              />
+            ) : null}
+
+            {openError !== null ? (
+              <div className="notice notice--warn">
+                <p>{t('bookmark_open_failed', openError)}</p>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setOpenError(null);
+                  }}
+                >
+                  {t('action_close')}
+                </Button>
+              </div>
+            ) : null}
+
+            {selecting ? (
+              <SelectAllRow
+                total={nodes.length}
+                selected={nodes.filter((node) => selectedIds.has(node.id)).length}
+                onSelectAll={() => {
+                  // 資料夾也一起選：批量搬移對資料夾同樣有效
+                  setSelectedIds((current) => new Set([...current, ...nodes.map((node) => node.id)]));
+                }}
+                onClearAll={() => {
+                  setSelectedIds((current) => {
+                    const next = new Set(current);
+                    for (const node of nodes) {
+                      next.delete(node.id);
+                    }
+                    return next;
+                  });
+                }}
+              />
+            ) : null}
+
+            <BookmarkList
+              nodes={nodes}
+              density={settings.density}
+              emptyMessage={
+                search !== null || missingNodes !== null ? t('search_no_match') : t('folder_no_bookmarks')
+              }
+              onOpenFolder={(id) => {
+                setFolderId(id);
+                setQuery('');
+                setMissing(null);
+              }}
+              onOpenLink={openLink}
+              // 只在隱私空間已解鎖時提供移入按鈕：加密需要金鑰，鎖著時做不到。
+              // 根層也不提供 —— 那一層每一列都是 Firefox 內建的永久資料夾
+              // （書籤選單／書籤工具列／其他書籤），`removeTree` 對它們會失敗。
+              // 讓人按下去再看到錯誤，不如一開始就不要給那個入口。
+              onMoveToVault={
+                vaultUnlocked && !showingRoots
+                  ? (node, x, y) => {
+                      setPendingMove({ nodes: [node], x, y });
+                    }
+                  : undefined
+              }
+              onContextMenu={(node, x, y) => {
+                setMenu({ node, x, y });
+              }}
+              selecting={selecting}
+              selected={selectedIds}
+              onToggleSelect={toggleSelect}
+              activeId={menu?.node.id ?? null}
+              highlight={search !== null ? trimmed : undefined}
+              locationOf={
+                search !== null || missingNodes !== null
+                  ? (node) => {
+                      const parent = index.byId.get(index.parentOf.get(node.id) ?? '');
+                      return parent === undefined ? undefined : parent.title || t('folder_untitled');
+                    }
+                  : undefined
+              }
+              // 換資料夾或換搜尋字串時，虛擬滾動要把量到的列高丟掉
+              listKey={
+                search !== null ? `search:${trimmed}` : missingNodes !== null ? 'missing' : (folderId ?? 'root')
+              }
+              grouping={inFolderView || tagResults ? { board: bookmarkList, drag: bookmarkDrag } : undefined}
+              // 搜尋結果沒有「上一層」可回，最上層也沒有 —— 兩者都不提供，
+              // Backspace 於是不做事，而不是把人送到一個看起來像退格失效的地方
+              onNavigateUp={
+                search === null && missingNodes === null && currentFolder !== undefined
+                  ? () => {
+                      setFolderId(index.parentOf.get(currentFolder.id) ?? null);
+                    }
+                  : undefined
+              }
+            />
+          </main>
+        </>
+      )}
+
+      {/*
+        提示浮在工具列上方，兩個分頁都看得到 —— 訊息要出現在**觸發它的那個畫面**上
+        （從隱私空間觸發的「重新抓預覽圖」結果，不能只在書籤那一頁才看得到）。
+      */}
+      {moveResult !== null || backfillResult !== null ? (
+        <div className="toast-slot">
+          {moveResult !== null ? (
+            <Toast
+              timeout={10_000}
+              onClose={() => {
+                setMoveResult(null);
+              }}
+            >
+              {moveResult}
+            </Toast>
+          ) : null}
+          {backfillResult !== null ? (
+            <Toast
+              timeout={3_000}
+              onClose={backfill.dismissResult}
+              action={
+                backfillResult.missing.length === 0
+                  ? undefined
+                  : {
+                      label: t('backfill_show_missing'),
+                      onClick: () => {
+                        const target: Tab = backfillResult.kind === 'vault/backfill' ? 'vault' : 'bookmarks';
+                        if (target !== tab) {
+                          switchTab(target);
+                        }
+                        // 放在 switchTab 後面：它會清掉篩選，同一次更新裡以最後一次為準
+                        setMissing({ tab: target, keys: new Set(backfillResult.missing) });
+                        setQuery('');
+                        setVaultQuery('');
+                        backfill.dismissResult();
+                      },
+                    }
+              }
+            >
+              {backfillResult.text}
+            </Toast>
+          ) : null}
+        </div>
+      ) : null}
+
+      {tab === 'vault' ? (
+        /*
           隱私空間這一頁也要有底部工具列 —— 密度切換對這裡的清單同樣有效，
           而「全頁瀏覽」與偶爾用到的選項不該因為切到這一頁就消失。
-          只有「選取」不提供：隱私空間目前沒有多選。
-        */}
+        */
         <Toolbar
-          density={settings.density}
-          onDensityChange={(density) => {
-            update({ density });
-          }}
-          previewSource={settings.previewSource}
-          onPreviewSourceChange={(previewSource) => {
-            update({ previewSource });
-          }}
-          entryIcons={settings.entryIcons}
-          onEntryIconsChange={(entryIcons) => {
-            update({ entryIcons });
-          }}
-          canBackfill={permission.granted === true}
+          {...toolbarCommon}
           // 站在隱私空間按補抓，要抓的是隱私書籤（加密寫入），不是一般書籤
           backfillKind="vault/backfill"
           canSelect={vaultUnlocked}
+          selectHint={t('gallery_select_hint')}
           selecting={vaultSelecting}
           selectedCount={vaultSelectedIds.size}
           selectionActions={[
@@ -664,216 +930,56 @@ export function App() {
             }
             setVaultSelecting(true);
           }}
-          onSelectAll={() => {
-            setVaultSelectedIds((current) => {
-              const next = new Set(current);
-              for (const folder of vault.folders.filter((item) => item.parentId === vaultFolderId)) {
-                next.add(folder.id);
-              }
-              for (const record of vault.bookmarks.filter(
-                (item) => item.folderId === vaultFolderId,
-              )) {
-                next.add(record.id);
-              }
-              return next;
-            });
+          destroyVault={
+            vault.state.status === 'unlocked'
+              ? {
+                  count: vault.state.bookmarkCount,
+                  onConfirm: () => {
+                    void vault.destroy();
+                  },
+                }
+              : undefined
+          }
+        />
+      ) : (
+        <Toolbar
+          {...toolbarCommon}
+          backfillKind="thumbs/backfill"
+          canSelect
+          // 隱藏模式下提示文字也不能提到隱私空間
+          selectHint={showTabs ? t('toolbar_select_hint') : t('gallery_select_hint')}
+          selecting={selecting}
+          selectedCount={selectedNodes.length}
+          selectionActions={[
+            {
+              label: t('action_move_to'),
+              primary: true,
+              onPick: (x, y) => {
+                setFolderPicker({ x, y });
+              },
+            },
+            ...(vaultUnlocked
+              ? [
+                  {
+                    label: t('row_import'),
+                    // 資料夾整棵一起移入，所以只有「勾到的東西裡一個書籤都沒有」才無事可做
+                    disabled: selectedLinkCount === 0,
+                    title: selectedNodes.some((node) => node.kind === 'folder') ? t('row_import_folder_hint') : undefined,
+                    onPick: (x: number, y: number) => {
+                      setPendingMove({ nodes: selectedNodes, x, y });
+                    },
+                  },
+                ]
+              : []),
+          ]}
+          onToggleSelecting={() => {
+            if (selecting) {
+              exitSelection();
+              return;
+            }
+            setSelecting(true);
           }}
         />
-        </>
-      ) : (
-        <>
-          <header className="head">
-            <SearchBar value={query} onChange={handleQueryChange} />
-            {search === null ? (
-              <div className="head__row">
-                <Breadcrumb
-                  path={currentFolder === undefined ? [] : pathTo(index, currentFolder.id)}
-                  onNavigate={setFolderId}
-                  drop={
-                    canArrange
-                      ? {
-                          // 「全部」那一層只能放 Firefox 的永久資料夾，不接受拖放
-                          props: (id) => bookmarkDrag.crumbProps(id, id !== null),
-                          className: bookmarkDrag.crumbClass,
-                        }
-                      : undefined
-                  }
-                />
-                {/* 放在麵包屑旁邊而不是底部工具列：它建在「目前這個資料夾」裡，
-                    放在路徑旁邊才看得出那個「目前」是哪裡；工具列在 320px 下也已經滿了 */}
-                <button
-                  type="button"
-                  className="toolbar__action"
-                  title={
-                    folderId === null
-                      ? t('new_folder_hint_root')
-                      : t('new_folder_hint_nested')
-                  }
-                  onClick={() => {
-                    setNewFolder(true);
-                  }}
-                >
-                  {t('action_new_folder')}
-                </button>
-              </div>
-            ) : (
-              <p className="head__hint">
-                {tn('search_results', search.nodes.length)}
-                {search.truncated ? t('search_truncated') : ''}
-              </p>
-            )}
-            {newFolder ? (
-              <NewFolderForm
-                hint={folderId === null ? t('new_folder_root_note') : undefined}
-                onCancel={() => {
-                  setNewFolder(false);
-                }}
-                onCreate={(name) => {
-                  setNewFolder(false);
-                  void request('bookmarks/folder-create', {
-                    ...(folderId === null ? {} : { parentId: folderId }),
-                    title: name,
-                  }).then(reload, (cause: unknown) => {
-                    setMoveResult(cause instanceof Error ? cause.message : String(cause));
-                  });
-                }}
-              />
-            ) : null}
-          </header>
-
-          <main className="body">
-            {permission.granted === false && !noticeDismissed ? (
-              <>
-                <PermissionNotice onGrant={permission.request} />
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => {
-                    setNoticeDismissed(true);
-                  }}
-                >
-                  {t('permission_dismiss')}
-                </button>
-              </>
-            ) : null}
-
-            {openError !== null ? (
-              <div className="notice notice--warn">
-                <p>{t('bookmark_open_failed', openError)}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenError(null);
-                  }}
-                >
-                  {t('action_close')}
-                </button>
-              </div>
-            ) : null}
-
-            <BookmarkList
-              nodes={nodes}
-              density={settings.density}
-              emptyMessage={search !== null ? t('search_no_match') : t('folder_no_bookmarks')}
-              onOpenFolder={(id) => {
-                setFolderId(id);
-                setQuery('');
-              }}
-              onOpenLink={openLink}
-              // 只在隱私空間已解鎖時提供移入按鈕：加密需要金鑰，鎖著時做不到。
-              // 根層也不提供 —— 那一層每一列都是 Firefox 內建的永久資料夾
-              // （書籤選單／書籤工具列／其他書籤），`removeTree` 對它們會失敗。
-              // 讓人按下去再看到錯誤，不如一開始就不要給那個入口。
-              onMoveToVault={
-                vaultUnlocked && !showingRoots
-                  ? (node, x, y) => {
-                      setPendingMove({ nodes: [node], x, y });
-                    }
-                  : undefined
-              }
-              onContextMenu={(node, x, y) => {
-                setMenu({ node, x, y });
-              }}
-              selecting={selecting}
-              selected={selectedIds}
-              onToggleSelect={toggleSelect}
-              // 換資料夾或換搜尋字串時，虛擬滾動要把量到的列高丟掉
-              listKey={search === null ? (folderId ?? 'root') : `search:${trimmed}`}
-              grouping={inFolderView || tagResults ? { board: bookmarkList, drag: bookmarkDrag } : undefined}
-              // 搜尋結果沒有「上一層」可回，最上層也沒有 —— 兩者都不提供，
-              // Backspace 於是不做事，而不是把人送到一個看起來像退格失效的地方
-              onNavigateUp={
-                search === null && currentFolder !== undefined
-                  ? () => {
-                      setFolderId(index.parentOf.get(currentFolder.id) ?? null);
-                    }
-                  : undefined
-              }
-            />
-          </main>
-
-          <Toolbar
-            density={settings.density}
-            onDensityChange={(density) => {
-              update({ density });
-            }}
-            previewSource={settings.previewSource}
-            onPreviewSourceChange={(previewSource) => {
-              update({ previewSource });
-            }}
-            entryIcons={settings.entryIcons}
-            onEntryIconsChange={(entryIcons) => {
-              update({ entryIcons });
-            }}
-            canBackfill={permission.granted === true}
-            backfillKind="thumbs/backfill"
-            canSelect
-            selecting={selecting}
-            selectedCount={selectedNodes.length}
-            selectionActions={[
-              {
-                label: t('action_move_to'),
-                primary: true,
-                onPick: (x, y) => {
-                  setFolderPicker({ x, y });
-                },
-              },
-              ...(vaultUnlocked
-                ? [
-                    {
-                      label: t('row_import'),
-                      // 資料夾整棵一起移入，所以只有「勾到的東西裡一個書籤都沒有」才無事可做
-                      disabled: selectedLinkCount === 0,
-                      title:
-                        selectedNodes.some((node) => node.kind === 'folder')
-                          ? t('row_import_folder_hint')
-                          : undefined,
-                      onPick: (x: number, y: number) => {
-                        setPendingMove({ nodes: selectedNodes, x, y });
-                      },
-                    },
-                  ]
-                : []),
-            ]}
-            onToggleSelecting={() => {
-              if (selecting) {
-                exitSelection();
-                return;
-              }
-              setSelecting(true);
-            }}
-            onSelectAll={() => {
-              // 資料夾也一起選：批量搬移對資料夾同樣有效
-              setSelectedIds((current) => {
-                const next = new Set(current);
-                for (const node of nodes) {
-                  next.add(node.id);
-                }
-                return next;
-              });
-            }}
-          />
-        </>
       )}
 
       {menu !== null ? (

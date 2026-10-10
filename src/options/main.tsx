@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../sidebar/styles.css';
+import '../ui/tokens.css';
+import '../ui/components.css';
 import './options.css';
 import { Options } from './Options';
 import { t } from '@/shared/i18n';

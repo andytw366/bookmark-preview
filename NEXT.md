@@ -2,6 +2,25 @@
 
 最後更新：2026-10-10（1.2.0 已公開上架；**下一版定為 1.3.0**（新功能＋新設定＋多一種外送請求，所以是 minor），版號已改，第 2 期一起進這一版。「網站入口顯示網站圖示」**第 1、2 期都已實作並實機驗收**；**下一步是 1.3.0 送審**（reviewer notes 的「New in」還沒寫））
 
+## UI 重新設計（2026-10-10 實作完，未提交）
+
+依 `bookmark-preview-ui/HANDOFF.md`（設計稿 `design/*.dc.html`）改完側邊欄、全頁瀏覽、設定頁。
+
+- 變數在 `src/ui/tokens.css`，共用元件在 `src/ui/`（`IconButton`／`Button`、`SegmentedControl`、`Menu*`、
+  `CheckMark`／`RadioMark`／`Switch`、`Toast`、`Icon`），樣式在 `src/ui/components.css`；三個頁面的
+  `main.tsx` 都先載入這兩份。字母色卡的 8 色在 `src/shared/letter-color.ts`（測試檢查對白字 ≥ 4.5:1）。
+- **隱藏模式＋沒解鎖時設定頁只顯示一般設定**（`Options.tsx` 的 `concealed`）；建立表單只在「顯示分頁」模式出現。
+  背景頁的 `thumbs/usage`／`thumbs/clear` 這時不算、不動隱私書籤的預覽圖（`visibleThumbs`）。
+- 設定頁改成 `open_in_tab: true`：嵌在 about:addons 只有約 460px 寬，左目錄＋卡片的版面放不下。
+- 補抓回傳 `missing`（還是沒有預覽圖的網址／隱私書籤 id），完成提示的「查看缺的」靠它篩。
+- 刻意沒照設計稿做的：資料夾**沒有**固定排在最上面（會跟拖拽排序衝突，維持使用者的順序）；
+  全頁瀏覽的群組標題列壓在框的上緣（像 legend），⋯ 接在數量後面而不是靠右（框是 SVG 疊上去的，格子裡沒有標題列的空間）；
+  刪除整個隱私空間只做二次確認，沒有再要求輸入密碼。
+- 改版後的調整（使用者回饋）：全頁瀏覽的搜尋框置中（工具列三欄 grid，左右下限一樣寬，頁面窄於 940px
+  ／隱私空間 1100px 時搜尋換到第二列，用 container query 量頁面寬度）；新設定 `folderPreviews`
+  （全頁瀏覽 ⋯ 選單與設定頁「預覽圖」都有開關，關掉時資料夾卡片只畫圖示）；側邊欄大卡模式的資料夾改成和小列一樣的 40px 兩行列。
+- 實機：`FF_DARK=1 ./scripts/ff.sh start` 可以用深色主題啟動（`test-headless.sh` 會寫進 user.js）。
+
 ## 下一個 session 從這裡開始：網站入口顯示網站圖示（2026-10-10 定案）
 
 ### 使用者要的是什麼

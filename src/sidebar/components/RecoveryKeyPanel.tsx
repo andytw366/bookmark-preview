@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Button } from '../../ui/Button';
+import { CheckField } from '../../ui/Toggles';
 import { t } from '@/shared/i18n';
 import { Rich } from '../lib/rich';
 
@@ -51,9 +53,8 @@ export function RecoveryKeyPanel({
       <code className="recovery__code">{recoveryKey}</code>
 
       <div className="recovery__actions">
-        <button
-          type="button"
-          className="chip"
+        <Button
+          icon="copy"
           onClick={() => {
             void navigator.clipboard.writeText(recoveryKey).then(
               () => {
@@ -64,10 +65,8 @@ export function RecoveryKeyPanel({
           }}
         >
           {copied ? t('action_copied') : t('action_copy')}
-        </button>
-        <button
-          type="button"
-          className="chip"
+        </Button>
+        <Button
           onClick={() => {
             // 存成檔案是給「現在沒有紙筆」的人的退路
             const url = URL.createObjectURL(new Blob([`${recoveryKey}\n`], { type: 'text/plain' }));
@@ -84,7 +83,7 @@ export function RecoveryKeyPanel({
           }}
         >
           {t('recovery_save_as_file')}
-        </button>
+        </Button>
       </div>
 
       <p className="notice__body">
@@ -95,32 +94,20 @@ export function RecoveryKeyPanel({
 
       {onDismiss !== undefined ? (
         <div className="recovery__actions">
-          <button type="button" className="chip" onClick={onDismiss}>
+          <Button variant="ghost" onClick={onDismiss}>
             {t('action_collapse')}
-          </button>
+          </Button>
         </div>
       ) : null}
 
       {onAcknowledge !== undefined ? (
         <>
-          <label className="gate__check">
-            <input
-              type="checkbox"
-              checked={acknowledged}
-              onChange={(event) => {
-                setAcknowledged(event.target.checked);
-              }}
-            />
+          <CheckField checked={acknowledged} onChange={setAcknowledged}>
             {t('recovery_acknowledged')}
-          </label>
-          <button
-            type="button"
-            className="gate__submit"
-            disabled={!acknowledged}
-            onClick={onAcknowledge}
-          >
+          </CheckField>
+          <Button variant="primary" disabled={!acknowledged} onClick={onAcknowledge}>
             {t('action_done')}
-          </button>
+          </Button>
         </>
       ) : null}
     </div>

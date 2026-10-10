@@ -189,6 +189,12 @@ user_pref("browser.sessionstore.resume_from_crash", false);
 user_pref("browser.sessionstore.max_resumed_crashes", 0);
 PREFS
 
+# FF_DARK=1：頁面一律當成系統是深色（驗深色主題用）
+if [[ "${FF_DARK:-0}" == "1" ]]; then
+  echo 'user_pref("layout.css.prefers-color-scheme.content-override", 0);' >> "$PROFILE/user.js"
+  echo 'user_pref("ui.systemUsesDarkTheme", 1);' >> "$PROFILE/user.js"
+fi
+
 export DISPLAY="$DISPLAY_NUM"
 # 容器內無法建立 user namespace，沙盒會失敗，測試環境下關閉
 export MOZ_DISABLE_CONTENT_SANDBOX=1

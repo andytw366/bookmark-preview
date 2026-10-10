@@ -1,3 +1,4 @@
+import { MenuItem } from '../../ui/Menu';
 import { t } from '@/shared/i18n';
 
 /**
@@ -17,32 +18,26 @@ export function ReorderItems({ reorder, onClose }: { reorder: ReorderActions; on
   const vertical = reorder.vertical === true;
   return (
     <>
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
-        disabled={reorder.earlier === null}
+      <MenuItem
+        icon={vertical ? 'arrow-up' : 'arrow-left'}
+        label={vertical ? t('row_move_up') : t('row_move_earlier')}
         title={vertical ? t('row_move_up_hint') : t('row_move_earlier_hint')}
+        disabled={reorder.earlier === null}
         onClick={() => {
           reorder.earlier?.();
           onClose();
         }}
-      >
-        {vertical ? t('row_move_up') : t('row_move_earlier')}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
-        disabled={reorder.later === null}
+      />
+      <MenuItem
+        icon={vertical ? 'arrow-down' : 'arrow-right'}
+        label={vertical ? t('row_move_down') : t('row_move_later')}
         title={vertical ? t('row_move_down_hint') : t('row_move_later_hint')}
+        disabled={reorder.later === null}
         onClick={() => {
           reorder.later?.();
           onClose();
         }}
-      >
-        {vertical ? t('row_move_down') : t('row_move_later')}
-      </button>
+      />
     </>
   );
 }

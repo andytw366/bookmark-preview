@@ -1,4 +1,5 @@
-import type { HTMLAttributes } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
+import { IconButton } from '../../ui/Button';
 import { t } from '@/shared/i18n';
 
 /**
@@ -10,85 +11,72 @@ export interface CrumbPath {
   title: string;
 }
 
+/** 把一段麵包屑當成拖拽的落點（拖到那一層）：要掛上去的處理器，與它現在要不要亮起來 */
+export interface CrumbDrop {
+  props: (folderId: string | null) => HTMLAttributes<HTMLElement>;
+  className: (folderId: string | null) => string;
+}
+
 interface BreadcrumbProps {
   path: CrumbPath[];
   onNavigate: (folderId: string | null) => void;
-  /** 有給就在最前面放一顆「↑」回上一層（全頁瀏覽用；側邊欄窄，靠 Backspace 與滑鼠側鍵） */
-  onUp?: (() => void) | undefined;
-  /**
-   * 全頁瀏覽的拖拽：把一段麵包屑當成落點（拖到那一層）。回傳要掛在那一段上的處理器，
-   * 與它現在要不要亮起來的 class。
-   */
-  drop?:
-    | {
-        props: (folderId: string | null) => HTMLAttributes<HTMLElement>;
-        className: (folderId: string | null) => string;
-      }
-    | undefined;
+  /** 最上層的名稱（書籤是「全部書籤」，隱私空間是「全部」） */
+  rootLabel: string;
+  drop?: CrumbDrop | undefined;
 }
 
 /**
- * 窄欄用麵包屑，而非縮排樹狀清單 —— 側邊欄典型寬度只有 320–420px，
- * 放不下多層縮排。路徑過長時只保留最後兩層並以「…」代表被折疊的中間層。
+ * 側邊欄的麵包屑：單行，太長時中間折成「…」。
+ *
+ * 只畫出最上層、上一層與目前這一層：再往上的幾層折掉（「…」回最上層、「上一層」鈕一層一層退），
+ * 目前這一層的名字太長時用刪節號 —— 換到第二行會讓整個清單往下跳。
  */
-export function Breadcrumb({ path, onNavigate, onUp, drop }: BreadcrumbProps) {
-  if (path.length === 0) {
-    return null;
+export function Breadcrumb({ path, onNavigate, rootLabel, drop }: BreadcrumbProps) {
+  const current = path[path.length - 1];
+  if (current === undefined) {
+    return (
+      <nav className="crumbs" aria-label={t('crumbs_label')}>
+        <span className="crumbs__current" aria-current="page">
+          {rootLabel}
+        </span>
+      </nav>
+    );
   }
 
-  const collapsed = path.length > 2;
-  const visible = collapsed ? path.slice(-2) : path;
+  const parent = path.length >= 2 ? path[path.length - 2] : undefined;
+  const crumb = (id: string | null, label: ReactNode, title: string): ReactNode => (
+    <button
+      type="button"
+      className={`crumbs__item${drop?.className(id) ?? ''}`}
+      title={title}
+      {...drop?.props(id)}
+      onClick={() => {
+        onNavigate(id);
+      }}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <nav className="crumbs" aria-label={t('crumbs_label')}>
-      {onUp !== undefined ? (
-        <button
-          type="button"
-          className="crumbs__item crumbs__up"
-          title={t('crumbs_up')}
-          aria-label={t('crumbs_up')}
-          onClick={onUp}
-        >
-          ↑
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className={`crumbs__item${drop?.className(null) ?? ''}`}
-        {...drop?.props(null)}
-        onClick={() => {
-          onNavigate(null);
-        }}
-      >
-        {t('crumbs_all')}
-      </button>
-
-      {collapsed ? <span className="crumbs__sep">/ …</span> : null}
-
-      {visible.map((folder, position) => {
-        const isLast = position === visible.length - 1;
-        return (
-          <span key={folder.id} className="crumbs__group">
-            <span className="crumbs__sep">/</span>
-            {isLast ? (
-              <span className="crumbs__item crumbs__item--current" aria-current="page">
-                {folder.title || t('folder_untitled')}
-              </span>
-            ) : (
-              <button
-                type="button"
-                className={`crumbs__item${drop?.className(folder.id) ?? ''}`}
-                {...drop?.props(folder.id)}
-                onClick={() => {
-                  onNavigate(folder.id);
-                }}
-              >
-                {folder.title || t('folder_untitled')}
-              </button>
-            )}
-          </span>
-        );
-      })}
+      {/* 有上一層可回時，最上層縮成「…」省寬度（滑鼠提示仍寫全名） */}
+      {crumb(null, parent === undefined ? rootLabel : '…', rootLabel)}
+      <span className="crumbs__sep">/</span>
+      {parent === undefined ? null : (
+        <>
+          {crumb(parent.id, parent.title || t('folder_untitled'), parent.title || t('folder_untitled'))}
+          <span className="crumbs__sep">/</span>
+        </>
+      )}
+      <span className="crumbs__current" aria-current="page" title={current.title}>
+        {current.title || t('folder_untitled')}
+      </span>
     </nav>
   );
+}
+
+/** 「上一層」：最上層與搜尋結果沒有上一層，不傳就不畫 */
+export function UpButton({ onUp }: { onUp: (() => void) | undefined }) {
+  return onUp === undefined ? null : <IconButton icon="back" label={t('crumbs_up')} onClick={onUp} />;
 }

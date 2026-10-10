@@ -1,0 +1,139 @@
+/*
+ * 書籤預覽 — 設計變數（淺色預設，深色跟著系統）。
+ *
+ * 側邊欄、全頁瀏覽、設定頁共用。所有顏色、字級、間距、圓角、陰影都從這裡來；
+ * 元件的樣式只引用變數，不寫死數值（例外：預覽圖本身的內容色，例如字母色卡的白字）。
+ */
+:root {
+  color-scheme: light dark;
+
+  /* 字型與字級 */
+  --font: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --mono: ui-monospace, "SF Mono", Consolas, monospace;
+  --fs-xs: 11px;   /* 網域、說明、計數（最小字） */
+  --fs-sm: 12px;   /* 麵包屑、分段控制 */
+  --fs-md: 13px;   /* 內文、清單標題、選單、按鈕 */
+  --fs-lg: 15px;   /* 設定項名稱、對話框標題 */
+  --fs-xl: 18px;   /* 設定分組標題 */
+  --fs-2xl: 24px;  /* 全頁的資料夾名稱 */
+  --lh: 1.5;
+
+  /* 間距（4px 為單位） */
+  --sp-0: 2px;  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+
+  /* 圓角 */
+  --r-sm: 4px;   /* 勾選框、選單項目 */
+  --r-md: 6px;   /* 按鈕、輸入框、小縮圖 */
+  --r-lg: 8px;   /* 卡片、預覽底板、選單 */
+  --r-xl: 12px;  /* 對話框、設定卡片、全頁卡片 */
+  --r-2xl: 16px; /* 全頁瀏覽的群組框 */
+  --r-full: 999px;
+  --r-favicon: 20%;
+
+  /* 尺寸 */
+  --ctl-h: 28px;     /* 側邊欄控制項 */
+  --ctl-h-lg: 32px;  /* 全頁、設定頁 */
+  --menu-w: 208px;
+  --thumb-row: 40px;
+
+  /* 色彩：淺色 */
+  --bg: #f9f9fb;
+  --surface: #ffffff;
+  --surface-2: #f0f0f4;   /* hover、輸入框、次要按鈕 */
+  --surface-3: #e0e0e6;   /* 按下、開關軌道 */
+  --plate: #ececf1;       /* 預覽圖底板 */
+  --border: #e0e0e6;
+  --border-strong: #c4c4cf;
+  --text: #15141a;
+  --text-2: #5b5b66;
+  --text-3: #8f8f9d;      /* 只給停用項目 */
+  --accent: #0061e0;
+  --accent-hover: #0250bb;
+  --on-accent: #ffffff;
+  --accent-tint: rgb(0 97 224 / .10);
+  --accent-tint-2: rgb(0 97 224 / .18);
+  --danger: #c50042;
+  --danger-hover: #a1003a;
+  --danger-tint: rgb(197 0 66 / .08);
+  --success: #017a40;
+  --success-tint: rgb(1 122 64 / .10);
+  --warn: #8a4b00;
+  --warn-tint: rgb(180 95 0 / .12);
+  --focus-ring: 2px solid var(--accent);
+  --seg-on: var(--surface);  /* 分段控制的選中塊 */
+  --knob: #ffffff;           /* 開關的圓鈕 */
+
+  /* 浮動提示（兩種主題都是深底） */
+  --toast-bg: #2b2a33;
+  --toast-text: #fbfbfe;
+  --toast-link: #80ebff;
+
+  /* 群組 6 色 */
+  --g-blue: #0061e0;  --g-green: #017a40;
+  --g-orange: #a84d00; --g-pink: #b5006c;
+  --g-purple: #6a35d9; --g-cyan: #006f8c;
+  --on-g: #ffffff;
+
+  /* 陰影（只有 3 層） */
+  --shadow-1: 0 1px 2px rgb(21 20 26 / .10);
+  --shadow-menu: 0 0 0 1px rgb(21 20 26 / .08), 0 4px 16px rgb(21 20 26 / .16);
+  --shadow-dialog: 0 0 0 1px rgb(21 20 26 / .08), 0 16px 48px rgb(21 20 26 / .24);
+  --scrim: rgb(21 20 26 / .30);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1b22;
+    --surface: #2b2a33;
+    --surface-2: #3a3944;
+    --surface-3: #52525e;
+    --plate: #33323b;
+    --border: #3f3e48;
+    --border-strong: #5b5b66;
+    --text: #fbfbfe;
+    --text-2: #bfbfc9;
+    --text-3: #8f8f9d;
+    --accent: #00ddff;
+    --accent-hover: #80ebff;
+    --on-accent: #15141a;
+    --accent-tint: rgb(0 221 255 / .12);
+    --accent-tint-2: rgb(0 221 255 / .22);
+    --danger: #ff848b;
+    --danger-hover: #ffa4a9;
+    --danger-tint: rgb(255 132 139 / .12);
+    --success: #54ffbd;
+    --success-tint: rgb(84 255 189 / .12);
+    --warn: #ffb066;
+    --warn-tint: rgb(255 176 102 / .14);
+    --seg-on: var(--surface-3);
+    --knob: #15141a;
+    --toast-bg: #52525e;
+    --g-blue: #7cb1ff;  --g-green: #54d69a;
+    --g-orange: #ffb066; --g-pink: #ff8ad0;
+    --g-purple: #b99bff; --g-cyan: #5fd8f5;
+    --on-g: #15141a;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / .4);
+    --shadow-menu: 0 0 0 1px rgb(251 251 254 / .10), 0 4px 16px rgb(0 0 0 / .5);
+    --shadow-dialog: 0 0 0 1px rgb(251 251 254 / .10), 0 16px 48px rgb(0 0 0 / .6);
+    --scrim: rgb(0 0 0 / .5);
+  }
+}
+
+/* 群組：一個顏色變數推出框、底色、標籤 */
+.group-c0 { --g: var(--g-blue); }
+.group-c1 { --g: var(--g-green); }
+.group-c2 { --g: var(--g-orange); }
+.group-c3 { --g: var(--g-pink); }
+.group-c4 { --g: var(--g-purple); }
+.group-c5 { --g: var(--g-cyan); }
+
+/*
+ * 焦點：只在鍵盤操作時出現。
+ * 用 outline 而不是設計稿的 box-shadow：好幾個元件自己就用 box-shadow（分段控制的選中塊、
+ * 被右鍵的那一列的內框），疊上去會互相蓋掉。
+ */
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}

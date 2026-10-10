@@ -3,9 +3,10 @@ import { request } from '@/shared/messages';
 import type { BookmarkNode } from '@/shared/types';
 import { folderHash } from '../lib/gallery-history';
 import { knownDigest } from '../lib/thumb-cache';
+import { Button } from '../../ui/Button';
+import { Menu, MenuItem, MenuSeparator } from '../../ui/Menu';
 import { PreviewModeItem } from './PreviewModeItem';
 import { FolderPicker } from './FolderPicker';
-import { Popover } from './Popover';
 import { ReorderItems, type ReorderActions } from './ReorderItems';
 import { TagItems, type TagActions } from './TagItems';
 import { t } from '@/shared/i18n';
@@ -69,9 +70,9 @@ export function RowMenu({
 
   if (renaming) {
     return (
-      <Popover x={target.x} y={target.y} onClose={onClose}>
+      <Menu x={target.x} y={target.y} onClose={onClose}>
         <form
-          className="rowmenu__form"
+          className="menu__form"
           onSubmit={(event) => {
             event.preventDefault();
             const next = title.trim();
@@ -83,7 +84,7 @@ export function RowMenu({
           }}
         >
           <input
-            className="rowmenu__input"
+            className="input"
             value={title}
             autoFocus
             data-autofocus=""
@@ -92,11 +93,11 @@ export function RowMenu({
             }}
             aria-label={t('bookmark_name_label')}
           />
-          <button type="submit" className="chip chip--primary">
+          <Button type="submit" variant="primary">
             {t('action_save')}
-          </button>
+          </Button>
         </form>
-      </Popover>
+      </Menu>
     );
   }
 
@@ -116,61 +117,56 @@ export function RowMenu({
 
   if (confirmDelete) {
     return (
-      <Popover x={target.x} y={target.y} onClose={onClose}>
-        <p className="rowmenu__heading">
+      <Menu x={target.x} y={target.y} variant="prompt" onClose={onClose}>
+        <p className="menu__title">
           {t('delete_confirm_named', node.title || t('folder_untitled'))}
           {node.kind === 'folder' ? t('delete_confirm_folder_suffix') : ''}
         </p>
-        <button
-          type="button"
-          className="rowmenu__item rowmenu__item--danger"
-          onClick={() => {
-            run(async () => request('bookmarks/delete', { id: node.id }));
-          }}
-        >
-          {t('action_delete_confirm')}
-        </button>
-        {/* 焦點落在「取消」而不是排在前面的「確定刪除」：用鍵盤按下選單裡的
-            「刪除」之後，焦點會自動進到這個確認框，若那是確定鈕，連按兩次
-            Enter 就刪掉了 —— 不可逆的動作不該只隔一個重複鍵。
-            用 data-autofocus 而不是 React 的 autoFocus，理由見 Popover */}
-        <button type="button" className="rowmenu__item" data-autofocus="" onClick={onClose}>
-          {t('action_cancel')}
-        </button>
-      </Popover>
+        {/* 焦點落在「取消」而不是「確定刪除」：用鍵盤按下選單裡的「刪除」之後，
+            焦點會自動進到這個確認框，若那是確定鈕，連按兩次 Enter 就刪掉了 ——
+            不可逆的動作不該只隔一個重複鍵。用 data-autofocus 而不是 React 的
+            autoFocus，理由見 Popover */}
+        <div className="menu__actions">
+          <Button variant="ghost" data-autofocus="" onClick={onClose}>
+            {t('action_cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              run(async () => request('bookmarks/delete', { id: node.id }));
+            }}
+          >
+            {t('action_delete_confirm')}
+          </Button>
+        </div>
+      </Menu>
     );
   }
 
   return (
-    <Popover x={target.x} y={target.y} role="menu" onClose={onClose}>
+    <Menu x={target.x} y={target.y} role="menu" onClose={onClose}>
       {node.kind === 'link' ? (
         <>
-          <button
-            type="button"
-            role="menuitem"
-            className="rowmenu__item"
+          <MenuItem
+            icon="open-new"
+            label={t('action_open_in_new_tab')}
             onClick={() => {
               onOpen(node.url, true);
               onClose();
             }}
-          >
-            {t('action_open_in_new_tab')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="rowmenu__item"
+          />
+          <MenuItem
+            icon="copy"
+            label={t('action_copy_url')}
             onClick={() => {
               void navigator.clipboard.writeText(node.url).catch(() => undefined);
               onClose();
             }}
-          >
-            {t('action_copy_url')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="rowmenu__item"
+          />
+          <MenuSeparator />
+          <MenuItem
+            icon="refresh"
+            label={t('action_refresh_thumb')}
             title={t('refresh_thumb_hint')}
             onClick={() => {
               const url = node.url;
@@ -185,9 +181,7 @@ export function RowMenu({
                 },
               );
             }}
-          >
-            {t('action_refresh_thumb')}
-          </button>
+          />
           <PreviewModeItem
             thumbKey={knownDigest(node.url)}
             send={async (mode) => request('thumbs/set-mode', { url: node.url, mode })}
@@ -197,74 +191,62 @@ export function RowMenu({
         </>
       ) : (
         // 只有書籤這邊有：隱私資料夾的 id 不能出現在網址上（理由見 gallery-history）
-        <button
-          type="button"
-          role="menuitem"
-          className="rowmenu__item"
+        <MenuItem
+          icon="gallery"
+          label={t('row_open_in_gallery')}
           onClick={() => {
             void browser.tabs.create({
               url: `${browser.runtime.getURL('gallery/index.html')}${folderHash(node.id)}`,
             });
             onClose();
           }}
-        >
-          {t('row_open_in_gallery')}
-        </button>
+        />
       )}
 
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
+      <MenuSeparator />
+      <MenuItem
+        icon="rename"
+        label={t('action_rename')}
         onClick={() => {
           setRenaming(true);
         }}
-      >
-        {t('action_rename')}
-      </button>
-
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
+      />
+      <MenuItem
+        icon="folder-move"
+        label={t('action_move_to')}
         onClick={() => {
           setChoosingFolder(true);
         }}
-      >
-        {t('action_move_to')}
-      </button>
-
+      />
       {reorder !== undefined ? <ReorderItems reorder={reorder} onClose={onClose} /> : null}
-
       {tag !== undefined ? (
         <TagItems tag={tag} x={target.x} y={target.y} isFolder={node.kind === 'folder'} onClose={onClose} />
       ) : null}
 
       {canMoveToVault ? (
-        <button
-          type="button"
-          role="menuitem"
-          className="rowmenu__item"
-          onClick={() => {
-            onMoveToVault(node);
-            onClose();
-          }}
-        >
+        <>
+          <MenuSeparator />
           {/* 資料夾是整棵子樹一起移入，講清楚才不會以為只搬了資料夾這個殼 */}
-          {node.kind === 'folder' ? t('row_import_folder') : t('row_import')}
-        </button>
+          <MenuItem
+            icon="move-in"
+            label={node.kind === 'folder' ? t('row_import_folder') : t('row_import')}
+            onClick={() => {
+              onMoveToVault(node);
+              onClose();
+            }}
+          />
+        </>
       ) : null}
 
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item rowmenu__item--danger"
+      <MenuSeparator />
+      <MenuItem
+        icon="trash"
+        label={t('action_delete')}
+        danger
         onClick={() => {
           setConfirmDelete(true);
         }}
-      >
-        {t('action_delete')}
-      </button>
-    </Popover>
+      />
+    </Menu>
   );
 }

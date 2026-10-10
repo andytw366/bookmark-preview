@@ -1,6 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import '../ui/tokens.css';
+import '../ui/components.css';
 import './styles.css';
 import { t } from '@/shared/i18n';
 import { applyDocumentLocale } from '@/shared/document-locale';

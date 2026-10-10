@@ -1,7 +1,8 @@
 import type { DragEvent as ReactDragEvent } from 'react';
 import type { GroupInfo } from '@/shared/groups';
 import { contextMenuHandlers } from '../sidebar/lib/keys';
-import { t } from '@/shared/i18n';
+import { IconButton } from '../ui/Button';
+import { t, tn } from '@/shared/i18n';
 
 interface GroupTagProps {
   group: GroupInfo;
@@ -12,7 +13,8 @@ interface GroupTagProps {
     onDragStart: (event: ReactDragEvent<HTMLElement>) => void;
     onDragEnd: () => void;
   };
-  onMenu: (x: number, y: number) => void;
+  /** `align: 'end'` = 從右邊的 ⋯ 打開，選單右緣對齊 x */
+  onMenu: (x: number, y: number, align?: 'start' | 'end') => void;
   /** 滑鼠停留的提示。搜尋結果裡點標籤是跳到資料夾，要換一句 */
   hint?: string | undefined;
 }
@@ -42,7 +44,41 @@ export function GroupTag({ group, drag, onMenu, hint }: GroupTagProps) {
       })}
     >
       {/* 沒名字的群組只是一個小色塊：「未命名群組」幾個字對使用者沒有資訊 */}
-      {group.name === '' ? null : group.name}
+      {group.name === '' ? null : <span className="group-tag__name">{group.name}</span>}
     </button>
+  );
+}
+
+/**
+ * 群組的標題列（側邊欄、全頁瀏覽同一個樣子）：名稱標籤、成員數、⋯。
+ *
+ * ⋯ 是標籤之外的第二個選單入口，滑鼠移到群組上、或焦點進到群組裡才出現（CSS）；
+ * 標籤本身已經能點開選單，⋯ 只是讓「這裡有選項」看得出來。
+ */
+export function GroupHead({
+  group,
+  count,
+  drag,
+  onMenu,
+  hint,
+  menuOpen = false,
+}: GroupTagProps & { count: number; menuOpen?: boolean }) {
+  const name = group.name === '' ? t('group_untitled') : group.name;
+  return (
+    <div className={`group-head group-c${String(group.color)}`}>
+      <GroupTag group={group} drag={drag} onMenu={onMenu} hint={hint} />
+      <span className="group-head__count">{tn('group_count', count)}</span>
+      <IconButton
+        icon="more"
+        className="group-head__more"
+        label={t('group_menu_named', name)}
+        aria-haspopup="true"
+        aria-expanded={menuOpen}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          onMenu(rect.right, rect.bottom + 4, 'end');
+        }}
+      />
+    </div>
   );
 }

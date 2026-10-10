@@ -76,18 +76,20 @@ export interface ThumbUsage {
   bytes: number;
 }
 
-export async function usage(): Promise<ThumbUsage> {
-  const records = await run<ThumbRecord[]>('readonly', (store) => store.getAll() as IDBRequest<ThumbRecord[]>);
+/** `include` 決定哪些鍵算進來（預設全部） */
+export async function usage(include: (key: string) => boolean = () => true): Promise<ThumbUsage> {
+  const all = await run<ThumbRecord[]>('readonly', (store) => store.getAll() as IDBRequest<ThumbRecord[]>);
+  const records = all.filter((record) => include(record.key));
   return {
     count: records.length,
     bytes: records.reduce((total, record) => total + record.bytes.byteLength, 0),
   };
 }
 
-/** 刪除早於 cutoff 的縮圖，回傳刪除筆數。 */
-export async function pruneOlderThan(cutoff: number): Promise<number> {
+/** 刪除早於 cutoff 的縮圖（只動 `include` 認可的鍵，預設全部），回傳刪除筆數。 */
+export async function pruneOlderThan(cutoff: number, include: (key: string) => boolean = () => true): Promise<number> {
   const records = await run<ThumbRecord[]>('readonly', (store) => store.getAll() as IDBRequest<ThumbRecord[]>);
-  const stale = records.filter((record) => record.capturedAt < cutoff);
+  const stale = records.filter((record) => record.capturedAt < cutoff && include(record.key));
   await Promise.all(stale.map((record) => deleteThumb(record.key)));
   return stale.length;
 }

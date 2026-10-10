@@ -1,294 +1,563 @@
 /*
- * 全頁瀏覽視圖。
+ * 全頁瀏覽的版面。共用元件在 ui/components.css，數值在 ui/tokens.css。
  *
- * 沿用 sidebar/styles.css 的色彩變數與 .thumb / .segmented / .notice 等元件，
- * 這裡只加「整個視窗寬度的網格」需要的部分。
+ * 由上到下：工具列（sticky）→ 頁首（或多選時的選取列）→ 卡片格線。
  */
 
 .gallery {
-  max-width: 1800px;
-  margin: 0 auto;
-  padding: 20px 24px 60px;
+  min-height: 100vh;
+  container: gallery / inline-size;
+  padding-bottom: 40px;
 }
 
-.gallery__head {
-  display: flex;
-  flex-wrap: wrap;
+/* ── 工具列：名稱｜搜尋（可伸縮）｜卡片大小｜欄數｜⋯ ──────────── */
+
+.gbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  /*
+   * 三欄：左（名稱、分頁）｜中（搜尋）｜右（卡片大小、欄數、⋯）。左右兩欄平分剩下的寬度，
+   * 搜尋才會在正中間。兩邊的下限一樣（放得下右邊的控制項），放不下時搜尋先縮，再不行就換到下一列。
+   */
+  --gbar-side: 330px;
+  display: grid;
+  grid-template-columns: minmax(var(--gbar-side), 1fr) minmax(200px, 560px) minmax(var(--gbar-side), 1fr);
   gap: 12px;
   align-items: center;
-  padding-bottom: 4px;
+  padding: 12px 24px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
-.gallery__title {
-  margin: 0;
-  font-size: 1.15em;
-  font-weight: 600;
-}
-
-/* 搜尋框吃掉剩下的寬度，但在窄視窗仍能換行 */
-.gallery__search {
-  flex: 1 1 220px;
+.gbar__left {
+  display: flex;
+  gap: 12px;
+  align-items: center;
   min-width: 0;
-  padding: 7px 10px;
-  color: var(--fg);
-  font: inherit;
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: 6px;
 }
 
-.gallery__modes {
+.gbar__brand {
+  font-size: var(--fs-lg);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.gbar__search {
+  width: 100%;
+}
+
+/* 隱私空間多一顆「上鎖」 */
+.gbar--vault {
+  --gbar-side: 410px;
+}
+
+/* 放不下三欄時：名稱與控制項一列，搜尋換到下一列撐滿（量的是頁面寬度，不是視窗） */
+@container gallery (width < 940px) {
+  .gbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .gbar__search {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+}
+
+@container gallery (width < 1100px) {
+  .gbar--vault {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .gbar--vault .gbar__search {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+}
+
+.gbar__spacer {
+  flex: 1;
+}
+
+.gbar__controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-self: end;
+  justify-content: flex-end;
   gap: 8px;
   align-items: center;
-  padding-bottom: 8px;
 }
 
-/* 多選列與上一列分開，讓「這是暫時性的模式」看得出來 */
-.gallery__selection {
+/* 補抓中：工具列下緣一條細進度條 */
+.gbar__progress {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+  transition: width 0.2s;
+}
+
+/* 欄數：− 5 欄 · 自動 + */
+.stepper {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  align-items: center;
+  padding: 2px;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+
+.stepper .ib:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.stepper__value {
+  padding: 0 6px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.stepper__auto {
+  height: 24px;
+  padding: 0 8px;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+}
+
+.stepper__auto:hover {
+  background: var(--surface-3);
+}
+
+/* ── 頁首：麵包屑＋大標題＋數量，右邊是這一層的動作 ──────────── */
+
+.ph {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
-  padding: 8px 10px;
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  gap: 12px 16px;
+  align-items: flex-end;
+  padding: 20px 24px 8px;
 }
 
-.gallery__status {
-  margin: 0 2px 8px;
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  line-height: 1.4;
-}
-
-/*
- * 共用的 `.newfolder` 在窄側邊欄裡要吃滿寬度，但整頁寬度下那會把「建立」
- * 推到畫面另一端。這裡限制輸入框的成長上限。
- */
-.newfolder .rowmenu__input {
-  flex: 0 1 320px;
-}
-
-.gallery__crumbs {
-  min-height: 28px;
-  padding-bottom: 8px;
-}
-
-.gallery__hint {
-  margin: 0;
-  color: var(--fg-dim);
-  font-size: 0.9em;
-}
-
-/*
- * 並排排列的核心：auto-fill + minmax 讓欄數隨視窗寬度自動決定，
- * 不必寫任何斷點。--card-min 由卡片大小切換器設定。
- */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 200px), 1fr));
-  gap: 16px;
-}
-
-.card {
+.ph__title {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.card:hover {
-  background: var(--bg-hover);
-  border-color: var(--border);
-}
-
-.card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/*
- * 縮圖區給固定高度並置中：封面是直式、截圖是 16:9，兩種混在同一個網格裡
- * 若讓卡片各自長高，整排就會參差不齊。固定高度 + contain 讓每張圖完整顯示
- * 又對齊在同一條基線上。
- */
-.card__thumb {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: calc(var(--card-min, 200px) * 0.72);
-  overflow: hidden;
-  background: var(--bg-hover);
-  border-radius: 6px;
-}
-
-/*
- * 讓縮圖填滿整個框，實際的裁切／留白交給 sidebar/styles.css 既有的
- * object-fit 規則決定（封面 contain、截圖 cover、色卡填滿）。
- *
- * 不要改成 width: auto —— 色卡（.thumb--placeholder）沒有 <img>，
- * 寬度會塌成那個字母的寬度，變成一條窄長條。
- */
-.card__thumb .thumb {
-  width: 100%;
-  height: 100%;
-  border-radius: 6px;
-}
-
-.card--folder {
-  align-items: flex-start;
-}
-
-.card__folder-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: calc(var(--card-min, 200px) * 0.72);
-  color: var(--fg-dim);
-  background: var(--bg-hover);
-  border-radius: 6px;
-}
-
-/* 與側邊欄同一個問題：圖示底色與卡片 hover 底色同色，滑過去會融成一片 */
-.card:hover .card__folder-icon,
-.card-wrap:hover .card__folder-icon {
-  color: var(--fg);
-  background: var(--bg);
-}
-
-/* ── 多選 ────────────────────────────────────────────────── */
-
-.card--select {
-  /* 卡片本來就是 flex 直排，這裡只要清掉 <button> 的預設外觀 */
-  width: 100%;
-}
-
-.card--selected,
-.card-wrap--selected {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 8px;
-}
-
-/*
- * 資料夾卡片外面包一層，讓勾選框能絕對定位在角落 ——
- * 資料夾的卡片本體必須保持「點了就進去」，所以勾選框不能是它的一部分。
- */
-.card-wrap {
-  position: relative;
-  display: flex;
-}
-
-.card-wrap .card {
-  flex: 1;
+  gap: 4px;
   min-width: 0;
 }
 
-.card-wrap .card__check {
-  top: 14px;
-  left: 14px;
-}
-
-/*
- * 多選中資料夾的巡覽入口。
- *
- * 點卡片改成勾選之後還是得能進到資料夾裡 —— 跨資料夾挑選是這個功能的重點。
- */
-.card__enter {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 1;
+.ph__crumbs {
   display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
   align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--fg-dim);
-  font: inherit;
-  font-size: 1.1em;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  cursor: pointer;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
 }
 
-.card__enter:hover,
-.card__enter:focus-visible {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-/* 勾選標記疊在縮圖角落，不佔額外高度 —— 卡片高度一致才排得整齊 */
-.card__thumb {
-  position: relative;
-}
-
-/* 連結卡片用 <span>（整張卡片都能勾選），資料夾用 <button>（只有這裡能勾選），
-   所以一併清掉按鈕的預設外觀 */
-.card__check {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 1;
-  /* 純視覺的疊加元素，點擊要穿透到底下的卡片按鈕 —— 理由同 styles.css 的 .row__check */
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.ph__up {
   width: 20px;
   height: 20px;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  font-size: 0.75em;
-  line-height: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  cursor: pointer;
+  margin-right: 2px;
 }
 
-.card__check--on {
-  color: var(--bg);
-  background: var(--accent);
-  border-color: var(--accent);
+.ph__crumbgroup {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
 }
 
-.card__title {
+.ph__crumb {
+  max-width: 16em;
+  padding: 0 4px;
   overflow: hidden;
-  font-size: 0.92em;
-  line-height: 1.35;
-  /* 標題最多兩行，超出以刪節號收尾，避免長標題把卡片高度撐開 */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
 }
 
-.card__meta {
+.ph__crumb:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.ph__sep {
+  color: var(--text-3);
+}
+
+.ph__heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.ph__heading h1 {
+  margin: 0;
   overflow: hidden;
-  color: var(--fg-dim);
-  font-size: 0.8em;
+  font-size: var(--fs-2xl);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
+.ph__meta {
+  color: var(--text-2);
+  font-size: var(--fs-md);
+}
+
+.ph__actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+/* 拖到麵包屑：那一層亮起來 */
+.ph__crumb.crumbs__item--drop {
+  color: var(--text);
+  background: var(--accent-tint);
+  outline: var(--focus-ring);
+}
+
+/* ── 多選時取代頁首的選取列 ─────────────────────────────── */
+
+.selbar {
+  position: sticky;
+  top: 57px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 16px 24px 4px;
+  padding: 8px;
+  /* 藍色是半透明的：疊在頁面底色上，底下的卡片捲過去時才不會透出來 */
+  background: linear-gradient(var(--accent-tint), var(--accent-tint)), var(--bg);
+  border-radius: var(--r-xl);
+}
+
+.selbar > .ib {
+  color: var(--text);
+}
+
+.selbar__count {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.selbar__where {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.selbar__all {
+  color: var(--accent);
+}
+
+/* ── 提示 ───────────────────────────────────────────────── */
+
+.gallery > .notice {
+  margin: 8px 24px;
+}
+
+.gallery__newfolder {
+  max-width: 560px;
+  padding: 4px 24px 8px;
+}
+
+.gallery__toasts {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px));
+  transform: translateX(-50%);
+}
+
+.empty {
+  margin: 0;
+  padding: 40px 24px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* ── 卡片格線 ───────────────────────────────────────────── */
+
 /*
- * 拖拽的落點提示（畫在格子 `.cell` 上；群組框線用了 `::before`，提示一律用 `::after`）。
+ * auto-fill + minmax 讓欄數隨視窗寬度自動決定，不必寫任何斷點。--card-min 由「小／中／大」設定。
+ * 使用者定了欄數（`.grid--fixed`）就固定、卡片維持那個寬度，視窗太窄時外層 `.grid-scroll` 橫向捲動。
  *
+ * `.grid-scroll` 的 `overflow-y` 必須是 hidden 而不是 auto：虛擬滾動往上找「會捲的那一層」
+ * 時只認 auto／scroll，認錯了就會把它當成捲動容器。內距是留給群組的框線與標題列的
+ * （它們畫在格子外面，會被 overflow 切掉）。
+ */
+.grid-scroll {
+  padding: 26px 16px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min, 200px), 100%), 1fr));
+  gap: 16px;
+  isolation: isolate;
+}
+
+.grid--fixed {
+  grid-template-columns: repeat(var(--grid-cols, 4), var(--card-min, 200px));
+  width: max-content;
+}
+
+.cell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+}
+
+/* 最後面的空位：平常看不見，拖拽時才畫出來 */
+.cell--empty {
+  min-height: calc(var(--card-min, 200px) * 0.5);
+  border: 1px dashed transparent;
+  border-radius: var(--r-xl);
+}
+
+.grid--dragging .cell--empty {
+  border-color: var(--border-strong);
+}
+
+/* 卡片：平常不加陰影、靠底色區分；hover 換成 --surface-2 */
+.gcard {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: none;
+  border-radius: var(--r-xl);
+}
+
+.gcard:hover,
+.cell:hover .gcard {
+  background: var(--surface-2);
+}
+
+.gcard:focus-visible {
+  outline-offset: 2px;
+}
+
+.gcard .thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+}
+
+.gcard__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0 2px;
+}
+
+.gcard__title {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.gcard__title > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gcard__title .ico {
+  color: var(--text-2);
+}
+
+.gcard__meta {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 被右鍵（或 ⋯）的那張：選單開著時留著外框 */
+.gcard--ctx,
+.cell:hover .gcard--ctx {
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+/* 右上角的 ⋯：右鍵選單的另一個入口，滑鼠移到卡片上或焦點進到格子裡才出現 */
+.gcard__quick,
+.gcard__enter {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.gcard__quick:hover:not(:disabled),
+.gcard__enter:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.gcard__quick {
+  visibility: hidden;
+}
+
+.cell:hover .gcard__quick,
+.cell:focus-within .gcard__quick,
+.gcard--ctx + .gcard__quick {
+  visibility: visible;
+}
+
+/* 多選：左上角 18px 勾選框（外圈描邊，壓在圖上也看得清楚）；選中的卡片藍底＋內框 */
+.gcard .cb {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+}
+
+.gcard--selected,
+.cell:hover .gcard--selected {
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* 資料夾卡片：底板裡 2×2 拼出前 4 個書籤的小預覽 */
+.gcard__mosaic {
+  display: grid;
+  /* 底板預設把內容置中；拼圖要每一格撐滿自己那一塊 */
+  place-items: stretch;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 6px;
+  background: var(--surface-2);
+}
+
+.cell:hover .gcard__mosaic {
+  background: var(--surface-3);
+}
+
+.gcard__tile {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: var(--r-sm);
+}
+
+.gcard .gcard__tile .thumb {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.gcard__mosaic-empty {
+  grid-row: 1 / -1;
+  grid-column: 1 / -1;
+  place-self: center;
+  width: 32px;
+  height: 32px;
+  color: var(--text-2);
+}
+
+/* ── 群組 ───────────────────────────────────────────────── */
+
+/*
+ * 框：每個群組一條路徑，墊在卡片底下的一層 SVG 裡（`GroupOutlines`，幾何在 `shared/outline.ts`）。
+ * 群組色 1.5px 框線＋8% 底色。
+ */
+.group-outlines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.group-outline {
+  fill: color-mix(in srgb, var(--g) 8%, transparent);
+  stroke: var(--g);
+  stroke-width: 1.5px;
+}
+
+/*
+ * 標題列（名稱標籤、數量、⋯）壓在框的上緣，像 <fieldset> 的 legend：
+ * 墊一塊頁面底色把框線斷開，數量的字才不會跟線疊在一起。
+ */
+.cell .group-head {
+  position: absolute;
+  top: -19px;
+  left: 2px;
+  z-index: 2;
+  max-width: calc(100% - 4px);
+  padding: 0 4px;
+  background: var(--bg);
+  border-radius: var(--r-full);
+}
+
+.cell .group-tag {
+  height: 22px;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+}
+
+.cell .group-tag--untitled {
+  width: 24px;
+  padding: 0;
+}
+
+/* ── 拖拽的落點 ─────────────────────────────────────────── */
+
+/*
  * 插入線畫在卡片外側、網格間距（16px）的正中間，看起來是「插在兩張之間」而不是
  * 「貼在這一張上」。移入資料夾與合併用外框：前者是實線（放開就搬進去），後者要停留
  * 一下才出現（`MERGE_DWELL_MS`），一路滑過去的卡片不會每張都亮。
@@ -316,125 +585,17 @@
 .drop--merge > :first-child {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 8px;
 }
 
 .drop--merge > :first-child {
   outline-style: dashed;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: var(--accent-tint);
 }
 
 .drop--slot::after {
   position: absolute;
   inset: 0;
   border: 2px dashed var(--accent);
-  border-radius: 8px;
+  border-radius: var(--r-xl);
   content: '';
-}
-
-/*
- * 格子（第 3 期改版：緊密排列）。
- *
- * 每一格是一個 `.cell`（`data-cell` = 順序上的第幾個），裝著一張卡片；最後多一個空位當
- * 「放到最後」的落點。欄數跟著視窗時照舊用 auto-fill；使用者定了欄數（`.grid--fixed`）
- * 就固定、卡片維持「小／中／大」的寬度，視窗太窄時外層 `.grid-scroll` 橫向捲動。
- *
- * `.grid-scroll` 的 `overflow-y` 必須是 hidden 而不是 auto：虛擬滾動往上找「會捲的那一層」
- * 時只認 auto／scroll，認錯了就會把它當成捲動容器。內距是留給群組的框線與標籤的
- * （它們畫在格子外面 8px，會被 overflow 切掉）。
- */
-.grid-scroll {
-  /* 上方不抵銷內距：群組標籤會凸出格子上緣，不能壓到麵包屑的按鈕 */
-  margin: 0 -10px;
-  padding: 14px 10px 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.grid--fixed {
-  grid-template-columns: repeat(var(--grid-cols, 4), var(--card-min, 200px));
-  width: max-content;
-}
-
-.cell {
-  position: relative;
-  display: flex;
-  min-width: 0;
-}
-
-.cell > .card,
-.cell > .card-wrap {
-  flex: 1;
-  min-width: 0;
-}
-
-/* 最後面的空位：平常看不見，拖拽時才畫出來 */
-.cell--empty {
-  min-height: calc(var(--card-min, 200px) * 0.5);
-  border: 1px dashed transparent;
-  border-radius: 8px;
-}
-
-.grid--dragging .cell--empty {
-  border-color: var(--border);
-}
-
-/*
- * 群組的框：每個群組一條路徑，墊在卡片底下的一層 SVG 裡（`GroupOutlines`，幾何在 `shared/outline.ts`）。
- * 網格是它的定位基準；格子疊在它上面。
- */
-.grid {
-  position: relative;
-  isolation: isolate;
-}
-
-.cell {
-  z-index: 1;
-}
-
-.group-outlines {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.group-outline {
-  fill: color-mix(in srgb, var(--group-color) 8%, transparent);
-  stroke: var(--group-color);
-  stroke-width: 2px;
-}
-
-/* 群組名稱：貼在框左上角的小色塊，壓在框線上（外觀在 sidebar/styles.css，這裡只管位置） */
-.group-tag {
-  position: absolute;
-  top: -13px;
-  left: 0;
-  z-index: 2;
-  max-width: calc(100% - 8px);
-}
-
-/* 沒名字的群組：只有一個小色塊（還是能點、能拖） */
-.group-tag--untitled {
-  width: 22px;
-  height: 14px;
-  padding: 0;
-  top: -11px;
-}
-
-.grid-cols {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.grid-cols__value {
-  min-width: 4.5em;
-  color: var(--fg-dim);
-  font-size: 0.85em;
-  text-align: center;
 }

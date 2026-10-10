@@ -29,8 +29,8 @@ interface VaultPromptProps {
  * 包含建立時的不可救回警示、二次輸入與確認勾選。在這裡重寫一份只會讓兩邊的
  * 驗證規則開始各自漂移（尤其是那個警示，那是不能弱化的）。
  *
- * 置中而不是貼著觸發點：這是需要專注輸入的密碼欄位，不是快速選單。
- * 側邊欄很窄，貼著輸入框展開會蓋掉正在打字的地方。
+ * 接在搜尋框下方的一張卡片（背景變暗）：這是需要專注輸入的密碼欄位，不是快速選單。
+ * 觸發字串一比對成功就從搜尋框清掉，焦點移到這裡的密碼欄。取消是 Esc 或點背景。
  */
 export function VaultPrompt({
   state,
@@ -68,10 +68,10 @@ export function VaultPrompt({
     >
       <div
         ref={panelRef}
-        className="overlay__panel"
+        className="dialog"
         role="dialog"
         aria-modal="true"
-        aria-label={state.status === 'absent' ? t('vault_create_title') : t('vault_unlock_action')}
+        aria-label={state.status === 'absent' ? t('vault_create_title') : t('vault_prompt_title')}
       >
         <VaultGate
           state={state}
@@ -79,15 +79,9 @@ export function VaultPrompt({
           onUnlock={onUnlock}
           onUnlockWithRecoveryKey={onUnlockWithRecoveryKey}
           onCreated={onCreated}
+          escHint
         />
-        {error !== null ? (
-          <div className="notice notice--error">
-            <p>{error}</p>
-          </div>
-        ) : null}
-        <button type="button" className="link-button" onClick={onClose}>
-          {t('action_cancel')}
-        </button>
+        {error !== null ? <p className="gate__error" role="alert">{error}</p> : null}
       </div>
     </div>
   );

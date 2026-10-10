@@ -1,13 +1,26 @@
 import { useState } from 'react';
 import { GROUP_COLORS, type GroupInfo } from '@/shared/groups';
-import { Popover } from '../sidebar/components/Popover';
 import { ReorderItems, type ReorderActions } from '../sidebar/components/ReorderItems';
+import { Button } from '../ui/Button';
+import { Menu, MenuHeader, MenuItem, MenuSeparator } from '../ui/Menu';
 import { t } from '@/shared/i18n';
+
+/** 6 個群組色的名稱，順序與 `.group-c0`～`.group-c5` 一致（字串鍵要寫死，i18n 測試才掃得到） */
+const COLOR_NAMES = [
+  t('group_color_0'),
+  t('group_color_1'),
+  t('group_color_2'),
+  t('group_color_3'),
+  t('group_color_4'),
+  t('group_color_5'),
+];
 
 interface GroupMenuProps {
   group: GroupInfo;
   x: number;
   y: number;
+  /** `end`：選單右緣對齊 x（從群組標題列右邊的 ⋯ 打開時） */
+  align?: 'start' | 'end' | undefined;
   reorder: ReorderActions;
   onClose: () => void;
   onRename: (name: string) => void;
@@ -26,6 +39,7 @@ export function GroupMenu({
   group,
   x,
   y,
+  align,
   reorder,
   onClose,
   onRename,
@@ -38,9 +52,9 @@ export function GroupMenu({
 
   if (renaming) {
     return (
-      <Popover x={x} y={y} onClose={onClose}>
+      <Menu x={x} y={y} align={align} onClose={onClose}>
         <form
-          className="rowmenu__form"
+          className="menu__form"
           onSubmit={(event) => {
             event.preventDefault();
             onRename(name.trim());
@@ -48,7 +62,7 @@ export function GroupMenu({
           }}
         >
           <input
-            className="rowmenu__input"
+            className="input"
             value={name}
             data-autofocus=""
             placeholder={t('group_untitled')}
@@ -57,11 +71,11 @@ export function GroupMenu({
               setName(event.target.value);
             }}
           />
-          <button type="submit" className="chip chip--primary">
+          <Button type="submit" variant="primary">
             {t('action_save')}
-          </button>
+          </Button>
         </form>
-      </Popover>
+      </Menu>
     );
   }
 
@@ -71,51 +85,37 @@ export function GroupMenu({
   };
 
   return (
-    <Popover x={x} y={y} role="menu" onClose={onClose}>
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
+    <Menu x={x} y={y} align={align} role="menu" label={t('group_menu_named', group.name || t('group_untitled'))} onClose={onClose}>
+      <MenuItem
+        icon="rename"
+        label={t('action_rename')}
         onClick={() => {
           setRenaming(true);
         }}
-      >
-        {t('action_rename')}
-      </button>
-      <div className="group-menu__colors" role="group" aria-label={t('group_color')}>
+      />
+      <MenuSeparator />
+      <MenuHeader>{t('group_color')}</MenuHeader>
+      <div className="dots" role="group" aria-label={t('group_color')}>
         {Array.from({ length: GROUP_COLORS }, (_, color) => (
           <button
             key={color}
             type="button"
             role="menuitemradio"
             aria-checked={group.color === color}
-            aria-label={t('group_color_n', String(color + 1))}
-            className={`group-menu__swatch group-c${String(color)}${group.color === color ? ' group-menu__swatch--on' : ''}`}
+            aria-label={COLOR_NAMES[color]}
+            title={COLOR_NAMES[color]}
+            className={`dot group-c${String(color)}${group.color === color ? ' dot--on' : ''}`}
             onClick={run(() => {
               onColor(color);
             })}
           />
         ))}
       </div>
+      <MenuSeparator />
       <ReorderItems reorder={reorder} onClose={onClose} />
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
-        title={t('group_to_folder_hint')}
-        onClick={run(onToFolder)}
-      >
-        {t('group_to_folder')}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
-        title={t('group_dissolve_hint')}
-        onClick={run(onDissolve)}
-      >
-        {t('group_dissolve')}
-      </button>
-    </Popover>
+      <MenuSeparator />
+      <MenuItem icon="folder" label={t('group_to_folder')} title={t('group_to_folder_hint')} onClick={run(onToFolder)} />
+      <MenuItem icon="dissolve" label={t('group_dissolve')} title={t('group_dissolve_hint')} onClick={run(onDissolve)} />
+    </Menu>
   );
 }

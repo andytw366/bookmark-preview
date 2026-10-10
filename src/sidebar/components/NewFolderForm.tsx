@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '../../ui/Button';
 import { t } from '@/shared/i18n';
 
 interface NewFolderFormProps {
@@ -31,7 +32,7 @@ export function NewFolderForm({ hint, onCreate, onCancel }: NewFolderFormProps) 
       }}
     >
       <input
-        className="rowmenu__input"
+        className="input"
         value={name}
         autoFocus
         placeholder={t('folder_name_placeholder')}
@@ -45,12 +46,12 @@ export function NewFolderForm({ hint, onCreate, onCancel }: NewFolderFormProps) 
           }
         }}
       />
-      <button type="submit" className="chip chip--primary" disabled={name.trim() === ''}>
+      <Button type="submit" variant="primary" disabled={name.trim() === ''}>
         {t('action_create')}
-      </button>
-      <button type="button" className="chip" onClick={onCancel}>
+      </Button>
+      <Button variant="ghost" onClick={onCancel}>
         {t('action_cancel')}
-      </button>
+      </Button>
       {hint === undefined ? null : <p className="newfolder__hint">{hint}</p>}
     </form>
   );

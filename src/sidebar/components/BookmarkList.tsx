@@ -32,6 +32,12 @@ interface BookmarkListProps {
    * 搜尋結果與 Firefox 的永久資料夾那一層不傳：那裡的順序沒有意義、也不能排。
    */
   grouping?: { board: ListBoard; drag: GridDrag } | undefined;
+  /** 右鍵選單正開在哪一列（留外框） */
+  activeId?: string | null | undefined;
+  /** 搜尋字（符合的部分加底色） */
+  highlight?: string | undefined;
+  /** 搜尋結果的第二行：這一筆在哪個資料夾。不是搜尋結果就不傳 */
+  locationOf?: ((node: BookmarkNode) => string | undefined) | undefined;
 }
 
 /**
@@ -40,7 +46,7 @@ interface BookmarkListProps {
  * 只影響捲軸長度與第一次繪製要畫幾列，量到之後就以實際值為準，所以不必精準；
  * 但也不能亂給 —— 估太小會在第一次繪製時畫出遠超過視窗的列數。
  */
-const ESTIMATE: Record<Density, number> = { card: 210, row: 55, text: 28 };
+const ESTIMATE: Record<Density, number> = { card: 170, row: 52, text: 44 };
 
 export function BookmarkList({
   nodes,
@@ -56,6 +62,9 @@ export function BookmarkList({
   onNavigateUp,
   listKey,
   grouping,
+  activeId,
+  highlight,
+  locationOf,
 }: BookmarkListProps) {
   // hook 不能寫在 early return 後面，所以擺在空清單那個分支之前
   const virtual = useVirtualRows({
@@ -106,6 +115,9 @@ export function BookmarkList({
             selecting={selecting}
             selected={selected.has(node.id)}
             onToggleSelect={onToggleSelect}
+            active={activeId === node.id}
+            highlight={highlight}
+            location={locationOf?.(node)}
             dragProps={grouping?.drag.cardProps(node.id)}
           />
         </ListCell>

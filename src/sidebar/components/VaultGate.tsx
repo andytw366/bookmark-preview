@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { VaultState } from '@/shared/types';
+import { Button } from '../../ui/Button';
+import { CheckField } from '../../ui/Toggles';
 import { RecoveryKeyPanel } from './RecoveryKeyPanel';
 import { t } from '@/shared/i18n';
 import { Rich } from '../lib/rich';
@@ -15,8 +17,9 @@ interface VaultGateProps {
   onCreated?: () => void;
   /** 放棄這台裝置上的隱私空間（舊格式時唯一的出路） */
   onForget?: () => void;
+  /** 在密碼框（對話框）裡：右下角提示「Esc 取消」 */
+  escHint?: boolean;
 }
-
 
 
 /** 尚未建立隱私空間、已建立但上鎖、或資料是舊格式時的介面。 */
@@ -27,6 +30,7 @@ export function VaultGate({
   onUnlockWithRecoveryKey,
   onCreated,
   onForget,
+  escHint = false,
 }: VaultGateProps) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -74,27 +78,32 @@ export function VaultGate({
         {onForget === undefined ? (
           <p className="gate__hint">{t('vault_legacy_how')}</p>
         ) : (
-          <button type="button" className="gate__submit" onClick={onForget}>
+          <Button variant="danger" onClick={onForget}>
             {t('vault_legacy_action')}
-          </button>
+          </Button>
         )}
       </div>
     );
   }
 
+  const esc = escHint ? <span className="gate__esc">{t('vault_prompt_esc')}</span> : null;
+
+  /*
+   * 上鎖時的密碼框刻意看起來像一般的驗證：標題只寫「輸入密碼」、按鈕是「繼續」，
+   * 不提「隱私空間」也不寫「解鎖」—— 旁人瞄到這個畫面不該聯想到裡面藏著東西。
+   */
   if (state.status === 'locked') {
     if (usingRecovery) {
       return (
         <div className="gate">
           <h2 className="gate__title">{t('vault_unlock_recovery_title')}</h2>
-          <p className="gate__hint">
-            {t('vault_unlock_recovery_hint')}
-          </p>
+          <p className="gate__hint">{t('vault_unlock_recovery_hint')}</p>
           {/* 不包在 <form> 裡：表單送出會觸發 Firefox 的存密碼提示 */}
           <input
             type="text"
-            className="gate__input"
+            className="input"
             placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+            aria-label={t('vault_unlock_recovery_title')}
             autoComplete="off"
             spellCheck={false}
             autoFocus
@@ -108,37 +117,39 @@ export function VaultGate({
               }
             }}
           />
-          <button
-            type="button"
-            className="gate__submit"
+          <Button
+            variant="primary"
             disabled={recoveryInput.trim() === ''}
             onClick={() => {
               onUnlockWithRecoveryKey(recoveryInput);
             }}
           >
-            {t('vault_unlock_action')}
-          </button>
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => {
-              setUsingRecovery(false);
-              setRecoveryInput('');
-            }}
-          >
-            {t('vault_use_password_instead')}
-          </button>
+            {t('action_continue')}
+          </Button>
+          <div className="gate__foot">
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setUsingRecovery(false);
+                setRecoveryInput('');
+              }}
+            >
+              {t('vault_use_password_instead')}
+            </button>
+            {esc}
+          </div>
         </div>
       );
     }
 
     return (
       <div className="gate">
-        <h2 className="gate__title">{t('vault_locked_title')}</h2>
+        <h2 className="gate__title">{t('vault_prompt_title')}</h2>
         <input
           type="password"
-          className="gate__input"
-          placeholder={t('vault_secret_password')}
+          className="input"
+          aria-label={t('vault_prompt_title')}
           autoComplete="off"
           autoFocus
           value={password}
@@ -152,26 +163,28 @@ export function VaultGate({
             }
           }}
         />
-        <button
-          type="button"
-          className="gate__submit"
+        <Button
+          variant="primary"
           disabled={password === ''}
           onClick={() => {
             onUnlock(password);
             setPassword('');
           }}
         >
-          {t('vault_unlock_action')}
-        </button>
-        <button
-          type="button"
-          className="link-button"
-          onClick={() => {
-            setUsingRecovery(true);
-          }}
-        >
-          {t('vault_forgot_password')}
-        </button>
+          {t('action_continue')}
+        </Button>
+        <div className="gate__foot">
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setUsingRecovery(true);
+            }}
+          >
+            {t('vault_use_recovery_instead')}
+          </button>
+          {esc}
+        </div>
       </div>
     );
   }
@@ -208,15 +221,15 @@ export function VaultGate({
         </p>
         <p className="notice__body">
           <Rich text={t('vault_create_body')} />
-          
         </p>
       </div>
 
       {/* 密碼欄位不包在 <form> 裡：表單送出會觸發 Firefox 的「要儲存密碼嗎？」提示 */}
       <input
         type="password"
-        className="gate__input"
+        className="input"
         placeholder={t('vault_password_placeholder', MIN_PASSWORD_LENGTH)}
+        aria-label={t('vault_password_placeholder', MIN_PASSWORD_LENGTH)}
         autoComplete="new-password"
         value={password}
         onChange={(event) => {
@@ -225,8 +238,9 @@ export function VaultGate({
       />
       <input
         type="password"
-        className="gate__input"
+        className="input"
         placeholder={t('vault_password_again')}
+        aria-label={t('vault_password_again')}
         autoComplete="new-password"
         value={confirm}
         onChange={(event) => {
@@ -242,25 +256,14 @@ export function VaultGate({
       {password !== '' && tooShort ? <p className="gate__hint">{t('vault_password_too_short', MIN_PASSWORD_LENGTH)}</p> : null}
       {confirm !== '' && mismatch ? <p className="gate__hint">{t('vault_password_mismatch')}</p> : null}
 
-      <label className="gate__check">
-        <input
-          type="checkbox"
-          checked={acknowledged}
-          onChange={(event) => {
-            setAcknowledged(event.target.checked);
-          }}
-        />
+      <CheckField checked={acknowledged} onChange={setAcknowledged}>
         {t('vault_create_acknowledge')}
-      </label>
+      </CheckField>
 
-      <button
-        type="button"
-        className="gate__submit"
-        disabled={tooShort || mismatch || !acknowledged || busy}
-        onClick={submit}
-      >
+      <Button variant="primary" disabled={tooShort || mismatch || !acknowledged || busy} onClick={submit}>
         {busy ? t('action_creating') : t('action_create')}
-      </button>
+      </Button>
+      {esc === null ? null : <div className="gate__foot">{esc}</div>}
     </div>
   );
 }

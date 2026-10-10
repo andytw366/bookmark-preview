@@ -3,10 +3,10 @@ import type { Board } from '@/shared/board';
 import type { Grid } from '@/shared/grid';
 import { groupRects, roundedPath, unionOutline, type MemberCell } from '@/shared/outline';
 
-/** 框線離卡片多遠（網格間距 16px 的四分之一：兩個群組相鄰時中間留 8px） */
-const PAD = 4;
-/** 轉角的圓角半徑 */
-const RADIUS = 10;
+/** 框線離卡片多遠（網格間距 16px 減掉兩邊各 6px：兩個群組相鄰時中間留 4px） */
+const PAD = 6;
+/** 轉角的圓角半徑（--r-2xl） */
+const RADIUS = 16;
 
 interface OutlinePath {
   groupId: string;

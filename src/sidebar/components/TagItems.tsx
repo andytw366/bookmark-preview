@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
-import { Popover } from './Popover';
+import { Button } from '../../ui/Button';
+import { Menu, MenuItem } from '../../ui/Menu';
 import { t } from '@/shared/i18n';
 
 /**
@@ -30,46 +31,37 @@ export function TagItems({
 }) {
   if (isFolder) {
     return tag.onFlatten === undefined ? null : (
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
-        disabled={tag.onFlatten === null}
+      <MenuItem
+        icon="frame"
+        label={t('group_flatten')}
         title={tag.onFlatten === null ? t('group_flatten_has_folders') : t('group_flatten_hint')}
+        disabled={tag.onFlatten === null}
         onClick={() => {
           tag.onFlatten?.();
           onClose();
         }}
-      >
-        {t('group_flatten')}
-      </button>
+      />
     );
   }
   return (
     <>
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
+      <MenuItem
+        icon="tag"
+        label={t('tag_set')}
         onClick={() => {
           onClose();
           tag.onSetTag(x, y);
         }}
-      >
-        {t('tag_set')}
-      </button>
+      />
       {tag.onLeave !== null ? (
-        <button
-          type="button"
-          role="menuitem"
-          className="rowmenu__item"
+        <MenuItem
+          icon="leave-group"
+          label={t('tag_leave')}
           onClick={() => {
             tag.onLeave?.();
             onClose();
           }}
-        >
-          {t('tag_leave')}
-        </button>
+        />
       ) : null}
     </>
   );
@@ -97,9 +89,9 @@ export function TagPrompt({
   const [name, setName] = useState(current);
   const listId = useId();
   return (
-    <Popover x={x} y={y} onClose={onClose}>
+    <Menu x={x} y={y} onClose={onClose}>
       <form
-        className="rowmenu__form"
+        className="menu__form"
         onSubmit={(event) => {
           event.preventDefault();
           const trimmed = name.trim();
@@ -110,7 +102,7 @@ export function TagPrompt({
         }}
       >
         <input
-          className="rowmenu__input"
+          className="input"
           value={name}
           list={listId}
           data-autofocus=""
@@ -125,10 +117,10 @@ export function TagPrompt({
             <option key={option} value={option} />
           ))}
         </datalist>
-        <button type="submit" className="chip chip--primary">
+        <Button type="submit" variant="primary">
           {t('action_save')}
-        </button>
+        </Button>
       </form>
-    </Popover>
+    </Menu>
   );
 }

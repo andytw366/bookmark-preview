@@ -12,14 +12,18 @@ interface PopoverProps {
   x: number;
   y: number;
   className?: string;
-  role?: string;
+  role?: string | undefined;
+  /** 選單的名稱（`aria-label`） */
+  label?: string | undefined;
+  /** `end`：右緣對齊 x（觸發的按鈕在畫面右邊時，選單往左長） */
+  align?: 'start' | 'end' | undefined;
   onClose: () => void;
   children: ReactNode;
 }
 
 const MARGIN = 6;
 /** 量到實際寬度之前的預設值，用於首次繪製的水平夾限 */
-const ASSUMED_WIDTH = 190;
+const ASSUMED_WIDTH = 208;
 
 /** 選單裡真的能收到焦點的東西（停用的項目要跳過，否則方向鍵會卡在上面）。 */
 const FOCUSABLE = [
@@ -58,10 +62,10 @@ function defaultFocusIn(box: HTMLElement): HTMLElement | undefined {
  * 第一個項目、Tab 困在選單內、關閉時還給觸發元素 —— 少了最後這一項，用鍵盤
  * 開了選單再按 Escape，焦點會掉到 `<body>`，等於被丟回清單開頭。
  */
-export function Popover({ x, y, className, role, onClose, children }: PopoverProps) {
+export function Popover({ x, y, className, role, label, align = 'start', onClose, children }: PopoverProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState({
-    left: Math.max(MARGIN, Math.min(x, window.innerWidth - ASSUMED_WIDTH)),
+    left: Math.max(MARGIN, Math.min(align === 'end' ? x - ASSUMED_WIDTH : x, window.innerWidth - ASSUMED_WIDTH)),
     top: y,
   });
 
@@ -181,19 +185,20 @@ export function Popover({ x, y, className, role, onClose, children }: PopoverPro
       return;
     }
     const { offsetWidth: width, offsetHeight: height } = box;
-    const left = Math.max(MARGIN, Math.min(x, window.innerWidth - width - MARGIN));
+    const left = Math.max(MARGIN, Math.min(align === 'end' ? x - width : x, window.innerWidth - width - MARGIN));
     const overflowsBottom = y + height + MARGIN > window.innerHeight;
     const top = overflowsBottom ? Math.max(MARGIN, y - height) : y;
     setPlacement((current) =>
       current.left === left && current.top === top ? current : { left, top },
     );
-  }, [x, y, children]);
+  }, [x, y, align, children]);
 
   return (
     <div
       ref={boxRef}
-      className={className ?? 'rowmenu'}
+      className={className ?? 'menu'}
       role={role}
+      aria-label={label}
       onKeyDown={onKeyDown}
       style={{ left: `${String(placement.left)}px`, top: `${String(placement.top)}px` }}
     >

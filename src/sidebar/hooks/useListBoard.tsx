@@ -39,11 +39,18 @@ export interface RowGroup {
   group: GroupInfo;
   first: boolean;
   last: boolean;
+  /** 群組裡有幾個（標題列上的數字） */
+  count: number;
 }
 
 export function useListBoard(space: ListBoardSpace) {
   const { board } = space;
-  const [groupMenu, setGroupMenu] = useState<{ group: GroupInfo; x: number; y: number } | null>(null);
+  const [groupMenu, setGroupMenu] = useState<{
+    group: GroupInfo;
+    x: number;
+    y: number;
+    align: 'start' | 'end' | undefined;
+  } | null>(null);
   const [tagPrompt, setTagPrompt] = useState<{ ids: string[]; current: string; x: number; y: number } | null>(null);
   const [merge, setMerge] = useState<{ targetId: string; ids: string[]; x: number; y: number } | null>(null);
 
@@ -62,6 +69,7 @@ export function useListBoard(space: ListBoardSpace) {
       group: shownGroup(group),
       first: board.memberOf.get(board.grid.cells[at - 1] ?? '') !== groupId,
       last: board.memberOf.get(board.grid.cells[at + 1] ?? '') !== groupId,
+      count: membersInOrder(board, group.id).length,
     };
   };
 
@@ -215,6 +223,7 @@ export function useListBoard(space: ListBoardSpace) {
           group={groupMenu.group}
           x={groupMenu.x}
           y={groupMenu.y}
+          align={groupMenu.align}
           reorder={{
             earlier: groupNudger(groupMenu.group.id, -1),
             later: groupNudger(groupMenu.group.id, 1),
@@ -286,13 +295,15 @@ export function useListBoard(space: ListBoardSpace) {
     /** 畫面的順序（群組聚成連續的幾列）。清單照這個排 */
     order: board.grid.cells,
     rowGroup,
-    openGroupMenu: (group: GroupInfo, x: number, y: number) => {
+    openGroupMenu: (group: GroupInfo, x: number, y: number, align?: 'start' | 'end') => {
       if (space.onTag !== undefined) {
         space.onTag(group.id);
         return;
       }
-      setGroupMenu({ group, x, y });
+      setGroupMenu({ group, x, y, align });
     },
+    /** 群組選單正開著的那一組（⋯ 按鈕留著「開啟中」的樣子） */
+    menuGroupId: groupMenu?.group.id ?? null,
     /** 標籤的提示：搜尋結果裡點它是跳到資料夾 */
     tagHint: space.onTag === undefined ? undefined : t('group_tag_search_hint'),
     reorder,

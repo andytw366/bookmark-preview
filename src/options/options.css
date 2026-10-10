@@ -1,159 +1,485 @@
-/* 設定頁在一般分頁中開啟，寬度充裕，不受側邊欄的窄欄限制。 */
+/*
+ * 設定頁的版面。左側固定目錄＋右側內容；每個設定是一張卡片裡的一列（左說明、右控制項）。
+ * 共用元件在 ui/components.css，數值在 ui/tokens.css。
+ */
 
 body {
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
-.options {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px 20px 64px;
+.opts--loading {
+  padding: 40px 24px;
+  color: var(--text-2);
 }
 
-.options h1 {
-  margin: 0 0 4px;
-  font-size: 1.4em;
-}
-
-.options__lede {
-  margin: 0 0 24px;
-  color: var(--fg-dim);
-}
-
-.options section {
-  padding: 16px 0;
-  border-top: 1px solid var(--border);
-}
-
-.options h2 {
-  margin: 0 0 4px;
-  font-size: 1.05em;
-}
-
-.options p {
-  margin: 0 0 10px;
-  line-height: 1.55;
-}
-
-.options__hint {
-  color: var(--fg-dim);
-  font-size: 0.92em;
-}
-
-.options__row {
+.opts__head {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  margin-top: 10px;
+  gap: 12px 24px;
+  align-items: flex-end;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 40px 24px 28px;
 }
 
-.options label.options__check {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  margin-top: 8px;
-  line-height: 1.5;
-  cursor: pointer;
-}
-
-.options input[type='number'],
-.options input[type='text'],
-.options textarea {
-  padding: 5px 7px;
-  font: inherit;
-  color: var(--fg);
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.options textarea {
-  width: 100%;
-  min-height: 70px;
-  resize: vertical;
-}
-
-/* 標籤在輸入框上方而不是當成 placeholder —— placeholder 一打字就消失 */
-.options__field {
+.opts__titles {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  align-items: flex-start;
-  margin-top: 10px;
 }
 
-.options__field input {
-  min-width: 220px;
+.opts__product {
+  color: var(--text-2);
+  font-size: var(--fs-md);
 }
 
-.options__status {
-  margin-top: 8px;
-  color: var(--fg-dim);
-  font-size: 0.92em;
-}
-
-.options input[type='password'],
-.options input[type='file'] {
-  padding: 5px 7px;
-  font: inherit;
-  color: var(--fg);
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.options input[type='password'] {
-  min-width: 220px;
-}
-
-.options__details {
-  margin-top: 10px;
-  font-size: 0.92em;
-}
-
-.options__details summary {
-  color: var(--fg-dim);
-  cursor: pointer;
-}
-
-.options__details > * {
-  margin-top: 8px;
-}
-
-/* 備份內容的手動複製區。等寬字讓「這是一團密文」看得出來 */
-.options__blob {
-  width: 100%;
-  min-height: 120px;
-  font-family: monospace;
-  font-size: 0.85em;
-  word-break: break-all;
-}
-
-/* 名稱／值兩欄。用 dl 是因為這確實是一組「項目 → 現況」 */
-.options__facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 12px;
-  margin: 12px 0 0;
-  font-size: 0.94em;
-}
-
-.options__facts dt {
-  color: var(--fg-dim);
-}
-
-.options__facts dd {
+.opts__head h1 {
   margin: 0;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
-.options__list {
-  margin: 8px 0 0;
+.opts__spacer {
+  flex: 1;
+}
+
+.opts__lede {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  color: var(--text-2);
+}
+
+.opts__wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 24px 64px;
+}
+
+/* 左側目錄：寬視窗時 sticky；窄視窗時疊到上方（flex-wrap） */
+.opts__nav {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex: 0 0 200px;
+  flex-direction: column;
+  gap: 2px;
+  align-self: flex-start;
+}
+
+.opts__navitem {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
+  color: var(--text);
+  font-size: 14px;
+  text-decoration: none;
+  border-radius: var(--r-md);
+}
+
+.opts__navitem .ico {
+  color: var(--text-2);
+}
+
+.opts__navitem:hover {
+  background: var(--surface-2);
+}
+
+.opts__navitem--on,
+.opts__navitem--on:hover {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-tint);
+}
+
+.opts__navitem--on .ico {
+  color: var(--accent);
+}
+
+.opts__navitem--danger,
+.opts__navitem--danger .ico {
+  color: var(--danger);
+}
+
+.opts__main {
+  display: flex;
+  flex: 999 1 560px;
+  flex-direction: column;
+  gap: 40px;
+  min-width: 0;
+  max-width: 800px;
+}
+
+/* 窄視窗：目錄變成上方一排可換行的連結 */
+@media (width < 860px) {
+  .opts__nav {
+    position: static;
+    flex: 1 1 100%;
+    flex-flow: row wrap;
+  }
+}
+
+/* ── 一組 ───────────────────────────────────────────────── */
+
+.sec {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-margin-top: 24px;
+}
+
+.sec > h2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+
+.sec--danger > h2 {
+  color: var(--danger);
+}
+
+.sec__hint {
+  margin: -6px 0 0;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+
+.sec__card {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.sec--danger .sec__card {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+/* ── 一列 ───────────────────────────────────────────────── */
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+  padding: 16px 20px;
+}
+
+.item + .item {
+  border-top: 1px solid var(--border);
+}
+
+.item__label {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.item__label b {
+  display: block;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.item__desc {
+  margin: 2px 0 0;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+
+.item__desc b,
+.item__desc strong {
+  color: var(--text);
+}
+
+.item__control {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.item__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.item__small {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.item__below {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.item__status {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.item__list {
+  margin: 0;
   padding-left: 1.3em;
-  color: var(--fg-dim);
   line-height: 1.6;
 }
 
-.options__list li + li {
+.item__list li + li {
   margin-top: 6px;
+}
+
+/* ── 輸入框 ─────────────────────────────────────────────── */
+
+.input--num {
+  width: 72px;
+  text-align: right;
+}
+
+.input--mono {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+}
+
+.input--trigger {
+  width: 200px;
+}
+
+.input--select {
+  width: 240px;
+  max-width: 100%;
+}
+
+.input--file {
+  padding: 4px 6px;
+}
+
+.input--blob {
+  min-height: 120px;
+  word-break: break-all;
+}
+
+textarea.input--mono {
+  min-height: 88px;
+}
+
+/* ── 展開的區塊（同步狀態、改密碼、還原） ─────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border-radius: var(--r-lg);
+}
+
+.panel--narrow {
+  max-width: 420px;
+}
+
+.panel--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.panel--grid > .field__error,
+.panel--grid > .field__note,
+.panel__end,
+.panel__wide {
+  grid-column: 1 / -1;
+}
+
+.panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  align-items: flex-start;
+}
+
+.panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.panel__end {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.field .seg {
+  align-self: flex-start;
+}
+
+.field__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+
+.field__note {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+/* 名稱／值兩欄。用 dl 是因為這確實是一組「項目 → 現況」 */
+.kv {
+  display: grid;
+  flex: 1 1 320px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+  margin: 0;
+}
+
+.kv dt {
+  color: var(--text-2);
+}
+
+.kv dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  margin: 0;
+}
+
+.meter {
+  display: block;
+  width: 160px;
+  height: 6px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: var(--r-full);
+}
+
+.meter i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--r-full);
+}
+
+.meter i.meter--over {
+  background: var(--danger);
+}
+
+.badge {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: var(--r-full);
+}
+
+.badge--ok {
+  color: var(--success);
+  background: var(--success-tint);
+}
+
+.badge--warn {
+  color: var(--warn);
+  background: var(--warn-tint);
+}
+
+.badge--mute {
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+
+/* 黃色提醒（建議改掉觸發字串、同步超過額度…） */
+.note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  line-height: 1.55;
+  border-radius: var(--r-lg);
+}
+
+.note p {
+  margin: 0;
+}
+
+.note .ico {
+  margin-top: 2px;
+}
+
+.note--warn {
+  color: var(--warn);
+  background: var(--warn-tint);
+}
+
+.details summary {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.details > :not(summary) {
+  margin: 8px 0 0;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+
+/* 危險操作的確認 */
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: flex-end;
+  padding: 14px 16px;
+  background: var(--danger-tint);
+  border-radius: var(--r-lg);
+}
+
+.confirm__text {
+  flex: 1 1 260px;
+  min-width: 0;
+  line-height: 1.55;
+}
+
+.confirm__actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.recovery__code {
+  font-size: var(--fs-lg);
 }

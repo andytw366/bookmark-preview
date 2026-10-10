@@ -1,5 +1,5 @@
 import type { PrivateFolder } from '@/shared/types';
-import { Popover } from './Popover';
+import { Menu, MenuHeader, MenuItem } from '../../ui/Menu';
 import { t } from '@/shared/i18n';
 
 interface VaultFolderPickerProps {
@@ -73,32 +73,27 @@ export function VaultFolderPicker({
   onClose,
 }: VaultFolderPickerProps) {
   return (
-    <Popover x={x} y={y} className="rowmenu rowmenu--list" onClose={onClose}>
-      <p className="rowmenu__heading">{heading}</p>
-      <button
-        type="button"
-        className="rowmenu__item"
+    <Menu x={x} y={y} variant="list" onClose={onClose}>
+      <MenuHeader>{heading}</MenuHeader>
+      <MenuItem
+        icon="folder"
+        label={t('folder_top_level')}
         disabled={disabledId === null}
         onClick={() => {
           onPick(null);
         }}
-      >
-        {t('folder_top_level')}
-      </button>
+      />
       {flatten(folders, null, 0, excludeIds).map((choice) => (
-        <button
+        <MenuItem
           key={choice.id}
-          type="button"
-          className="rowmenu__item"
+          icon="folder"
+          label={`${'\u2003'.repeat(choice.depth)}${choice.name || t('folder_untitled')}`}
           disabled={choice.id === disabledId}
           onClick={() => {
             onPick(choice.id);
           }}
-        >
-          {' '.repeat(choice.depth * 2)}
-          {choice.name || t('folder_untitled')}
-        </button>
+        />
       ))}
-    </Popover>
+    </Menu>
   );
 }

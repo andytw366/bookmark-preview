@@ -1,5 +1,6 @@
 import type { RefreshReport } from '@/shared/messages';
 import type { PreviewMode } from '@/shared/types';
+import { MenuItem } from '../../ui/Menu';
 import { peekThumb } from '../lib/thumb-cache';
 import { t } from '@/shared/i18n';
 
@@ -22,10 +23,9 @@ export function PreviewModeItem({ thumbKey, send, onClose, onNotice }: PreviewMo
   const showingIcon = thumbKey !== undefined && peekThumb(thumbKey)?.source === 'icon';
   const next: PreviewMode = showingIcon ? 'page' : 'icon';
   return (
-    <button
-      type="button"
-      role="menuitem"
-      className="rowmenu__item"
+    <MenuItem
+      icon={showingIcon ? 'image' : 'site-icon'}
+      label={showingIcon ? t('row_use_page_preview') : t('row_use_site_icon')}
       title={showingIcon ? t('row_use_page_preview_hint') : t('row_use_site_icon_hint')}
       onClick={() => {
         onClose();
@@ -39,8 +39,6 @@ export function PreviewModeItem({ thumbKey, send, onClose, onNotice }: PreviewMo
           },
         );
       }}
-    >
-      {showingIcon ? t('row_use_page_preview') : t('row_use_site_icon')}
-    </button>
+    />
   );
 }

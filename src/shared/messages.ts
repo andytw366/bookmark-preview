@@ -43,6 +43,11 @@ export interface RefreshReport {
 export interface BackfillReport {
   total: number;
   ok: number;
+  /**
+   * 這次試過卻還是沒有預覽圖的：一般書籤是網址，隱私書籤是 id。
+   * 補抓完的提示有「查看缺的」，靠這份清單篩出來。
+   */
+  missing: string[];
 }
 
 export interface ImportReport {

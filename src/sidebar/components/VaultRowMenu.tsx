@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { request } from '@/shared/messages';
 import type { PrivateBookmark, PrivateFolder } from '@/shared/types';
 import { vaultThumbKey } from '@/shared/url';
-import { Popover } from './Popover';
+import { Button } from '../../ui/Button';
+import { Menu, MenuHeader, MenuItem, MenuSeparator } from '../../ui/Menu';
 import { PreviewModeItem } from './PreviewModeItem';
 import { ReorderItems, type ReorderActions } from './ReorderItems';
 import { TagItems, type TagActions } from './TagItems';
@@ -101,9 +102,9 @@ export function VaultRowMenu({
 
   if (renaming) {
     return (
-      <Popover x={target.x} y={target.y} onClose={onClose}>
+      <Menu x={target.x} y={target.y} onClose={onClose}>
         <form
-          className="rowmenu__form"
+          className="menu__form"
           onSubmit={(event) => {
             event.preventDefault();
             const next = name.trim();
@@ -129,7 +130,7 @@ export function VaultRowMenu({
           }}
         >
           <input
-            className="rowmenu__input"
+            className="input"
             value={name}
             autoFocus
             data-autofocus=""
@@ -138,11 +139,11 @@ export function VaultRowMenu({
             }}
             aria-label={target.kind === 'folder' ? t('folder_name_label_edit') : t('vault_bookmark_name_label')}
           />
-          <button type="submit" className="chip chip--primary">
+          <Button type="submit" variant="primary">
             {t('action_save')}
-          </button>
+          </Button>
         </form>
-      </Popover>
+      </Menu>
     );
   }
 
@@ -162,98 +163,86 @@ export function VaultRowMenu({
     // 搬資料夾時把自己整棵子樹拿掉；自己那一項在下面也一併排除了
     const choices = flatten(folders, null, 0, movingFolder ? movingId : null);
     return (
-      <Popover x={target.x} y={target.y} className="rowmenu rowmenu--list" onClose={onClose}>
-        <p className="rowmenu__heading">{t('action_move_to')}</p>
-        <button
-          type="button"
-          className="rowmenu__item"
+      <Menu x={target.x} y={target.y} variant="list" onClose={onClose}>
+        <MenuHeader>{t('action_move_to')}</MenuHeader>
+        <MenuItem
+          icon="folder"
+          label={t('folder_top_level')}
           disabled={current === null}
           onClick={() => {
             move(null);
           }}
-        >
-          {t('folder_top_level')}
-        </button>
+        />
         {choices.map((choice) => (
-          <button
+          <MenuItem
             key={choice.id}
-            type="button"
-            className="rowmenu__item"
+            icon="folder"
+            label={`${'\u2003'.repeat(choice.depth)}${choice.name || t('folder_untitled')}`}
             disabled={choice.id === current}
             onClick={() => {
               move(choice.id);
             }}
-          >
-            {' '.repeat(choice.depth * 2)}
-            {choice.name || t('folder_untitled')}
-          </button>
+          />
         ))}
-      </Popover>
+      </Menu>
     );
   }
 
   if (confirmDelete) {
     const isFolder = target.kind === 'folder';
     return (
-      <Popover x={target.x} y={target.y} onClose={onClose}>
-        <p className="rowmenu__heading">{t('delete_confirm_named', initialName || t('folder_untitled'))}</p>
-        <p className="rowmenu__note">
-          {isFolder
-            ? t('vault_delete_folder_note')
-            : t('vault_delete_bookmark_note')}
-        </p>
-        <button
-          type="button"
-          className="rowmenu__item rowmenu__item--danger"
-          onClick={() => {
-            if (target.kind === 'folder') {
-              onDeleteFolder(target.folder.id);
-            } else {
-              onRemove(target.record.id);
-            }
-            onClose();
-          }}
-        >
-          {t('action_delete_confirm')}
-        </button>
+      <Menu x={target.x} y={target.y} variant="prompt" onClose={onClose}>
+        <p className="menu__title">{t('delete_confirm_named', initialName || t('folder_untitled'))}</p>
+        <p className="menu__note">{isFolder ? t('vault_delete_folder_note') : t('vault_delete_bookmark_note')}</p>
         {/* 焦點給「取消」，理由同 RowMenu：連按兩次 Enter 不該就刪掉東西 */}
-        <button type="button" className="rowmenu__item" data-autofocus="" onClick={onClose}>
-          {t('action_cancel')}
-        </button>
-      </Popover>
+        <div className="menu__actions">
+          <Button variant="ghost" data-autofocus="" onClick={onClose}>
+            {t('action_cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (target.kind === 'folder') {
+                onDeleteFolder(target.folder.id);
+              } else {
+                onRemove(target.record.id);
+              }
+              onClose();
+            }}
+          >
+            {t('action_delete_confirm')}
+          </Button>
+        </div>
+      </Menu>
     );
   }
 
+  const targetId = target.kind === 'folder' ? target.folder.id : target.record.id;
+
   return (
-    <Popover x={target.x} y={target.y} role="menu" onClose={onClose}>
+    <Menu x={target.x} y={target.y} role="menu" onClose={onClose}>
       {target.kind === 'bookmark' ? (
         <>
-          <button
-            type="button"
-            role="menuitem"
-            className="rowmenu__item"
+          <MenuItem
+            icon="open-new"
+            label={t('action_open_in_new_tab')}
             onClick={() => {
               onOpen(target.record.url, true);
               onClose();
             }}
-          >
-            {t('action_open_in_new_tab')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="rowmenu__item"
+          />
+          <MenuItem
+            icon="copy"
+            label={t('action_copy_url')}
             onClick={() => {
               void navigator.clipboard.writeText(target.record.url).catch(() => undefined);
               onClose();
             }}
-          >
-            {t('action_copy_url')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="rowmenu__item"
+          />
+          <MenuSeparator />
+          <MenuItem
+            icon="refresh"
+            label={t('action_refresh_thumb')}
             title={t('vault_refresh_thumb_hint')}
             onClick={() => {
               const id = target.record.id;
@@ -268,87 +257,68 @@ export function VaultRowMenu({
                 },
               );
             }}
-          >
-            {t('action_refresh_thumb')}
-          </button>
+          />
           <PreviewModeItem
             thumbKey={vaultThumbKey(target.record.id)}
             send={async (mode) => request('vault/set-thumb-mode', { id: target.record.id, mode })}
             onClose={onClose}
             onNotice={onNotice}
           />
+          <MenuSeparator />
         </>
       ) : null}
 
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
+      <MenuItem
+        icon="rename"
+        label={t('action_rename')}
         onClick={() => {
           setRenaming(true);
         }}
-      >
-        {t('action_rename')}
-      </button>
-
+      />
       {/* 資料夾也能搬 —— 多選已經可以勾它了，單筆選單沒有反而不一致 */}
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
+      <MenuItem
+        icon="folder-move"
+        label={t('action_move_to')}
         onClick={() => {
           setChoosingFolder(true);
         }}
-      >
-        {t('action_move_to')}
-      </button>
-
+      />
       {reorder !== undefined ? <ReorderItems reorder={reorder} onClose={onClose} /> : null}
-
       {tag !== undefined ? (
         <TagItems tag={tag} x={target.x} y={target.y} isFolder={target.kind === 'folder'} onClose={onClose} />
       ) : null}
 
-      {/* 資料夾與書籤都能移出：資料夾會連同子樹在原生書籤裡重建，與移入對稱 */}
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
-        title={
-          target.kind === 'folder'
-            ? t('vault_export_folder_hint')
-            : t('vault_export_hint')
-        }
+      {/* 「移出」自成一組，和一般的「移動到…」分開，避免搞混。
+          資料夾與書籤都能移出：資料夾會連同子樹在原生書籤裡重建，與移入對稱 */}
+      <MenuSeparator />
+      <MenuItem
+        icon="move-out"
+        label={target.kind === 'folder' ? t('vault_export_folder') : t('vault_export')}
+        title={target.kind === 'folder' ? t('vault_export_folder_hint') : t('vault_export_hint')}
         onClick={() => {
-          onMoveOut(target.kind === 'folder' ? target.folder.id : target.record.id);
+          onMoveOut(targetId);
           onClose();
         }}
-      >
-        {target.kind === 'folder' ? t('vault_export_folder') : t('vault_export')}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item"
+      />
+      <MenuItem
+        icon="move-out"
+        label={t('vault_export_to')}
         title={t('vault_export_to_hint')}
         onClick={() => {
-          onExportTo(target.kind === 'folder' ? target.folder.id : target.record.id, target.x, target.y);
+          onExportTo(targetId, target.x, target.y);
           onClose();
         }}
-      >
-        {t('vault_export_to')}
-      </button>
+      />
 
-      <button
-        type="button"
-        role="menuitem"
-        className="rowmenu__item rowmenu__item--danger"
+      <MenuSeparator />
+      <MenuItem
+        icon="trash"
+        label={t('action_delete')}
+        danger
         onClick={() => {
           setConfirmDelete(true);
         }}
-      >
-        {t('action_delete')}
-      </button>
-    </Popover>
+      />
+    </Menu>
   );
 }

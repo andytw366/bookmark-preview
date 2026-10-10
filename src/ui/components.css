@@ -1,0 +1,976 @@
+/*
+ * 共用元件的樣式（側邊欄、全頁瀏覽、設定頁都載入）。數值一律來自 tokens.css。
+ *
+ * 各頁自己的版面在 sidebar/styles.css、gallery/gallery.css、options/options.css。
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+  background: var(--bg);
+}
+
+button,
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+a {
+  color: var(--accent);
+}
+
+.ico {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── 圖示鈕 ─────────────────────────────────────────────── */
+
+.ib {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 0;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-radius: var(--r-md);
+}
+
+.ib--lg {
+  width: var(--ctl-h-lg);
+  height: var(--ctl-h-lg);
+}
+
+.ib:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.ib:active:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.ib--on,
+.ib--on:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.ib:disabled {
+  color: var(--text-3);
+}
+
+/* ── 有字的按鈕 ─────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  height: var(--ctl-h);
+  padding: 0 12px;
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--surface-2);
+  border: none;
+  border-radius: var(--r-md);
+}
+
+.btn .ico {
+  color: var(--text-2);
+}
+
+.btn--lg {
+  height: var(--ctl-h-lg);
+  padding: 0 14px;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.btn--primary {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.btn--primary .ico {
+  color: var(--on-accent);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn--ghost {
+  background: transparent;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn--outline {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.btn--outline:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn--danger {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.btn--danger .ico {
+  color: var(--danger);
+}
+
+.btn--danger:hover:not(:disabled) {
+  color: var(--danger-hover);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+.btn:disabled {
+  color: var(--text-3);
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+.btn:disabled .ico {
+  color: var(--text-3);
+}
+
+/* 純文字連結樣式的按鈕（「改用救援金鑰」「查看缺的」） */
+.link {
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  text-align: left;
+  background: none;
+  border: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* ── 分段控制 ───────────────────────────────────────────── */
+
+.seg {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+
+.seg__item {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+}
+
+.seg__item:hover:not(.seg__item--on) {
+  color: var(--text);
+}
+
+.seg__item--on {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--seg-on);
+  box-shadow: var(--shadow-1);
+}
+
+/* 只有圖示的分段：選中時字重沒有意義 */
+.seg__item:not(:has(.seg__label)) {
+  padding: 0 4px;
+}
+
+.seg--lg .seg__item {
+  min-width: 32px;
+  height: 28px;
+  padding: 0 10px;
+}
+
+.seg--fill {
+  display: flex;
+}
+
+.seg--fill .seg__item {
+  flex: 1;
+  min-width: 0;
+}
+
+.seg__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 勾選框、單選、開關（外觀） ───────────────────────────── */
+
+.cb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--on-accent);
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-sm);
+}
+
+.cb .ico {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.2;
+}
+
+.cb--on,
+.cb--mixed {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.cb--mixed::after {
+  width: 8px;
+  height: 2px;
+  background: var(--on-accent);
+  border-radius: 1px;
+  content: '';
+}
+
+.cb--lg {
+  width: 18px;
+  height: 18px;
+}
+
+.rd {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.rd--on {
+  border: 5px solid var(--accent);
+}
+
+.sw {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 16px;
+  background: var(--surface-3);
+  border-radius: var(--r-full);
+}
+
+.sw::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  content: '';
+}
+
+.sw--on {
+  background: var(--accent);
+}
+
+.sw--on::after {
+  left: 14px;
+  background: var(--knob);
+}
+
+/* 設定頁的開關按鈕：比選單裡的大一號 */
+.switch {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: var(--r-full);
+}
+
+.switch--lg .sw {
+  width: 32px;
+  height: 18px;
+}
+
+.switch--lg .sw::after {
+  width: 14px;
+  height: 14px;
+}
+
+.switch--lg .sw--on::after {
+  left: 16px;
+}
+
+.switch:disabled .sw {
+  opacity: 0.5;
+}
+
+/* 表單裡的原生勾選框：只換顏色，保留原生的鍵盤與可及行為 */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+}
+
+.check-field {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.check-field input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+}
+
+/* ── 輸入框 ─────────────────────────────────────────────── */
+
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--ctl-h);
+  padding: 0 8px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+}
+
+.input:focus-visible,
+.input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.input--lg {
+  height: var(--ctl-h-lg);
+  padding: 0 10px;
+}
+
+textarea.input {
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+/* 搜尋框：外框是一個 div，裡面是放大鏡、輸入、清除鈕 */
+.search {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  height: var(--ctl-h);
+  padding: 0 4px 0 8px;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+}
+
+.search:focus-within {
+  color: var(--text-2);
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.search__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: var(--text);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+.search__input::placeholder {
+  color: var(--text-2);
+}
+
+/* 自己畫清除鈕，拿掉原生的那一顆 */
+.search__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search .ib {
+  width: 22px;
+  height: 22px;
+}
+
+.search--lg {
+  height: var(--ctl-h-lg);
+  padding: 0 6px 0 10px;
+  gap: 8px;
+}
+
+.kbd {
+  flex: none;
+  padding: 0 5px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+}
+
+/* ── 選單 ───────────────────────────────────────────────── */
+
+.menu {
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: var(--menu-w);
+  max-width: calc(100vw - 12px);
+  padding: 4px;
+  color: var(--text);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-menu);
+}
+
+/* 資料夾清單可能很長 */
+.menu--list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* 確認框：要放說明文字與按鈕，比一般選單寬一點，內距也大一點 */
+.menu--prompt {
+  gap: 8px;
+  width: 260px;
+  padding: 12px;
+}
+
+.mi {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--text);
+  font-size: var(--fs-md);
+  text-align: left;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+}
+
+.mi .ico {
+  color: var(--text-2);
+}
+
+.mi:hover:not(:disabled),
+.mi:focus-visible {
+  background: var(--surface-2);
+}
+
+.mi:focus-visible {
+  outline: none;
+}
+
+.mi:disabled,
+.mi:disabled .ico {
+  color: var(--text-3);
+}
+
+.mi--danger,
+.mi--danger .ico {
+  color: var(--danger);
+}
+
+.mi__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 沒有圖示的項目（資料夾清單）也和有圖示的對齊 */
+.mi__pad {
+  display: none;
+}
+
+.mi__end {
+  flex: none;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+.msep {
+  flex: none;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+.mh {
+  padding: 6px 8px 2px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.menu__note {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.menu__title {
+  margin: 0;
+  padding: 0 2px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.menu__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+}
+
+.menu__actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.menu__list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* 群組顏色：6 顆圓點的單選 */
+.dots {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px 8px;
+}
+
+.dot {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: var(--g);
+  border: none;
+  border-radius: 50%;
+}
+
+.dot--on {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+}
+
+/* ── 預覽圖底板 ─────────────────────────────────────────── */
+
+/*
+ * 所有預覽圖都放進同一個底板：底板決定尺寸（大卡 16:9、小列 40×40，由各頁的版面給），
+ * 圖只決定怎麼放進去。四種圖混在一起時高度一致。
+ */
+.thumb {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  background: var(--plate);
+  border-radius: var(--r-md);
+  container-type: size;
+}
+
+.thumb img {
+  display: block;
+}
+
+/* 封面圖：不裁切，兩側露出底板 */
+.thumb--contain img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 網頁截圖：裁成底板的比例，從頂端對齊保留頁首 */
+.thumb--fill img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+/*
+ * 網站圖示：底板素色、圖示置中、20% 圓角。大小是底板寬的 34%（小列另外給 24px），
+ * 但不超過 --icon-limit（原圖的兩倍，元件給）—— 只有 16px favicon 的站放大了只會糊。
+ */
+.thumb--icon img {
+  width: min(34cqw, var(--icon-limit, 48px));
+  height: min(34cqw, var(--icon-limit, 48px));
+  object-fit: contain;
+  border-radius: var(--r-favicon);
+}
+
+/*
+ * 字母色卡：整塊填色＋白字。顏色由網域雜湊挑自 8 色色票，每一色對白字都達 4.5:1
+ * （tests/letter-colors.test.ts 會檢查）。
+ */
+.thumb--letter {
+  color: #fff;
+  font-weight: 600;
+}
+
+.thumb--letter span {
+  font-size: clamp(17px, 25cqh, 44px);
+  line-height: 1;
+}
+
+.thumb--folder {
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+
+/* ── 群組標籤 ───────────────────────────────────────────── */
+
+/* 只有名稱、不加 ▾：加了會被看成「選 tag」的下拉選單 */
+.group-tag {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  height: 20px;
+  padding: 0 8px;
+  overflow: hidden;
+  color: var(--on-g);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: var(--g);
+  border: none;
+  border-radius: var(--r-full);
+  cursor: grab;
+}
+
+.group-tag__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-tag--untitled {
+  width: 22px;
+  padding: 0;
+}
+
+.group-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.group-head__count {
+  flex: none;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+/* ⋯ 只在滑鼠移到群組上、或焦點進到群組裡時出現 */
+.group-head__more {
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  visibility: hidden;
+}
+
+.group-head:hover .group-head__more,
+.group-head:focus-within .group-head__more,
+.group-head__more[aria-expanded='true'] {
+  visibility: visible;
+}
+
+/* ── 提示訊息 ───────────────────────────────────────────── */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 8px;
+  padding: 10px 12px;
+  font-size: var(--fs-md);
+  border-radius: var(--r-lg);
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice--error {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.notice--warn {
+  color: var(--warn);
+  background: var(--warn-tint);
+}
+
+.notice--info {
+  color: var(--text);
+  background: var(--accent-tint);
+}
+
+.notice__body {
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.notice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 浮動提示：深底白字，數秒後自己消失（位置由各頁決定） */
+.toast {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 6px 8px 12px;
+  color: var(--toast-text);
+  font-size: var(--fs-sm);
+  background: var(--toast-bg);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-menu);
+}
+
+.toast__text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast .link {
+  flex: none;
+  color: var(--toast-link);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.toast .ib {
+  width: 22px;
+  height: 22px;
+  color: var(--toast-text);
+}
+
+.toast .ib:hover {
+  color: var(--toast-text);
+  background: rgb(255 255 255 / 12%);
+}
+
+/* ── 對話框（密碼框）與隱私空間的表單 ─────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 8px 8px;
+  background: var(--scrim);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 340px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-dialog);
+}
+
+.gate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gate__title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.gate__hint {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.gate__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+
+.gate__foot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gate__esc {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+.gate .btn--primary {
+  width: 100%;
+}
+
+/* 救援金鑰：要抄在紙上，所以字距寬、字級大、可以整串選取 */
+.recovery__code {
+  display: block;
+  margin: 4px 0;
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  user-select: all;
+}
+
+.recovery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 新增資料夾的行內表單（側邊欄、隱私空間、全頁瀏覽共用） */
+.newfolder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.newfolder .input {
+  flex: 1 1 140px;
+  width: auto;
+}
+
+.newfolder__hint {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+/* 字串裡的 <b>／<code> 等由 Rich 轉出來 */
+code {
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+
+.dialog .gate__error {
+  margin-top: 8px;
+}
+
+.gate .notice,
+.notice.recovery {
+  margin: 0;
+}
