@@ -1,6 +1,92 @@
 # 接手指南 / 待辦
 
-最後更新：2026-10-15（1.3.0 已上架。**同步瘦身已實作並實機驗過**，在分支 `worktree-compact-sync`，還沒合進 main、版號還沒改）
+最後更新：2026-10-15（1.3.0 已上架。**同步瘦身已實作並實機驗過**，在分支 `worktree-compact-sync`，還沒合進 main、版號還沒改。
+**下一個 session 從「隱私空間改用書籤同步（方案 4）」開始**，先做第 0 期）
+
+## 下一個 session 從這裡開始：隱私空間改用書籤同步（方案 4，2026-10-15 規劃）
+
+### 使用者要的是什麼
+
+`storage.sync` 只有 100 KB。瘦身後使用者的 444 筆佔 52 KB（每筆約 115 bytes，網址與標題比模擬的長），上限約 800 筆。
+使用者預期會更多，所以要一條**沒有 100 KB 上限**的路：把密文切塊放進一個書籤資料夾，讓 Firefox 的**書籤同步**帶到其他裝置。
+
+### 使用者拍板的決定（不要再改）
+
+- **做成開關，預設關閉**，只有主動打開才有作用。
+- **同步空間快滿時提示使用者打開它**。
+- **設定頁那個開關旁邊放一張範例圖**，讓人看得到打開後書籤選單裡會多出什麼。
+
+### 已經實測過的事（2026-10-15，容器裡的 Firefox 153，`bookmarks` API 從擴充套件頁面呼叫）
+
+| 測試 | 結果 |
+|---|---|
+| `data:,` + 60,000 字元 | 收，讀回完全一致 |
+| 網址總長 65,536 | 收；**超過就 `Invalid bookmark`**（Places 的上限） |
+| `https://x.invalid/#` + 60,000 | 收，一致 |
+| 標題 5,000 / 70,000 字元 | **截到 4,096** —— 資料只能放網址 |
+| base91 字元放進 `data:` | **被改寫**（部分字元被跳脫）—— 書籤這邊不能用 base91 |
+| `bookmarks.create` 不給 parentId | 落在「其他書籤」（`unfiled_____`） |
+| `bookmarks.search` | 找得到這些書籤（自己的搜尋要濾掉） |
+| 網址列自動完成 | **只比對單字開頭**：打密文中間的字串不會跳出來；打 `data:,` 後面的開頭、或 `-` `_` 之後的字串**會**跳出來 |
+| `place:` 網址 | 不會出現在網址列，但會被當成智慧資料夾顯示、同步可能改寫它 —— **不用** |
+
+結論：**網址用 `data:,` + 只有英數字的編碼**（base32 小寫 `a-z2-7`，不補 `=`）。base64url 的 `-` `_` 是單字分界，
+會讓密文裡處處是「單字開頭」，網址列打什麼都可能跳出這些書籤。書籤這邊沒有配額，base32 大 60% 沒關係。
+
+### 第 0 期：先確認 Firefox 同步會不會帶 60 KB 的 data: 書籤（**這一期不過，方案 4 就不做**）
+
+容器裡沒有 Firefox 帳號，這一步只能在使用者的兩台電腦上做。給使用者的步驟：
+在 A 的 `about:debugging` → 這個 Firefox → 書籤預覽 →「檢測」→ 主控台貼上：
+
+```js
+const body = Array.from(crypto.getRandomValues(new Uint8Array(60000)), (b) => 'abcdefghijklmnopqrstuvwxyz234567'[b % 32]).join('');
+const f = await browser.bookmarks.create({ title: 'BPV sync test' });
+await browser.bookmarks.create({ parentId: f.id, title: '', url: 'data:,' + body });
+console.log(f.id, body.slice(0, 12));
+```
+
+A 按「立即同步」，幾分鐘後在 B 的書籤管理（Ctrl+Shift+O）→ 其他書籤 → `BPV sync test` 看有沒有那筆、網址開頭是否相同、
+長度是否一樣（B 的主控台：`(await browser.bookmarks.getChildren('<f.id>'))[0].url.length` 應為 60006；**資料夾 id 在兩台
+是同一個**，Firefox 同步保留 GUID）。也順便看手機版 Firefox 有沒有收到。測完在 A 刪掉那個資料夾。
+
+### 設計
+
+- **存放位置是雲端那份的屬性，不是每台裝置各自的設定**：`vaultPack` 的中介資料多一個 `store: 'bookmarks'` 與資料夾 id
+  （Firefox 同步保留 GUID，兩台的 id 相同；找不到再用標題找）。任何一台打開或關掉開關，就是整個帳號一起換，其他裝置照 meta 走。
+  否則兩台各自以為存放在不同地方，會互相覆蓋或永遠讀不到。
+- **中介資料仍在 `storage.sync`**（約 1 KB）：salt、包裹、塊數、digest、兩個指紋 —— 規則全部照舊（先塊後 meta、digest 判斷湊齊、
+  指紋判斷要不要上傳）。書籤同步與 `storage.sync` 是兩條獨立的同步，**meta 先到、書籤後到是常態**，digest 對不上就是傳輸中。
+- **`PACK_META_VERSION` 升到 3**（只在 `store: 'bookmarks'` 時寫 3；存在 `storage.sync` 時照寫 2，讓沒打開這個功能的人不必一起更新）。
+  第 2 版的建置看到 3 會停下來並提示更新（已經做好的保護）。
+- **資料夾**：「其他書籤」底下，名稱「書籤預覽：隱私空間的同步資料（請勿修改）」/「Bookmark Preview: private space sync data (do not edit)」。
+  每塊一筆書籤，**標題留空**（標題也會被網址列比對），網址 `data:,` + base32，每塊 ≤ 60,000 字元。
+  **順序不靠書籤位置**（同步合併可能重排）：每塊明文開頭放 1 byte 的塊號。
+- **寫入**：用 `bookmarks.update` 改既有那幾筆的網址（少一點同步流量），多的刪掉、不夠的新增；寫完再寫 meta。
+- **開關**：關 → 開：寫書籤、寫 meta（store bookmarks）、刪 `vaultPackC*`。開 → 關：先確認塞得進 `storage.sync`（塞不進就拒絕並說明），
+  寫回 `vaultPackC*`、寫 meta、`removeTree` 資料夾。兩個方向都要先確認雲端那份已經合併過（照「解鎖才推」的規則，所以開關要解鎖才能按）。
+- **被使用者動過**：資料夾或某一塊不見、內容被改 → digest 對不上 → 視為傳輸中。設定頁的「以這台裝置覆蓋雲端」照樣能用（會重建資料夾）。
+- **自己的介面要藏起來**（從 meta 或本機記住的資料夾 id 判斷）：
+  - `src/background/bookmark-tree.ts` 的 `collectRoots`（側邊欄與全頁瀏覽都從這裡拿）—— 整個資料夾不出現，也不算進「其他書籤」的筆數
+  - `src/background/bookmark-watcher.ts`：那個資料夾裡的事件不觸發重整（否則每次推送側邊欄都重載）
+  - `src/background/capture.ts`：新書籤自動擷取預覽 —— 跳過
+  - `src/background/bookmark-index.ts`、`bookmark-grid.ts`、`bookmark-order.ts`：跳過
+  - 移入隱私空間、搜尋：排除
+- **提示**：設定頁同步區塊在用量 ≥ 80% 時顯示提示與「改用書籤同步」按鈕；因為超額而停止同步時，錯誤訊息也帶同一顆按鈕。
+- **範例圖**：建議做成 **SVG 示意圖**（書籤選單展開到那個資料夾、裡面幾筆空白標題的書籤），字用 i18n 帶入 ——
+  容器的 Firefox 只有中文，截不到英文版；SVG 也跟得上深色主題。放在開關的 `below`。（若使用者堅持要真的截圖，用 `ff.sh crop` 截書籤選單。）
+- **文件**：隱私政策（多一種離開裝置的方式：密文放在書籤裡、經 Firefox 書籤同步）、`amo/permissions.md`（`bookmarks` 權限多一個用途）、
+  `docs/sync-and-backup.md`、listing。
+
+### 驗收
+
+1. 打開開關 → 書籤選單出現那個資料夾、裡面 N 筆空白標題書籤；`storage.sync` 只剩 `vaultPack`（version 3、store bookmarks）。
+2. 側邊欄、全頁瀏覽、搜尋都看不到那個資料夾；「其他書籤」筆數不含它；推送時側邊欄不閃。
+3. 網址列打常見字、打 `data`、打密文中間的幾個字都不會跳出那些書籤。
+4. 放棄本機 → 從雲端解鎖，內容回來、雲端沒有被重寫（指紋相同）。
+5. 關掉開關 → 回到 `storage.sync`、資料夾被刪；塞不進時拒絕並說明。
+6. 手動刪掉其中一筆 → 同步顯示傳輸中，「以這台裝置覆蓋雲端」能重建。
+7. 用量 ≥ 80% 時設定頁出現提示。
+8. 1,500 筆的隱私空間能同步（`SEED_BULK=1500`）。
 
 ## 同步瘦身：隱私空間在雲端改成一份精簡格式（2026-10-15）
 
