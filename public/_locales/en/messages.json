@@ -279,7 +279,7 @@
     "message": "This vault uses a development-era format that the current version no longer supports. Clear it with \"Give up the vault on this device\" in the settings, then create a new one."
   },
   "vault_remote_exists": {
-    "message": "There is already a vault in the cloud. Turn on sync in the settings, choose \"Restore from the cloud to this device\", and unlock with the same master password. (If you are sure you do not want the cloud copy, press \"Remove the cloud copy\" first.)"
+    "message": "There is already a vault in the cloud, so a new one cannot be created. Unlock it in the sidebar with your existing master password: that restores it from the cloud and turns on sync on this device. (If you are sure you do not want the cloud copy, remove it in the settings first.)"
   },
   "vault_remote_still_transferring": {
     "message": "The encrypted copy in the cloud is still arriving — Firefox Sync sends it piece by piece. Try again shortly."
@@ -1392,7 +1392,7 @@
     "message": "Leaving it empty disables this way in. Switch the setting above to “Show a tab”, or there will be no way to reach the vault at all."
   },
   "options_remote_awaiting_restore": {
-    "message": "There is already an encrypted copy in the cloud. Under “Sync across devices” below, press “Restore from the cloud to this device” and unlock with *the same master password*. *Do not create a second one here* — the keys would differ and the two could never be merged."
+    "message": "There is already an encrypted copy in the cloud. Enter *the same master password* in the sidebar's Private tab to restore it and turn on sync on this device. *Do not create a second one here* — the keys would differ and the two could never be merged."
   },
   "options_status_locked": {
     "message": "locked"

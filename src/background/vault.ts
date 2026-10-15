@@ -62,7 +62,7 @@ import {
 import { packSync, unpackSync, type PackedSync, type RawSync } from '@/shared/sync-pack';
 import { clearLayoutEnvelope } from '@/storage/layout-sync';
 import { clearPackEnvelope, packEnvelopePresent, readPackEnvelope, readPackMeta } from '@/storage/pack-sync';
-import { getSettings } from '@/storage/settings';
+import { getSettings, patchSettings } from '@/storage/settings';
 import { deleteThumb, getThumb, listKeys as listThumbKeys, putThumb } from '@/storage/thumbs-db';
 import { getPreviewChoice, setPreviewChoice } from '@/storage/preview-choice';
 import {
@@ -166,8 +166,10 @@ export function setPersistHook(hook: () => void): void {
  * 「還沒建立隱私空間」，接著使用者在建立畫面輸入同一組密碼 —— 產生的是**新的
  * salt**，於是兩邊金鑰不同、雲端那份永遠打不開。所以本機沒有時要看雲端。
  *
- * 同步預設關閉，關閉時完全不看雲端：沒有人希望一個沒開同步的裝置忽然冒出
- * 「這裡有隱私空間」。
+ * **不看「同步」設定**（只在本機沒有隱私空間時才會被呼叫）。新裝置上那個設定一定是關的，
+ * 而「隱藏」入口會把設定頁的開關一起藏起來 —— 曾經因此卡住：側邊欄只給建立表單，建立又因為
+ * 雲端已有一份而被擋，使用者找不到開關。雲端那份只可能是同一個 Firefox 帳號在別台裝置開了
+ * 同步放上去的，所以直接給密碼框；用它解開之後順手打開這台的同步（`unlockWith`）。
  */
 type SyncedCopy =
   /** 1.3.x 以前的格式：密文就是本機的格式，可以原樣落地 */
@@ -176,7 +178,7 @@ type SyncedCopy =
   | { format: 'pack'; meta: VaultMeta; blob: string };
 
 async function syncedVault(): Promise<SyncedCopy | null> {
-  if (!(await syncEnabled())) {
+  if (!syncAvailable()) {
     return null;
   }
   /*
@@ -211,9 +213,18 @@ async function syncEnabled(): Promise<boolean> {
  * 覆蓋掉 —— 那正是災難還原最需要它的時候。
  *
  * 順帶也便宜得多：`vaultState()` 每次 UI 更新都會呼叫，讀一個鍵而不是十幾個。
+ *
+ * 與 `syncedVault` 一樣不看「同步」設定，理由寫在那裡。
  */
 async function syncedVaultExists(): Promise<boolean> {
-  return (await syncEnabled()) && ((await packEnvelopePresent()) || (await syncEnvelopePresent()));
+  return syncAvailable() && ((await packEnvelopePresent()) || (await syncEnvelopePresent()));
+}
+
+/** 從雲端取回之後：這台裝置的隱私空間同步要開著，否則之後的變更兩邊都不會互通 */
+async function enableVaultSync(): Promise<void> {
+  if (!(await getSettings()).vaultSyncEnabled) {
+    await patchSettings({ vaultSyncEnabled: true });
+  }
 }
 
 /**
@@ -510,6 +521,7 @@ async function unlockWith(opener: Opener): Promise<void> {
       } else {
         await writeMeta(remote.meta);
       }
+      await enableVaultSync();
     }
 
     payload = opened;
@@ -726,6 +738,7 @@ export async function adoptSyncedVault(): Promise<void> {
       // 精簡格式要金鑰才轉得成本機的格式：先落 meta，第一次解鎖時再從雲端讀內容（`unlockWith`）
       await writeMeta(remote.meta);
     }
+    await enableVaultSync();
   });
 }
 
