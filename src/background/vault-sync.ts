@@ -25,6 +25,7 @@ import {
   clearPackEnvelope,
   PACK_CHUNK_PREFIX,
   PACK_META_KEY,
+  PACK_META_VERSION,
   readPackEnvelope,
   writePackEnvelope,
   type PackSyncMeta,
@@ -258,7 +259,8 @@ export async function syncVault(): Promise<SyncOutcome> {
      * 留下的殘塊，為它等下去會讓同步永遠停住；推新格式時會一起清掉。
      */
     if (pack.kind === 'partial' || (legacyOurs && legacy.kind === 'partial')) {
-      lastError = null;
+      // 更新版本寫的不會自己好，要講清楚；其餘是傳輸中，等下一輪
+      lastError = pack.kind === 'partial' && pack.newer === true ? t('sync_newer_format') : null;
       return finish('waiting');
     }
 
@@ -270,7 +272,7 @@ export async function syncVault(): Promise<SyncOutcome> {
     // 遠端那份本身解不開時（本機的錯誤會往上丟），用本機那份覆蓋過去 —— 否則這台裝置會因為
     // 一份壞掉的遠端副本而永遠停止上傳自己的新書籤
     let fellBack = false;
-    if (pack.kind === 'ok' && !(await mergePack(pack.blob))) {
+    if (pack.kind === 'ok' && !(await mergePack(pack.blob, pack.meta.version))) {
       fellBack = true;
     }
     if (legacyOurs && legacy.kind === 'ok') {
@@ -328,9 +330,9 @@ async function mergeRemote(remote: Extract<SyncRead, { kind: 'ok' }>): Promise<b
 }
 
 /** 合併雲端的新格式。回傳 false 代表**遠端那份本身**壞掉（呼叫端應該覆蓋它），理由同 `mergeRemote` */
-async function mergePack(blob: string): Promise<boolean> {
+async function mergePack(blob: string, version: number): Promise<boolean> {
   try {
-    if (await mergeEncryptedPack(blob)) {
+    if (await mergeEncryptedPack(blob, version)) {
       broadcast('vault/changed', await vaultState());
     }
     return true;
@@ -396,8 +398,10 @@ async function push(local: VaultMeta, remote: PackSyncMeta | null): Promise<void
     throw new Error(quotaMessage(snapshot.blob));
   }
   await clearLegacy();
+  // 舊版本（1）的雲端副本內容一樣也要重寫：換成目前的格式才省得到空間
   const unchanged =
     remote !== null &&
+    remote.version === PACK_META_VERSION &&
     remote.tag === snapshot.tag &&
     remote.layoutTag === snapshot.layoutTag &&
     sameMetaContent(remote.vault, local);

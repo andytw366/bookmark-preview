@@ -13,7 +13,8 @@ import {
   wrapDek,
   zero,
 } from '@/crypto/keyring';
-import { decodePayload, encodePayload } from '@/crypto/vault-codec';
+import { fromBase91, toBase91 } from '@/crypto/base91';
+import { decodePayload, encodePayload, openPayload, sealPayload } from '@/crypto/vault-codec';
 import type { VaultThumbPayload } from '@/shared/messages';
 import type {
   PrivateBookmark,
@@ -59,7 +60,7 @@ import {
   sanitizeVaultPayload,
   type MergeReport,
 } from '@/shared/vault-merge';
-import { packSync, unpackSync, type PackedSync, type RawSync } from '@/shared/sync-pack';
+import { packSync, unpackSync, type PackedSync, type RawSync, type Unpacked } from '@/shared/sync-pack';
 import { clearLayoutEnvelope } from '@/storage/layout-sync';
 import { clearPackEnvelope, packEnvelopePresent, readPackEnvelope, readPackMeta } from '@/storage/pack-sync';
 import { getSettings, patchSettings } from '@/storage/settings';
@@ -174,8 +175,8 @@ export function setPersistHook(hook: () => void): void {
 type SyncedCopy =
   /** 1.3.x 以前的格式：密文就是本機的格式，可以原樣落地 */
   | { format: 'legacy'; meta: VaultMeta; blob: string; tag: string }
-  /** 精簡格式（`shared/sync-pack`）：要有金鑰才轉得成本機的格式 */
-  | { format: 'pack'; meta: VaultMeta; blob: string };
+  /** 精簡格式（`shared/sync-pack`）：要有金鑰才轉得成本機的格式。`version` 決定塊怎麼解（`openPack`） */
+  | { format: 'pack'; meta: VaultMeta; blob: string; version: number };
 
 async function syncedVault(): Promise<SyncedCopy | null> {
   if (!syncAvailable()) {
@@ -187,7 +188,7 @@ async function syncedVault(): Promise<SyncedCopy | null> {
    */
   const pack = await readPackEnvelope();
   if (pack.kind === 'ok') {
-    return { format: 'pack', meta: pack.meta.vault, blob: pack.blob };
+    return { format: 'pack', meta: pack.meta.vault, blob: pack.blob, version: pack.meta.version };
   }
   if (pack.kind === 'partial') {
     return null;
@@ -504,7 +505,7 @@ async function unlockWith(opener: Opener): Promise<void> {
     let opened: VaultPayload;
     let openedLayout: VaultLayout | null = null;
     if (remote?.format === 'pack') {
-      const unpacked = unpackSync(await decodePayload<unknown>(dataKey, [remote.blob]));
+      const unpacked = await openPack(dataKey, remote.blob, remote.version);
       opened = sanitizeVaultPayload(unpacked.payload);
       openedLayout = sanitizeLayout(unpacked.layout);
     } else {
@@ -976,13 +977,13 @@ export async function mergeEncryptedBlob(blob: string): Promise<MergeReport> {
  * 規則與 `mergeEncryptedBlob` / `mergeEncryptedLayout` 一樣：解不開才是 `RemoteBlobUnreadable`，
  * 內容指紋沒變就不重新加密（否則兩台裝置會無止盡地互相上傳）。
  */
-export async function mergeEncryptedPack(blob: string): Promise<boolean> {
+export async function mergeEncryptedPack(blob: string, version: number): Promise<boolean> {
   return exclusive(async () => {
     const { key: k, payload: current } = requireUnlocked();
     let incomingPayload: VaultPayload;
     let incomingLayout: VaultLayout;
     try {
-      const unpacked = unpackSync(await decodePayload<unknown>(k, [blob]));
+      const unpacked = await openPack(k, blob, version);
       incomingPayload = sanitizeVaultPayload(unpacked.payload);
       incomingLayout = sanitizeLayout(unpacked.layout);
     } catch (cause) {
@@ -1013,8 +1014,20 @@ export async function mergeEncryptedPack(blob: string): Promise<boolean> {
   });
 }
 
+/**
+ * 解開雲端的精簡格式。`version` 是中介資料的版本（`PACK_META_VERSION` 的說明）：1 是 base64，
+ * 之後是 base91。呼叫端已經用中介資料把關過版本，這裡不認得的一律當 base91 —— 解不開會丟錯。
+ */
+async function openPack(dataKey: CryptoKey, blob: string, version: number): Promise<Unpacked> {
+  const body =
+    version === 1
+      ? await decodePayload<unknown>(dataKey, [blob])
+      : await openPayload<unknown>(dataKey, fromBase91(blob));
+  return unpackSync(body);
+}
+
 export interface PackedSnapshot {
-  /** 已加密的 base64 */
+  /** 已加密的 base91（`PACK_META_VERSION` 2） */
   blob: string;
   /** 書籤的內容指紋 */
   tag: string;
@@ -1046,7 +1059,7 @@ export async function packedSnapshot(): Promise<PackedSnapshot> {
     if (!exact) {
       body = { v: 0, payload: current, layout: currentLayout };
     }
-    return { blob: fromChunks(await encodePayload(k, body)), tag, layoutTag: lTag };
+    return { blob: toBase91(await sealPayload(k, body)), tag, layoutTag: lTag };
   });
 }
 

@@ -2136,5 +2136,8 @@
   },
   "preview_folder_contents_hint": {
     "message": "In the full-page view, show the first four bookmarks inside each folder card; turn off to show a plain folder icon"
+  },
+  "sync_newer_format": {
+    "message": "The cloud copy was written by a newer version of the extension that this device cannot read, so it is left untouched. Update the extension on this device."
   }
 }

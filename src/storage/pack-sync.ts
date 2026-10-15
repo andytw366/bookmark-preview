@@ -21,9 +21,19 @@ import { clearSyncGone, syncAvailable } from './vault-sync';
  */
 export const PACK_META_KEY = 'vaultPack';
 export const PACK_CHUNK_PREFIX = 'vaultPackC';
+/**
+ * 中介資料的版本，也就是「塊怎麼解」：
+ *
+ * - 1：base64 的密文，裡面是第 1 版的精簡編碼（只出現在沒有上架的建置裡）
+ * - 2：base91 的密文（`crypto/base91`），裡面是第 2 版的精簡編碼
+ *
+ * **改格式就要升這個數字。** 看到比自己新的版本，舊版會停下來等（`isPackMeta` 不認得 → 當成傳輸中），
+ * 而不是把解不開的東西當成「雲端壞了」拿本機那份蓋過去 —— 那會讓還沒更新的裝置每一輪都覆蓋雲端。
+ */
+export const PACK_META_VERSION = 2;
 
 export interface PackSyncMeta {
-  version: 1;
+  version: 1 | typeof PACK_META_VERSION;
   vault: VaultMeta;
   chunks: number;
   digest: string;
@@ -37,8 +47,11 @@ export interface PackSyncMeta {
 
 export type PackSyncRead =
   | { kind: 'absent' }
-  /** 塊沒到齊、新舊混雜，或 meta 還沒到（`meta` 為 null）。稍後會自己好，不能覆蓋 */
-  | { kind: 'partial'; meta: PackSyncMeta | null }
+  /**
+   * 塊沒到齊、新舊混雜，或 meta 還沒到（`meta` 為 null）。稍後會自己好，不能覆蓋。
+   * `newer`：meta 是更新版本的擴充套件寫的 —— 不會自己好，要更新這台
+   */
+  | { kind: 'partial'; meta: PackSyncMeta | null; newer?: true }
   | { kind: 'ok'; meta: PackSyncMeta; blob: string };
 
 function chunkKeys(count: number): string[] {
@@ -52,7 +65,7 @@ function isPackMeta(value: unknown): value is PackSyncMeta {
   const meta = value as Partial<PackSyncMeta>;
   const vault = meta.vault as Partial<VaultMeta> | undefined;
   return (
-    meta.version === 1 &&
+    (meta.version === 1 || meta.version === PACK_META_VERSION) &&
     typeof vault?.salt === 'string' &&
     vault.salt !== '' &&
     typeof vault.iterations === 'number' &&
@@ -82,16 +95,26 @@ export async function packEnvelopePresent(): Promise<boolean> {
   if (!syncAvailable()) {
     return false;
   }
-  if ((await readPackMeta()) !== null) {
+  if ((await readPackMeta()) !== null || (await newerMetaPresent())) {
     return true;
   }
   const all = await browser.storage.sync.get(null);
   return Object.keys(all).some((key) => key.startsWith(PACK_CHUNK_PREFIX));
 }
 
+/** 雲端那份的 meta 是不是比這一版新（版本號更大） */
+async function newerMetaPresent(): Promise<boolean> {
+  const stored = await browser.storage.sync.get(PACK_META_KEY);
+  const version = (stored[PACK_META_KEY] as { version?: unknown } | undefined)?.version;
+  return typeof version === 'number' && version > PACK_META_VERSION;
+}
+
 export async function readPackEnvelope(): Promise<PackSyncRead> {
   const meta = await readPackMeta();
   if (meta === null) {
+    if (await newerMetaPresent()) {
+      return { kind: 'partial', meta: null, newer: true };
+    }
     return (await packEnvelopePresent()) ? { kind: 'partial', meta: null } : { kind: 'absent' };
   }
   const keys = chunkKeys(meta.chunks);
@@ -125,7 +148,7 @@ export async function writePackEnvelope(identity: PackIdentity, chunks: readonly
   });
   await browser.storage.sync.set(items);
   const meta: PackSyncMeta = {
-    version: 1,
+    version: PACK_META_VERSION,
     vault: identity.vault,
     chunks: chunks.length,
     digest: await textDigest(fromChunks(chunks)),

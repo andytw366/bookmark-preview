@@ -80,8 +80,8 @@ but can never be seen on screen" — indistinguishable from having lost it.
 
 `storage.sync` holds a single document, `vaultPack` + `vaultPackC0…` (`src/storage/pack-sync.ts`):
 the bookmarks **and** the layout (order, groups, column counts — see [vault.md](vault.md#order))
-in a compact encoding (`src/shared/sync-pack.ts`), then gzip, AES-GCM and base64 like every
-other vault blob. The local store, the backup file and the merge rules do not use this
+in a compact encoding (`src/shared/sync-pack.ts`), then gzip and AES-GCM like every other vault
+blob, written as **base91** (`src/crypto/base91.ts`) instead of base64. The local store, the backup file and the merge rules do not use this
 encoding; it exists only between "push" and "pull".
 
 Why: the plain JSON spent most of the quota on things gzip cannot shrink. 400 bookmarks took
@@ -89,8 +89,21 @@ about 70 KB, and only ~12 KB of that was URLs and titles. A record's random UUID
 three times (bookmark, `order`, `groupOf`) in two separately compressed documents, and every
 record carried two or three 13-digit millisecond timestamps. The compact form keeps one id
 table and refers to it by index, sorts bookmarks by `createdAt` and stores the gaps (a batch
-import is milliseconds apart), and stores `updatedAt` as the offset from `createdAt`. Roughly
-half the size; a test pins "at least 30% smaller after gzip".
+import is milliseconds apart), and stores `updatedAt` as the offset from `createdAt`. Version 2
+of the encoding also stores UUIDs as 16 bytes in base64url rather than 32 hex digits, `order`
+members and `groupOf` keys as gaps between neighbours, and the URL's scheme + host in a table.
+
+base91 uses only ASCII that JSON does not escape (`"` and `\` are left out of the alphabet), so
+every character costs exactly one byte of quota; it carries about 6.5 bits per character
+against base64's 6. On a realistic 400-bookmark sample: 1.3.0's two documents 57 KB, version 1
+of the compact copy 36 KB, version 2 31 KB.
+
+The metadata's `version` says how to read the chunks: 1 is base64 with encoding version 1 (only
+ever written by unreleased builds, still read), 2 is base91 with encoding version 2. **Bump it
+whenever the format changes.** A version that does not recognise it treats the copy as still in
+transit and waits ("the cloud copy was written by a newer version") instead of calling it
+unreadable — which would make it overwrite the cloud with its own copy, unmerged, every round
+until it is updated.
 
 **Timestamps keep full millisecond precision.** If the decoded copy differed from the local
 one by even a millisecond, the content fingerprints would never agree and two devices would

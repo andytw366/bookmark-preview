@@ -1,7 +1,7 @@
 import { t } from '@/shared/i18n';
 
 import { seal, unseal, IV_BYTES } from './aead';
-import { concat, copyBytes, fromBase64, fromUtf8, toBase64, utf8 } from './bytes';
+import { concat, copyBytes, fromBase64, fromUtf8, toBase64, utf8, type Bytes } from './bytes';
 import { toChunks, fromChunks } from './chunk';
 import { gunzip, gzip } from './compress';
 
@@ -25,11 +25,8 @@ export interface EncodeOptions {
   compress?: boolean;
 }
 
-export async function encodePayload(
-  key: CryptoKey,
-  payload: unknown,
-  options: EncodeOptions = {},
-): Promise<string[]> {
+/** 加密成信封的位元組（標頭 + IV + 密文）。要換文字編碼的呼叫端（同步用 base91）用這個 */
+export async function sealPayload(key: CryptoKey, payload: unknown, options: EncodeOptions = {}): Promise<Bytes> {
   const compress = options.compress ?? true;
   const json = utf8(JSON.stringify(payload));
   const body = compress ? await gzip(json) : json;
@@ -39,15 +36,10 @@ export async function encodePayload(
   header[0] = FORMAT_VERSION;
   header[1] = compress ? FLAG_GZIP : 0;
 
-  const envelope = concat(header, sealed.iv, new Uint8Array(sealed.ciphertext));
-  return toChunks(toBase64(envelope));
+  return concat(header, sealed.iv, new Uint8Array(sealed.ciphertext));
 }
 
-export async function decodePayload<T>(key: CryptoKey, chunks: readonly string[]): Promise<T> {
-  if (chunks.length === 0) {
-    throw new Error(t('crypto_no_data'));
-  }
-  const envelope = fromBase64(fromChunks(chunks));
+export async function openPayload<T>(key: CryptoKey, envelope: Bytes): Promise<T> {
   if (envelope.length < HEADER_BYTES) {
     throw new Error(t('crypto_data_truncated'));
   }
@@ -63,4 +55,19 @@ export async function decodePayload<T>(key: CryptoKey, chunks: readonly string[]
   const plain = new Uint8Array(await unseal(key, { iv, ciphertext: ciphertext.buffer }));
   const json = compressed ? await gunzip(plain) : plain;
   return JSON.parse(fromUtf8(json)) as T;
+}
+
+export async function encodePayload(
+  key: CryptoKey,
+  payload: unknown,
+  options: EncodeOptions = {},
+): Promise<string[]> {
+  return toChunks(toBase64(await sealPayload(key, payload, options)));
+}
+
+export async function decodePayload<T>(key: CryptoKey, chunks: readonly string[]): Promise<T> {
+  if (chunks.length === 0) {
+    throw new Error(t('crypto_no_data'));
+  }
+  return openPayload<T>(key, fromBase64(fromChunks(chunks)));
 }

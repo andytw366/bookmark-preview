@@ -27,17 +27,17 @@ batch.json 的格式：
       },
 
       "messages": {
-        "toolbar_select": { "zh": "選取", "en": "Select" },
+        "toolbar_select": { "zh_TW": "選取", "en": "Select" },
 
         "vault_moved": {
           "args": ["count"],                      // 呼叫端的參數順序 → $1、$2…
-          "zh": "已移動 $COUNT$ 個項目。",
+          "zh_TW": "已移動 $COUNT$ 個項目。",
           "en": "Moved $COUNT$ items."
         },
 
         // tn() 用的：自己寫成兩條，沒有特別的複數模式
-        "unit_bookmarks_one":   { "args": ["count"], "zh": "$COUNT$ 個書籤", "en": "$COUNT$ bookmark" },
-        "unit_bookmarks_other": { "args": ["count"], "zh": "$COUNT$ 個書籤", "en": "$COUNT$ bookmarks" }
+        "unit_bookmarks_one":   { "args": ["count"], "zh_TW": "$COUNT$ 個書籤", "en": "$COUNT$ bookmark" },
+        "unit_bookmarks_other": { "args": ["count"], "zh_TW": "$COUNT$ 個書籤", "en": "$COUNT$ bookmarks" }
       },
       "imports": ["src/sidebar/components/Toolbar.tsx"]
     }

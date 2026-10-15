@@ -1,6 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { packSync, unpackSync } from '@/shared/sync-pack';
+import { fromBase91, toBase91 } from '@/crypto/base91';
+import { packSync, unpackSync, type PackedSync } from '@/shared/sync-pack';
 import { ROOT_KEY, layoutTag, sanitizeLayout, type VaultLayout } from '@/shared/vault-layout';
 import { contentTag, sanitizeVaultPayload } from '@/shared/vault-merge';
 import type { PrivateBookmark, VaultPayload } from '@/shared/types';
@@ -126,6 +127,42 @@ describe('同步的精簡編碼', () => {
     expect(unpackSync({ v: 0, payload, layout })).toEqual({ payload, layout });
   });
 
+  it('第 1 版（沒上架的建置推上去的）也解得開', async () => {
+    const { payload, layout } = sample(60);
+    payload.bookmarks.push({ id: 'odd', url: 'mailto:x@example.com', title: 't', folderId: null, createdAt: T0, updatedAt: T0 });
+    const v2 = packSync(payload, layout);
+    // 照第 1 版的寫法改回去：hex 的 id、網址整串、成員與鍵不存差值
+    const hex = (text: string): string =>
+      text.startsWith('!') ? text : Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('hex');
+    const running = (values: number[]): number[] => {
+      let sum = 0;
+      return values.map((value) => (sum += value));
+    };
+    const keys = running(v2.a.map(([key]) => key));
+    const { w: origins, ...rest2 } = v2;
+    const { h: originOf, ...columns } = v2.b;
+    const v1: PackedSync = {
+      ...rest2,
+      v: 1,
+      ids: v2.ids.map(hex),
+      b: { ...columns, u: v2.b.u.map((rest, index) => `${origins?.[originOf?.[index] ?? -1] ?? ''}${rest}`) },
+      o: v2.o.map(([key, at, members]) => [key, at, running(members)]),
+      a: v2.a.map(([, group, at], index) => [keys[index] as number, group, at]),
+    };
+    const back = unpackSync(JSON.parse(JSON.stringify(v1)));
+    expect(await contentTag(sanitizeVaultPayload(back.payload))).toBe(await contentTag(payload));
+    expect(await layoutTag(sanitizeLayout(back.layout))).toBe(await layoutTag(layout));
+  });
+
+  it('網址拆不了開頭的（不是 http/https、沒有主機）整串保留', async () => {
+    const { payload, layout } = sample(5);
+    for (const url of ['mailto:a@b.c', 'file:///home/x', 'https://', 'about:blank', 'http://host?q=1#h']) {
+      payload.bookmarks.push({ id: url, url, title: '', folderId: null, createdAt: T0, updatedAt: T0 });
+    }
+    const back = roundTrip(payload, layout);
+    expect(await contentTag(back.payload)).toBe(await contentTag(payload));
+  });
+
   it('看不懂的版本與壞掉的 id 表會丟錯', () => {
     expect(() => unpackSync({ v: 9 })).toThrow();
     const { payload, layout } = sample(3);
@@ -140,5 +177,26 @@ describe('同步的精簡編碼', () => {
     const before = gz(payload) + gz(layout);
     const after = gz(packSync(payload, layout));
     expect(after).toBeLessThan(before * 0.7);
+  });
+});
+
+describe('base91', () => {
+  it('往返後位元組完全相同（含各種長度的結尾）', () => {
+    for (let length = 0; length < 200; length += 1) {
+      const bytes = new Uint8Array(length).map((_, index) => (index * 151 + length * 7) & 255);
+      expect([...fromBase91(toBase91(bytes))]).toEqual([...bytes]);
+    }
+  });
+
+  it('只用 JSON 不會轉義的 ASCII，而且比 base64 短', () => {
+    const bytes = new Uint8Array(30_000).map(() => Math.floor(random() * 256));
+    const text = toBase91(bytes);
+    expect(JSON.stringify(text).length).toBe(text.length + 2);
+    expect(/^[\x21-\x7e]*$/.test(text)).toBe(true);
+    expect(text.length).toBeLessThan(Buffer.from(bytes).toString('base64').length * 0.93);
+  });
+
+  it('不是字母表裡的字元會丟錯', () => {
+    expect(() => fromBase91('ab"c')).toThrow();
   });
 });
