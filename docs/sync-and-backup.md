@@ -76,32 +76,58 @@ at the top level, and cyclic `parentId` chains are broken. Two devices each movi
 is enough to produce both states, and their symptom is "the bookmark is still in the data
 but can never be seen on screen" — indistinguishable from having lost it.
 
-### The layout syncs separately
+### One compact copy in the cloud
 
-The order of items in vault folders is a second encrypted document with its own keys
-(`vaultLayoutMeta` + `vaultLayoutC0…`), synced right after the bookmark copy with the same
-four rules: nothing while in transit, merge only while unlocked, content fingerprint
-decides uploads. It carries the salt to prove it belongs to the same vault.
+`storage.sync` holds a single document, `vaultPack` + `vaultPackC0…` (`src/storage/pack-sync.ts`):
+the bookmarks **and** the layout (order, groups, column counts — see [vault.md](vault.md#order))
+in a compact encoding (`src/shared/sync-pack.ts`), then gzip, AES-GCM and base64 like every
+other vault blob. The local store, the backup file and the merge rules do not use this
+encoding; it exists only between "push" and "pull".
 
-It is **not** inside the bookmark copy, and its keys deliberately do not start with
-`vaultSyncC`: an older version's stale-chunk cleanup deletes every key with that prefix,
-and an older version rebuilding records field by field would strip anything it does not
-know — after which the two devices' fingerprints never agree and they overwrite each other
-every two seconds. Old versions simply never touch the layout keys.
+Why: the plain JSON spent most of the quota on things gzip cannot shrink. 400 bookmarks took
+about 70 KB, and only ~12 KB of that was URLs and titles. A record's random UUID appeared
+three times (bookmark, `order`, `groupOf`) in two separately compressed documents, and every
+record carried two or three 13-digit millisecond timestamps. The compact form keeps one id
+table and refers to it by index, sorts bookmarks by `createdAt` and stores the gaps (a batch
+import is milliseconds apart), and stores `updatedAt` as the offset from `createdAt`. Roughly
+half the size; a test pins "at least 30% smaller after gzip".
 
-From phase 3 the layout also carries vault column counts and groups (`grid`, `groups`, `groupOf`);
-they sync and back up the same way.
+**Timestamps keep full millisecond precision.** If the decoded copy differed from the local
+one by even a millisecond, the content fingerprints would never agree and two devices would
+overwrite each other forever. For the same reason every upload decodes what it just encoded
+and compares both fingerprints (bookmarks and layout); on a mismatch it uploads the plain
+form instead (`{ v: 0, payload, layout }`, same envelope). Layout entries or sections the
+encoder does not recognise are carried verbatim, so a newer version's additions survive.
 
-Both documents share the 100 KB quota, so each upload checks that it fits **together with
-what the other one currently occupies, plus the 20 KB reserved for bookmark layout** (when
-that is on, below), and stops with the usual over-quota warning if not.
-An older version does not know the layout exists and checks only its own size; near the
-limit it can fail its upload with a quota error. "Remove the cloud copy", deleting the
-vault and "overwrite the cloud" all clear the layout keys too.
+The encoding needs the key, so **nothing is uploaded while locked** — including the first
+upload when the cloud is empty, which older versions did from the stored ciphertext.
+"Restore from the cloud to this device" therefore writes only the `VaultMeta`; the first
+unlock reads the content from the cloud and stores it in the local format.
+
+#### Moving off the 1.3.x format
+
+Versions up to 1.3.x wrote two documents: `vaultSync` + `vaultSyncC…` (bookmarks) and
+`vaultLayoutMeta` + `vaultLayoutC…` (layout). Both together and the new copy do not fit in
+100 KB at once, so the switch is a cutover, not a dual write:
+
+1. A newer version reads the old documents too and, while unlocked, merges them in.
+2. When it pushes, it first checks that the new copy fits, then deletes the old documents,
+   then writes the new one. If it does not fit, the old documents stay as they are.
+3. A device still on 1.3.x cannot read the new copy. It sees "no cloud copy" and pushes its
+   own in the old format; the next round on an updated device merges that and deletes it
+   again. Nothing is lost (merging is per record), it just repeats until that device updates.
+   Meanwhile the old device does not receive changes made elsewhere.
+
+The new keys must not start with `vaultSyncC` or `vaultLayoutC`: 1.3.x deletes every key with
+those prefixes as a stale chunk. The deletion marker (`vaultSyncGone`) is unchanged, so
+deleting the vault still stops devices on either version.
 
 Merging is per entry, newer `updatedAt` wins, regardless of what the entry contains — so
-sections a version does not understand (groups, from phase 3 on) are kept and merged
-rather than dropped.
+layout sections a version does not understand are kept and merged rather than dropped.
+
+The upload checks that the copy fits in 100 KB minus a 1 KB reserve for the metadata and
+minus what bookmark layout (below) currently uses plus 4 KB of headroom, and stops with the
+usual over-quota warning if not.
 
 ### Bookmark layout and groups sync too (on by default)
 
@@ -113,10 +139,13 @@ turning it off removes the cloud copies and keeps the local ones.
 
 - Each folder is one item; the newer document wins (`updatedAt`, then `deviceId`). Firefox
   Sync keeps bookmark GUIDs identical across devices, which is what makes this work.
-- A fixed **20 KB budget** (`src/storage/grid-sync.ts`). A folder whose document exceeds the
-  8 KB item limit stays local only; if all of them together exceed 20 KB, syncing layout stops
-  entirely (cloud copies removed) and the options page lists the largest folders — the space
-  stays with the vault.
+- A budget of **at most 20 KB** (`src/storage/grid-sync.ts`), and never more than what the
+  vault copy leaves free. A folder whose document exceeds the 8 KB item limit stays local
+  only; if all of them together exceed the budget, syncing layout stops entirely (cloud
+  copies removed) and the options page lists the largest folders — the space stays with
+  the vault. The vault, in turn, reserves only what these documents use now plus 4 KB, not
+  the whole 20 KB (80 bookmarks' layout is a few KB; reserving 20 KB cost the vault about
+  150 bookmarks).
 - Remote removals never delete local documents (stopping because of the budget would
   otherwise wipe other devices).
 

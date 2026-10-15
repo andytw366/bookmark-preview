@@ -3,7 +3,10 @@ import type { VaultMeta } from '@/shared/types';
 import { textDigest } from '@/shared/vault-merge';
 
 /**
- * `storage.sync` 上那份加密副本的讀寫。
+ * `storage.sync` 上那份加密副本（1.3.x 以前的格式）的讀取與清除，以及刪除標記與裝置 id。
+ *
+ * 1.3.0 之後的版本改推精簡格式（`pack-sync`），這裡的副本只讀進來合併、然後清掉 ——
+ * 所以不再有寫入的函式。以下是當時的版面與規則，新格式照抄：
  *
  * 版面配置：
  *
@@ -156,47 +159,6 @@ export async function readSyncEnvelope(): Promise<SyncRead> {
   return { kind: 'ok', meta, blob };
 }
 
-export interface SyncIdentity {
-  vault: VaultMeta;
-  /** 內容指紋；還沒算過時傳空字串代表「未知」 */
-  tag: string;
-  deviceId: string;
-}
-
-export async function writeSyncEnvelope(
-  identity: SyncIdentity,
-  chunks: readonly string[],
-): Promise<SyncMeta> {
-  const items: Record<string, string> = {};
-  chunks.forEach((chunk, index) => {
-    items[`${SYNC_CHUNK_PREFIX}${String(index)}`] = chunk;
-  });
-  await browser.storage.sync.set(items);
-
-  const blob = fromChunks(chunks);
-  const meta: SyncMeta = {
-    version: 1,
-    vault: identity.vault,
-    chunks: chunks.length,
-    digest: await textDigest(blob),
-    tag: identity.tag,
-    updatedAt: Date.now(),
-    deviceId: identity.deviceId,
-  };
-  await browser.storage.sync.set({ [SYNC_META_KEY]: meta });
-
-  await removeStaleChunks(chunks.length);
-  /*
-   * 一份完整的新副本取代了刪除標記。
-   *
-   * 少了這一行，「A 刪掉隱私空間 → A 重新建立 → A 上傳」之後，B 會永遠停在
-   * 「另一台裝置刪除了隱私空間」，而那句話已經不是事實，B 也永遠不會去合併
-   * 雲端上那份確實存在的副本。
-   */
-  await clearSyncGone();
-  return meta;
-}
-
 /**
  * 清掉塊號 >= `keep` 的殘塊。
  *
@@ -267,7 +229,7 @@ export async function clearSyncGone(): Promise<void> {
   await browser.storage.sync.remove(SYNC_GONE_KEY);
 }
 
-/** 這份副本目前佔用的配額。拿不到精確值時用 meta 回推估算。 */
+/** `storage.sync` 目前整個佔用多少（含版面與書籤排列）。拿不到精確值時照配額的算法自己加總 */
 export async function syncBytesInUse(): Promise<number> {
   if (!syncAvailable()) {
     return 0;
@@ -282,11 +244,8 @@ export async function syncBytesInUse(): Promise<number> {
       // 落到下面的估算
     }
   }
-  const meta = await readSyncMeta();
-  if (meta === null) {
-    return 0;
-  }
-  return meta.chunks * (7_500 + SYNC_CHUNK_PREFIX.length) + 256;
+  const all = await browser.storage.sync.get(null);
+  return Object.entries(all).reduce((total, [key, value]) => total + key.length + JSON.stringify(value).length, 0);
 }
 
 /**

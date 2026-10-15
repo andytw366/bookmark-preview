@@ -16,7 +16,7 @@ import { nextColor, sameName, tagMatches, type GroupInfo } from '@/shared/groups
 import { t } from '@/shared/i18n';
 import { isPreviewableUrl } from '@/shared/url';
 import { getSettings } from '@/storage/settings';
-import { GRID_ITEM_LIMIT, GRID_PREFIX, GRID_SYNC_BUDGET, gridBytes, gridKey } from '@/storage/grid-sync';
+import { GRID_ITEM_LIMIT, GRID_PREFIX, GRID_SYNC_BUDGET, gridBytes, gridKey, gridSyncBudget } from '@/storage/grid-sync';
 import { deviceId, syncAvailable } from '@/storage/vault-sync';
 import { placeBefore } from './bookmark-order';
 
@@ -31,7 +31,7 @@ import { placeBefore } from './bookmark-order';
  * - **順序就是 Firefox 原生的順序**：卡片緊密排列、不留空格，所以不另外存順序；每次版面操作後
  *   把原生書籤搬成畫面的順序（只搬變了的那幾筆）。擴充套件不在時，Firefox 的書籤選單裡群組成員也是相鄰的。
  * - `columns` 是使用者按 − / + 定下來的欄數，0 = 跟著視窗（自動排列）。
- * - **跨裝置同步**：同一份也寫進 `storage.sync` 的同名鍵（預設打開，固定預算 20 KB）。
+ * - **跨裝置同步**：同一份也寫進 `storage.sync` 的同名鍵（預設打開，最多 20 KB）。
  *   讀到遠端那份時整份較新者勝。Firefox 同步會讓同一個書籤在各台電腦的 GUID 一致，
  *   這是能同步的前提；成員裡本機還沒有的 GUID 保留著（那筆書籤可能還沒同步過來）。
  *
@@ -335,9 +335,11 @@ function folderIdsIn(node: browser.bookmarks.BookmarkTreeNode | undefined): stri
 
 // ── 同步 ─────────────────────────────────────────────────────────────
 
-let lastStatus: { over: boolean; total: number; folders: GridSyncStatus['folders'] } = {
+/** `budget` 是上一次推送時算出來的可用上限（20 KB，或隱私空間佔掉之後剩下的） */
+let lastStatus: { over: boolean; total: number; budget: number; folders: GridSyncStatus['folders'] } = {
   over: false,
   total: 0,
+  budget: GRID_SYNC_BUDGET,
   folders: [],
 };
 
@@ -408,13 +410,15 @@ async function upload(keys?: readonly string[]): Promise<void> {
   const sizes = [...docs].map(([key, doc]) => ({ key, doc, bytes: gridBytes(key, doc) }));
   const syncable = sizes.filter((item) => item.bytes <= GRID_ITEM_LIMIT);
   const total = syncable.reduce((sum, item) => sum + item.bytes, 0);
-  const over = total > GRID_SYNC_BUDGET;
+  const budget = await gridSyncBudget();
+  const over = total > budget;
   const listed = over
     ? [...sizes].sort((a, b) => b.bytes - a.bytes).slice(0, 5)
     : sizes.filter((item) => item.bytes > GRID_ITEM_LIMIT);
   lastStatus = {
     over,
     total,
+    budget,
     folders: await Promise.all(
       listed.map(async (item) => ({
         title: await titleOf(item.key),
@@ -474,7 +478,7 @@ export async function reconcileGridSync(): Promise<void> {
 /** 關掉「同步書籤的排列與群組」：清掉雲端那幾份（本機的留著） */
 export async function clearGridSync(): Promise<void> {
   return exclusive(async () => {
-    lastStatus = { over: false, total: 0, folders: [] };
+    lastStatus = { over: false, total: 0, budget: GRID_SYNC_BUDGET, folders: [] };
     await removeRemote();
   });
 }
@@ -483,7 +487,6 @@ export async function gridSyncStatus(): Promise<GridSyncStatus> {
   return {
     available: syncAvailable(),
     enabled: await syncEnabled(),
-    budget: GRID_SYNC_BUDGET,
     ...lastStatus,
   };
 }

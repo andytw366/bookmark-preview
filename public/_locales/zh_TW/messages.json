@@ -263,9 +263,6 @@
   "sync_no_local_vault": {
     "message": "這台裝置還沒有隱私空間"
   },
-  "sync_nothing_to_upload": {
-    "message": "本機沒有可上傳的資料"
-  },
   "vault_locked": {
     "message": "隱私空間尚未解鎖"
   },
@@ -1782,7 +1779,7 @@
     "message": "不再固定欄數，改回跟著視窗寬度換行（群組會跟著換行，不會被拆散）"
   },
   "options_grid_sync_hint": {
-    "message": "全頁瀏覽裡的群組（tag）與定下來的欄數跟著 Firefox 同步到其他裝置（排列順序本來就隨書籤同步）。固定佔用同步空間的 20 KB，其餘留給隱私空間。"
+    "message": "全頁瀏覽裡的群組（tag）與定下來的欄數跟著 Firefox 同步到其他裝置（排列順序本來就隨書籤同步）。最多佔用同步空間的 20 KB，用不到的部分留給隱私空間。"
   },
   "options_grid_sync_checkbox": {
     "message": "同步書籤的排列與群組"

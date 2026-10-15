@@ -226,7 +226,7 @@ export interface Settings {
    * 書籤的排列與群組（固定格子）跟著 `storage.sync` 到其他裝置。
    *
    * **預設打開**：群組名稱與排列本來就是明文書籤的一部分，不像隱私空間那樣需要使用者
-   * 自己決定。固定佔 20 KB（見 `storage/grid-sync.ts`）。
+   * 自己決定。最多佔 20 KB（見 `storage/grid-sync.ts`）。
    */
   syncGrid: boolean;
 }

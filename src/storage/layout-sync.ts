@@ -3,7 +3,8 @@ import { textDigest } from '@/shared/vault-merge';
 import { syncAvailable } from './vault-sync';
 
 /**
- * `storage.sync` 上那份加密**版面**的讀寫（書籤資料那份在 `vault-sync`）。
+ * `storage.sync` 上那份加密**版面**（1.3.x 以前的格式）。現在只讀進來合併、然後清掉；
+ * 新格式把版面與書籤合成一份（`pack-sync`）。
  *
  * ```
  * vaultLayoutMeta   中介資料（明文）：salt / 塊數 / 兩個指紋
@@ -89,28 +90,6 @@ export async function readLayoutEnvelope(): Promise<LayoutSyncRead> {
   return { kind: 'ok', meta, blob };
 }
 
-export async function writeLayoutEnvelope(
-  identity: { salt: string; tag: string; deviceId: string },
-  chunks: readonly string[],
-): Promise<void> {
-  const items: Record<string, string> = {};
-  chunks.forEach((chunk, index) => {
-    items[`${LAYOUT_CHUNK_PREFIX}${String(index)}`] = chunk;
-  });
-  await browser.storage.sync.set(items);
-  const meta: LayoutSyncMeta = {
-    version: 1,
-    salt: identity.salt,
-    chunks: chunks.length,
-    digest: await textDigest(fromChunks(chunks)),
-    tag: identity.tag,
-    updatedAt: Date.now(),
-    deviceId: identity.deviceId,
-  };
-  await browser.storage.sync.set({ [LAYOUT_META_KEY]: meta });
-  await removeStaleLayoutChunks(chunks.length);
-}
-
 async function removeStaleLayoutChunks(keep: number): Promise<void> {
   const all = await browser.storage.sync.get(null);
   const stale = Object.keys(all).filter((key) => {
@@ -132,17 +111,4 @@ export async function clearLayoutEnvelope(): Promise<void> {
   }
   await browser.storage.sync.remove(LAYOUT_META_KEY);
   await removeStaleLayoutChunks(0);
-}
-
-/** 版面目前在雲端佔多少（估算，與 `estimateSyncBytes` 同一套算法） */
-export async function layoutSyncBytes(): Promise<number> {
-  if (!syncAvailable()) {
-    return 0;
-  }
-  const stored = await browser.storage.sync.get(LAYOUT_META_KEY);
-  const meta = stored[LAYOUT_META_KEY];
-  if (!isLayoutMeta(meta)) {
-    return 0;
-  }
-  return meta.chunks * (7_500 + LAYOUT_CHUNK_PREFIX.length + 2) + JSON.stringify(meta).length + LAYOUT_META_KEY.length;
 }

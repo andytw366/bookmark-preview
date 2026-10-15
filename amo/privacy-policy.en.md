@@ -67,7 +67,7 @@ in `storage.sync`, so the same groups appear on your other devices. On this path
   to settle conflicts between your devices.
 - It never includes anything from the vault. Groups inside the vault are part of the
   vault and sync only as ciphertext, under case 1.
-- It uses a fixed 20 KB of the sync space and can be turned off in Settings → "Sync
+- It uses at most 20 KB of the sync space and can be turned off in Settings → "Sync
   bookmark layout and groups"; turning it off also removes this data from sync.
 
 **3. Fetching preview images requests the sites you have bookmarked.**

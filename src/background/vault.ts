@@ -59,7 +59,9 @@ import {
   sanitizeVaultPayload,
   type MergeReport,
 } from '@/shared/vault-merge';
+import { packSync, unpackSync, type PackedSync, type RawSync } from '@/shared/sync-pack';
 import { clearLayoutEnvelope } from '@/storage/layout-sync';
+import { clearPackEnvelope, packEnvelopePresent, readPackEnvelope, readPackMeta } from '@/storage/pack-sync';
 import { getSettings } from '@/storage/settings';
 import { deleteThumb, getThumb, listKeys as listThumbKeys, putThumb } from '@/storage/thumbs-db';
 import { getPreviewChoice, setPreviewChoice } from '@/storage/preview-choice';
@@ -76,7 +78,6 @@ import {
   destroyVault,
   readBlob,
   readMeta,
-  readStoredBlob,
   readStoredLayout,
   writeBlob,
   writeLayout,
@@ -168,8 +169,25 @@ export function setPersistHook(hook: () => void): void {
  * 同步預設關閉，關閉時完全不看雲端：沒有人希望一個沒開同步的裝置忽然冒出
  * 「這裡有隱私空間」。
  */
-async function syncedVault(): Promise<{ meta: VaultMeta; blob: string; tag: string } | null> {
+type SyncedCopy =
+  /** 1.3.x 以前的格式：密文就是本機的格式，可以原樣落地 */
+  | { format: 'legacy'; meta: VaultMeta; blob: string; tag: string }
+  /** 精簡格式（`shared/sync-pack`）：要有金鑰才轉得成本機的格式 */
+  | { format: 'pack'; meta: VaultMeta; blob: string };
+
+async function syncedVault(): Promise<SyncedCopy | null> {
   if (!(await syncEnabled())) {
+    return null;
+  }
+  /*
+   * 新格式在（哪怕還沒傳完）就只認它。舊格式那份這時多半是還沒刪掉的舊副本，
+   * 它的包裹可能是改密碼之前的 —— 拿它當來源會讓新密碼開不了。
+   */
+  const pack = await readPackEnvelope();
+  if (pack.kind === 'ok') {
+    return { format: 'pack', meta: pack.meta.vault, blob: pack.blob };
+  }
+  if (pack.kind === 'partial') {
     return null;
   }
   const remote = await readSyncEnvelope();
@@ -177,7 +195,7 @@ async function syncedVault(): Promise<{ meta: VaultMeta; blob: string; tag: stri
     return null;
   }
   // 中介資料原樣搬過來，不逐欄複製 —— 少帶一個欄位的症狀是「換裝置後打不開」
-  return { meta: remote.meta.vault, blob: remote.blob, tag: remote.meta.tag };
+  return { format: 'legacy', meta: remote.meta.vault, blob: remote.blob, tag: remote.meta.tag };
 }
 
 async function syncEnabled(): Promise<boolean> {
@@ -195,7 +213,7 @@ async function syncEnabled(): Promise<boolean> {
  * 順帶也便宜得多：`vaultState()` 每次 UI 更新都會呼叫，讀一個鍵而不是十幾個。
  */
 async function syncedVaultExists(): Promise<boolean> {
-  return (await syncEnabled()) && (await syncEnvelopePresent());
+  return (await syncEnabled()) && ((await packEnvelopePresent()) || (await syncEnvelopePresent()));
 }
 
 /**
@@ -217,11 +235,10 @@ async function syncedMetaCandidate(local: VaultMeta): Promise<VaultMeta | null> 
   if (!(await syncEnabled())) {
     return null;
   }
-  const remote = await readSyncMeta();
-  if (remote === null) {
+  const candidate = (await readPackMeta())?.vault ?? (await readSyncMeta())?.vault ?? null;
+  if (candidate === null) {
     return null;
   }
-  const candidate = remote.vault;
   if (candidate.salt !== local.salt) {
     return null;
   }
@@ -310,7 +327,7 @@ export async function createVault(password: string): Promise<string> {
      * 新建的 vault 會有新的 salt，兩份從此永遠合不起來，而後續的同步會把雲端那份
      * 覆蓋掉。這個代價太高，所以即使使用者還沒打開同步也要先擋下來並說明出路。
      */
-    if (syncAvailable() && (await readSyncMeta()) !== null) {
+    if (syncAvailable() && ((await readPackMeta()) !== null || (await readSyncMeta()) !== null)) {
       throw new Error(
         t('vault_remote_exists'),
       );
@@ -393,8 +410,13 @@ interface Opener {
 async function unlockWith(opener: Opener): Promise<void> {
   return exclusive(async () => {
     const local = await readMeta();
-    // 換裝置後的第一次解鎖：雲端那份是唯一的來源
-    const remote = local === null ? await syncedVault() : null;
+    const stored = local === null ? null : await readBlob();
+    /*
+     * 換裝置後的第一次解鎖：雲端那份是唯一的來源。本機有 meta 卻沒有內容也算 ——
+     * 「從雲端還原」落地精簡格式時只寫得下 meta（內容要金鑰才轉得成本機的格式）。
+     */
+    const synced = local === null || stored === null ? await syncedVault() : null;
+    const remote = synced !== null && (local === null || synced.meta.salt === local.salt) ? synced : null;
     const meta = local ?? remote?.meta ?? null;
     if (meta === null) {
       throw new Error(
@@ -468,19 +490,38 @@ async function unlockWith(opener: Opener): Promise<void> {
       zero(dek);
     }
 
-    const source = local === null && remote !== null ? remote.blob : await readBlob();
-    const opened =
-      source === null
-        ? { ...EMPTY }
-        : sanitizeVaultPayload(await decodePayload<unknown>(dataKey, [source]));
+    let opened: VaultPayload;
+    let openedLayout: VaultLayout | null = null;
+    if (remote?.format === 'pack') {
+      const unpacked = unpackSync(await decodePayload<unknown>(dataKey, [remote.blob]));
+      opened = sanitizeVaultPayload(unpacked.payload);
+      openedLayout = sanitizeLayout(unpacked.layout);
+    } else {
+      const source = remote?.blob ?? stored;
+      opened =
+        source === null
+          ? { ...EMPTY }
+          : sanitizeVaultPayload(await decodePayload<unknown>(dataKey, [source]));
+    }
 
     if (local === null && remote !== null) {
-      await adoptCopy(remote.meta, remote.blob, remote.tag);
+      if (remote.format === 'legacy') {
+        await adoptCopy(remote.meta, remote.blob, remote.tag);
+      } else {
+        await writeMeta(remote.meta);
+      }
     }
 
     payload = opened;
     key = dataKey;
-    layout = await openLayout(dataKey);
+    layout = openedLayout ?? (await openLayout(dataKey));
+    // 從雲端來的內容要落成本機的格式：精簡格式本來就沒有本機那份；舊格式在「本機只有 meta」時也沒有
+    if (remote !== null && (remote.format === 'pack' || local !== null)) {
+      await persist();
+      if (remote.format === 'pack') {
+        await persistLayout();
+      }
+    }
     prune();
     await forgetTraces(alive(opened.bookmarks).map((record) => record.url));
   });
@@ -619,8 +660,12 @@ export async function deleteEverything(): Promise<void> {
     const local = await readMeta();
     await Promise.all(current.bookmarks.map((record) => deleteThumb(vaultThumbKey(record.id))));
 
-    const remote = (await syncEnabled()) ? await readSyncMeta() : null;
-    if (remote !== null && local !== null && remote.vault.salt === local.salt) {
+    const remote = (await syncEnabled())
+      ? ((await readPackMeta())?.vault ?? (await readSyncMeta())?.vault ?? null)
+      : null;
+    if (remote !== null && local !== null && remote.salt === local.salt) {
+      await clearPackEnvelope();
+      // 舊格式那兩份也清：還沒更新的裝置會從那裡把隱私空間拉回來
       await clearSyncEnvelope();
       await clearLayoutEnvelope();
       /*
@@ -675,7 +720,12 @@ export async function adoptSyncedVault(): Promise<void> {
     if (remote === null) {
       throw new Error(t('vault_no_remote_copy'));
     }
-    await adoptCopy(remote.meta, remote.blob, remote.tag);
+    if (remote.format === 'legacy') {
+      await adoptCopy(remote.meta, remote.blob, remote.tag);
+    } else {
+      // 精簡格式要金鑰才轉得成本機的格式：先落 meta，第一次解鎖時再從雲端讀內容（`unlockWith`）
+      await writeMeta(remote.meta);
+    }
   });
 }
 
@@ -907,26 +957,84 @@ export async function mergeEncryptedBlob(blob: string): Promise<MergeReport> {
   });
 }
 
-export interface VaultSnapshot {
-  /** 已加密的 base64，null 代表還沒有任何資料 */
-  blob: string | null;
-  /** 那份密文的內容指紋。舊格式或還沒算過時為 null */
-  tag: string | null;
+/**
+ * 把雲端那份精簡格式（書籤＋版面）合併進解鎖中的隱私空間。回傳內容有沒有變。
+ *
+ * 規則與 `mergeEncryptedBlob` / `mergeEncryptedLayout` 一樣：解不開才是 `RemoteBlobUnreadable`，
+ * 內容指紋沒變就不重新加密（否則兩台裝置會無止盡地互相上傳）。
+ */
+export async function mergeEncryptedPack(blob: string): Promise<boolean> {
+  return exclusive(async () => {
+    const { key: k, payload: current } = requireUnlocked();
+    let incomingPayload: VaultPayload;
+    let incomingLayout: VaultLayout;
+    try {
+      const unpacked = unpackSync(await decodePayload<unknown>(k, [blob]));
+      incomingPayload = sanitizeVaultPayload(unpacked.payload);
+      incomingLayout = sanitizeLayout(unpacked.layout);
+    } catch (cause) {
+      throw new RemoteBlobUnreadable(cause instanceof Error ? cause.message : String(cause));
+    }
+    if (key !== k) {
+      throw new Error(t('vault_locked_during_merge'));
+    }
+
+    const merged = mergeVaults(current, incomingPayload);
+    const currentLayout = layout ?? emptyLayout();
+    const mergedLayout = mergeLayouts(currentLayout, incomingLayout);
+    const payloadChanged = (await contentTag(current)) !== (await contentTag(merged.payload));
+    const layoutChanged = (await layoutTag(currentLayout)) !== (await layoutTag(mergedLayout));
+
+    if (key !== k) {
+      throw new Error(t('vault_locked_during_merge'));
+    }
+    if (payloadChanged) {
+      payload = merged.payload;
+      await persist();
+    }
+    if (layoutChanged) {
+      layout = mergedLayout;
+      await persistLayout();
+    }
+    return payloadChanged || layoutChanged;
+  });
+}
+
+export interface PackedSnapshot {
+  /** 已加密的 base64 */
+  blob: string;
+  /** 書籤的內容指紋 */
+  tag: string;
+  /** 版面的內容指紋 */
+  layoutTag: string;
 }
 
 /**
- * 要上傳的加密副本與它的內容指紋。
+ * 要推上雲端的那一份：書籤＋版面，精簡編碼後加密（`shared/sync-pack`）。要解鎖。
  *
- * 兩者都來自 `storage.local`（`persist` 把它們寫在同一次 set 裡），所以**不可能**
- * 出現「舊的密文配新的指紋」。曾經改成從記憶體算指紋，那會在修改已套用而 persist
- * 還沒完成的瞬間產出不一致的組合，後果是那筆修改永遠不會被同步出去 —— 而且兩邊
- * 都看不出來，因為雲端那份看起來完全正常。
+ * 密文與兩個指紋都從記憶體裡**同一個時間點**的內容算出來，所以不會出現「舊的密文配新的
+ * 指紋」（`readStoredBlob` 檔頭說的那個問題，那是密文讀磁碟、指紋讀記憶體才有的）。
  *
- * 這裡不必進佇列：只是讀兩個一起寫入的鍵，沒有跨 await 的狀態。
+ * 編好之後先解回來比對指紋。精簡編碼若漏了什麼，兩台裝置的指紋會永遠對不上而輪流互相
+ * 覆蓋 —— 寧可這一次改用原樣的格式（大一些，但一定對）。
  */
-export async function currentSnapshot(): Promise<VaultSnapshot> {
-  const stored = await readStoredBlob();
-  return stored === null ? { blob: null, tag: null } : { blob: stored.blob, tag: stored.tag };
+export async function packedSnapshot(): Promise<PackedSnapshot> {
+  return exclusive(async () => {
+    const { key: k, payload: current } = requireUnlocked();
+    const currentLayout = layout ?? emptyLayout();
+    const tag = await contentTag(current);
+    const lTag = await layoutTag(currentLayout);
+
+    let body: PackedSync | RawSync = packSync(current, currentLayout);
+    const back = unpackSync(JSON.parse(JSON.stringify(body)));
+    const exact =
+      (await contentTag(sanitizeVaultPayload(back.payload))) === tag &&
+      (await layoutTag(sanitizeLayout(back.layout))) === lTag;
+    if (!exact) {
+      body = { v: 0, payload: current, layout: currentLayout };
+    }
+    return { blob: fromChunks(await encodePayload(k, body)), tag, layoutTag: lTag };
+  });
 }
 
 // ── 加密檔備份 ────────────────────────────────────────────────────────

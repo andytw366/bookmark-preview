@@ -1,5 +1,5 @@
 import { gridSyncReserve } from '@/storage/grid-sync';
-import { estimateSyncBytes, fitsInSync, SYNC_META_RESERVE, SYNC_TOTAL_BUDGET, toChunks } from '@/crypto/chunk';
+import { fitsInSync, SYNC_META_RESERVE, SYNC_TOTAL_BUDGET, toChunks } from '@/crypto/chunk';
 import { broadcast } from '@/shared/messages';
 import type { SyncOutcome, VaultSyncStatus } from '@/shared/messages';
 import { getSettings, patchSettings } from '@/storage/settings';
@@ -13,25 +13,30 @@ import {
   SYNC_META_KEY,
   syncAvailable,
   syncBytesInUse,
-  writeSyncEnvelope,
-  type SyncMeta,
   type SyncRead,
 } from '@/storage/vault-sync';
 import {
   clearLayoutEnvelope,
   LAYOUT_CHUNK_PREFIX,
   LAYOUT_META_KEY,
-  layoutSyncBytes,
   readLayoutEnvelope,
-  writeLayoutEnvelope,
 } from '@/storage/layout-sync';
-import { readMeta, readStoredLayout } from '@/storage/vault-store';
+import {
+  clearPackEnvelope,
+  PACK_CHUNK_PREFIX,
+  PACK_META_KEY,
+  readPackEnvelope,
+  writePackEnvelope,
+  type PackSyncMeta,
+} from '@/storage/pack-sync';
+import { readMeta } from '@/storage/vault-store';
 import {
   adoptRemoteMeta,
-  currentSnapshot,
   isUnlocked,
   mergeEncryptedBlob,
   mergeEncryptedLayout,
+  mergeEncryptedPack,
+  packedSnapshot,
   RemoteBlobUnreadable,
   setPersistHook,
   vaultState,
@@ -57,6 +62,12 @@ import { t } from '@/shared/i18n';
  *    相通，沒有任何合併的可能。只能讓使用者明確選一邊，絕不自動決定。
  * 4. **用內容指紋而不是密文判斷「是否需要上傳」。** 每次加密都用新的 IV，同一份內容
  *    的密文永遠不同；用密文判斷會讓兩台裝置無止盡地互相覆蓋。
+ *
+ * 雲端的格式（1.3.0 之後）是書籤＋版面合成一份的精簡編碼（`storage/pack-sync`、
+ * `shared/sync-pack`）。1.3.x 以前的兩份（`vaultSync*`、`vaultLayout*`）讀到就合併進來，
+ * 推上新格式時刪掉 —— 兩種格式同時放會超過 100 KB。還沒更新的裝置看不懂新格式，會把
+ * 自己那份用舊格式推回來；那也沒關係，下一輪合併後再刪一次，等它更新完就停了。
+ * 精簡格式要有金鑰才編得出來，所以**上鎖時一律不推**（以前雲端沒有副本時上鎖也會推）。
  *
  * 已知限制（設定頁要照實說）：
  * - Firefox for Android 完全不同步 `storage.sync`（Mozilla bug 1625257）。
@@ -86,7 +97,7 @@ function describe(error: unknown): string {
 }
 
 /** 兩份中介資料指的是不是同一個隱私空間（同一把金鑰派生得出來）。 */
-function sameVault(remote: SyncMeta, local: VaultMeta): boolean {
+function sameVault(remote: { vault: VaultMeta }, local: VaultMeta): boolean {
   return remote.vault.salt === local.salt && remote.vault.iterations === local.iterations;
 }
 
@@ -123,8 +134,8 @@ export function startVaultSync(): void {
    * 被卸載的空檔，deviceId 存在 storage.local 才可靠）。
    */
   browser.storage.onChanged.addListener((changes, area) => {
-    // 版面那份也要聽：只改了排列時，書籤那份的 meta 不會動
-    const changedKey = [SYNC_META_KEY, LAYOUT_META_KEY].find((name) => name in changes);
+    // 舊格式那兩份也要聽：還沒更新的裝置推上來的東西要合併進來（再刪掉）
+    const changedKey = [PACK_META_KEY, SYNC_META_KEY, LAYOUT_META_KEY].find((name) => name in changes);
     if (area !== 'sync' || changedKey === undefined) {
       return;
     }
@@ -204,14 +215,22 @@ export async function syncVault(): Promise<SyncOutcome> {
       return finish('deleted-elsewhere');
     }
 
-    const remote = await readSyncEnvelope();
-    const remoteMeta = remote.kind === 'absent' ? null : remote.meta;
+    const pack = await readPackEnvelope();
+    const legacy = await readSyncEnvelope();
+    const packMeta = pack.kind === 'absent' ? null : pack.meta;
+    const legacyMeta = legacy.kind === 'absent' ? null : legacy.meta;
 
     // salt 不同代表兩邊是各自建立的隱私空間，金鑰互不相通 —— 沒有任何合併的可能
-    if (remoteMeta !== null && !sameVault(remoteMeta, local)) {
-      throw new Error(
-        t('sync_salt_mismatch'),
-      );
+    if (packMeta !== null && !sameVault(packMeta, local)) {
+      throw new Error(t('sync_salt_mismatch'));
+    }
+    /*
+     * 舊格式那份 salt 不同：新格式已經是這個隱私空間的話，它是前一個（已刪除的）隱私空間
+     * 留下的，推新格式時會一起清掉；沒有新格式就與以前一樣停下來。
+     */
+    const legacyOurs = legacyMeta !== null && sameVault(legacyMeta, local);
+    if (legacyMeta !== null && !legacyOurs && packMeta === null) {
+      throw new Error(t('sync_salt_mismatch'));
     }
 
     /*
@@ -221,38 +240,52 @@ export async function syncVault(): Promise<SyncOutcome> {
      * `unlockVault` 只在本機完全沒有隱私空間時才看雲端，所以這是唯一的途徑。
      * 換包裹不影響任何資料：salt 相同代表兩邊包的是同一把資料金鑰。
      */
-    if (remoteMeta !== null && (await adoptRemoteMeta(remoteMeta.vault))) {
+    let adopted = false;
+    for (const meta of [packMeta, legacyOurs ? legacyMeta : null]) {
+      if (meta !== null && (await adoptRemoteMeta(meta.vault))) {
+        adopted = true;
+      }
+    }
+    if (adopted) {
       broadcast('vault/changed', await vaultState());
     }
 
-    if (remote.kind === 'partial') {
-      // 塊還沒到齊、新舊混雜、或連 meta 都還沒到。這時手上沒有完整的遠端內容，
-      // 上傳就等於覆蓋掉我們還沒看到的東西 —— 寧可等下一輪
+    /*
+     * 塊還沒到齊、新舊混雜、或連 meta 都還沒到。這時手上沒有完整的遠端內容，
+     * 上傳就等於覆蓋掉我們還沒看到的東西 —— 寧可等下一輪。
+     *
+     * 舊格式只在「有 meta 而且是這個隱私空間」時才等：只剩塊沒有 meta 的，多半是清到一半
+     * 留下的殘塊，為它等下去會讓同步永遠停住；推新格式時會一起清掉。
+     */
+    if (pack.kind === 'partial' || (legacyOurs && legacy.kind === 'partial')) {
       lastError = null;
       return finish('waiting');
     }
 
-    if (remote.kind === 'ok') {
-      if (!isUnlocked()) {
-        lastError = null;
-        return finish('locked');
+    if (!isUnlocked()) {
+      lastError = null;
+      return finish('locked');
+    }
+
+    // 遠端那份本身解不開時（本機的錯誤會往上丟），用本機那份覆蓋過去 —— 否則這台裝置會因為
+    // 一份壞掉的遠端副本而永遠停止上傳自己的新書籤
+    let fellBack = false;
+    if (pack.kind === 'ok' && !(await mergePack(pack.blob))) {
+      fellBack = true;
+    }
+    if (legacyOurs && legacy.kind === 'ok') {
+      if (!(await mergeRemote(legacy))) {
+        fellBack = true;
       }
-      if (!(await mergeRemote(remote))) {
-        // 只有「遠端那份本身解不開」會走到這裡（本機的寫入失敗會往上丟）。
-        // 那份已經救不回來，所以用本機那份覆蓋過去 —— 否則這台裝置會因為一份
-        // 壞掉的遠端副本而永遠停止上傳自己的新書籤。
-        await push(local, null);
-        await syncLayout(local);
-        lastSyncedAt = Date.now();
-        return finish('synced');
-      }
+      await mergeLegacyLayout(local);
     }
 
     // 重讀本機 meta：上面的協調可能剛換掉包裹，用一開始那份會把舊包裹又推回去
-    await push((await readMeta()) ?? local, remote.kind === 'ok' ? remote.meta : null);
-    await syncLayout(local);
+    await push((await readMeta()) ?? local, pack.kind === 'ok' && !fellBack ? pack.meta : null);
     lastSyncedAt = Date.now();
-    lastError = null;
+    if (!fellBack) {
+      lastError = null;
+    }
     return finish('synced');
   } catch (error) {
     lastError = describe(error);
@@ -294,90 +327,87 @@ async function mergeRemote(remote: Extract<SyncRead, { kind: 'ok' }>): Promise<b
   return true;
 }
 
-/**
- * 把本機那份推上雲端。
- *
- * 只有「書籤內容的指紋相同**而且**中介資料也相同」才跳過不寫。不能改用密文比對 ——
- * 每次加密都換 IV，同一份內容的密文永遠不同，於是兩台裝置會輪流認定「雲端跟我
- * 不一樣」而互相覆蓋，每次覆蓋又觸發對方再覆蓋一次，永遠停不下來。
- */
-async function push(local: VaultMeta, remote: SyncMeta | null): Promise<void> {
-  const { blob, tag } = await currentSnapshot();
-  if (blob === null) {
+/** 合併雲端的新格式。回傳 false 代表**遠端那份本身**壞掉（呼叫端應該覆蓋它），理由同 `mergeRemote` */
+async function mergePack(blob: string): Promise<boolean> {
+  try {
+    if (await mergeEncryptedPack(blob)) {
+      broadcast('vault/changed', await vaultState());
+    }
+    return true;
+  } catch (error) {
+    if (!(error instanceof RemoteBlobUnreadable)) {
+      throw error;
+    }
+    lastError = t('sync_remote_unreadable_fell_back', error.message);
+    return false;
+  }
+}
+
+/** 舊格式的版面：合併進來就好，解不開或還沒傳完都不管 —— 推新格式時它會被刪掉，掉的只是排列 */
+async function mergeLegacyLayout(local: VaultMeta): Promise<void> {
+  const remote = await readLayoutEnvelope();
+  if (remote.kind !== 'ok' || remote.meta.salt !== local.salt) {
     return;
   }
+  try {
+    if (await mergeEncryptedLayout(remote.blob)) {
+      broadcast('vault/changed', await vaultState());
+    }
+  } catch (error) {
+    if (!(error instanceof RemoteBlobUnreadable)) {
+      throw error;
+    }
+  }
+}
+
+/** 清掉舊格式的兩份（有的話）。沒有就不寫，免得每一輪都觸發其他裝置的 onChanged */
+async function clearLegacy(): Promise<void> {
+  const keys = Object.keys(await browser.storage.sync.get(null));
+  const present = keys.some(
+    (key) =>
+      key === SYNC_META_KEY ||
+      key === LAYOUT_META_KEY ||
+      key.startsWith(SYNC_CHUNK_PREFIX) ||
+      key.startsWith(LAYOUT_CHUNK_PREFIX),
+  );
+  if (present) {
+    await clearSyncEnvelope();
+    await clearLayoutEnvelope();
+  }
+}
+
+/** 這份塞不塞得進去：100 KB 扣掉 meta 的餘裕與書籤排列那份 */
+async function fits(blob: string): Promise<boolean> {
+  return fitsInSync(toChunks(blob), PACK_CHUNK_PREFIX, SYNC_META_RESERVE + (await gridSyncReserve()));
+}
+
+/**
+ * 把本機那份推上雲端（新格式），順手清掉舊格式。
+ *
+ * 只有「書籤與版面的指紋都相同**而且**中介資料也相同」才跳過不寫。不能改用密文比對 ——
+ * 每次加密都換 IV，同一份內容的密文永遠不同，於是兩台裝置會輪流認定「雲端跟我
+ * 不一樣」而互相覆蓋，每次覆蓋又觸發對方再覆蓋一次，永遠停不下來。
+ *
+ * 先確認塞得進去才清舊格式：塞不進去的話舊格式那份至少還是一份能用的雲端副本。
+ */
+async function push(local: VaultMeta, remote: PackSyncMeta | null): Promise<void> {
+  const snapshot = await packedSnapshot();
+  if (!(await fits(snapshot.blob))) {
+    throw new Error(quotaMessage(snapshot.blob));
+  }
+  await clearLegacy();
   const unchanged =
     remote !== null &&
-    tag !== null &&
-    remote.tag !== '' &&
-    remote.tag === tag &&
+    remote.tag === snapshot.tag &&
+    remote.layoutTag === snapshot.layoutTag &&
     sameMetaContent(remote.vault, local);
   if (unchanged) {
     return;
   }
-  const chunks = toChunks(blob);
-  // 版面那份與它共用同一個 100 KB，要把它佔掉的算進來
-  if (!fitsInSync(chunks, SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await layoutSyncBytes()) + (await gridSyncReserve()))) {
-    throw new Error(quotaMessage(blob));
-  }
-  await writeSyncEnvelope(
-    {
-      vault: local,
-      // 指紋是跟密文一起存的，所以上鎖也讀得到。只有「舊版寫的資料還沒有指紋」
-      // 這一種情況會是 null，那時寫空字串代表「未知」，下一次寫入就會補上
-      tag: tag ?? '',
-      deviceId: await deviceId(),
-    },
-    chunks,
+  await writePackEnvelope(
+    { vault: local, tag: snapshot.tag, layoutTag: snapshot.layoutTag, deviceId: await deviceId() },
+    toChunks(snapshot.blob),
   );
-}
-
-/** 書籤那份在雲端要佔多少（版面推上去之前要先扣掉） */
-async function mainSyncBytes(): Promise<number> {
-  const { blob } = await currentSnapshot();
-  return blob === null ? 0 : estimateSyncBytes(toChunks(blob), SYNC_CHUNK_PREFIX) + SYNC_META_RESERVE;
-}
-
-/**
- * 版面（排列順序）的同步：拉遠端 → 合併 → 推回去。在書籤那份處理完之後呼叫。
- *
- * 規則與書籤那份一致：傳播中什麼都不做；合併要金鑰，上鎖時不推（推了就是覆蓋）；
- * 內容指紋相同就不寫。salt 不同的那份屬於另一個隱私空間 —— 書籤那份已經確認過
- * salt 相同才會走到這裡，所以那是前一個（已刪除的）隱私空間留下的，直接蓋掉。
- */
-async function syncLayout(local: VaultMeta): Promise<void> {
-  const remote = await readLayoutEnvelope();
-  if (remote.kind === 'partial') {
-    return;
-  }
-  const sameSalt = remote.kind === 'ok' && remote.meta.salt === local.salt;
-  if (sameSalt) {
-    if (!isUnlocked()) {
-      return;
-    }
-    try {
-      if (await mergeEncryptedLayout(remote.blob)) {
-        broadcast('vault/changed', await vaultState());
-      }
-    } catch (error) {
-      // 遠端那份解不開才用本機的蓋過去；本機的錯誤往上丟（理由同 mergeRemote）
-      if (!(error instanceof RemoteBlobUnreadable)) {
-        throw error;
-      }
-    }
-  }
-  const stored = await readStoredLayout();
-  if (stored === null) {
-    return;
-  }
-  if (sameSalt && stored.tag !== null && remote.meta.tag === stored.tag) {
-    return;
-  }
-  const chunks = toChunks(stored.blob);
-  if (!fitsInSync(chunks, LAYOUT_CHUNK_PREFIX, SYNC_META_RESERVE + (await mainSyncBytes()) + (await gridSyncReserve()))) {
-    throw new Error(quotaMessage(stored.blob));
-  }
-  await writeLayoutEnvelope({ salt: local.salt, tag: stored.tag ?? '', deviceId: await deviceId() }, chunks);
 }
 
 /**
@@ -399,28 +429,25 @@ export async function overwriteRemote(): Promise<void> {
     if (local === null) {
       throw new Error(t('sync_no_local_vault'));
     }
-    const { blob, tag } = await currentSnapshot();
-    if (blob === null) {
-      throw new Error(t('sync_nothing_to_upload'));
-    }
-    const chunks = toChunks(blob);
+    // 要解鎖：精簡格式要有金鑰才編得出來
+    const snapshot = await packedSnapshot();
     /*
      * 先確認塞得進配額才清空遠端。
      *
      * 反過來的話（清空 → 上傳 → 因為超額而失敗）會變成兩邊都沒有那份副本，
      * 而使用者按這顆按鈕的處境往往正是「資料很多」。
      */
-    if (!fitsInSync(chunks, SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await gridSyncReserve()))) {
-      throw new Error(quotaMessage(blob));
+    if (!(await fits(snapshot.blob))) {
+      throw new Error(quotaMessage(snapshot.blob));
     }
+    await clearPackEnvelope();
     await clearSyncEnvelope();
     await clearLayoutEnvelope();
     await clearSyncGone();
-    await writeSyncEnvelope(
-      { vault: local, tag: tag ?? '', deviceId: await deviceId() },
-      chunks,
+    await writePackEnvelope(
+      { vault: local, tag: snapshot.tag, layoutTag: snapshot.layoutTag, deviceId: await deviceId() },
+      toChunks(snapshot.blob),
     );
-    await syncLayout(local);
     lastSyncedAt = Date.now();
     lastError = null;
     lastOutcome = 'synced';
@@ -455,6 +482,7 @@ export async function clearRemote(): Promise<void> {
       timer = null;
     }
     await patchSettings({ vaultSyncEnabled: false });
+    await clearPackEnvelope();
     await clearSyncEnvelope();
     // 版面也是隱私資訊（第 3 期起還有群組名稱），「移除雲端副本」要連它一起移除
     await clearLayoutEnvelope();
@@ -503,9 +531,10 @@ export async function syncStatus(): Promise<VaultSyncStatus> {
     };
   }
 
-  const remote = await readSyncEnvelope();
+  // 新格式在就看新格式；沒有的話（還沒有新版推過）看舊格式那份
+  const pack = await readPackEnvelope();
+  const remote = pack.kind === 'absent' ? await readSyncEnvelope() : pack;
   const remoteMeta = remote.kind === 'absent' ? null : remote.meta;
-  const { blob } = await currentSnapshot();
   const gone = await readSyncGone();
 
   return {
@@ -515,11 +544,21 @@ export async function syncStatus(): Promise<VaultSyncStatus> {
     remoteUpdatedAt: remoteMeta?.updatedAt ?? null,
     sameVault: remoteMeta === null || local === null ? null : sameVault(remoteMeta, local),
     bytes: await syncBytesInUse(),
-    wouldFit:
-      blob === null ||
-      fitsInSync(toChunks(blob), SYNC_CHUNK_PREFIX, SYNC_META_RESERVE + (await layoutSyncBytes()) + (await gridSyncReserve())),
+    wouldFit: await wouldFit(),
     deletedElsewhere: gone !== null && gone.deviceId !== (await deviceId()),
   };
+}
+
+/** 上鎖時量不到（要金鑰才編得出來），先當成放得下 —— 解鎖後的那次同步會說實話 */
+async function wouldFit(): Promise<boolean> {
+  if (!isUnlocked()) {
+    return true;
+  }
+  try {
+    return await fits((await packedSnapshot()).blob);
+  } catch {
+    return true;
+  }
 }
 
 function finish(outcome: SyncOutcome): SyncOutcome {

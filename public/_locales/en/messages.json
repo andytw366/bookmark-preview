@@ -263,9 +263,6 @@
   "sync_no_local_vault": {
     "message": "This device has no vault yet"
   },
-  "sync_nothing_to_upload": {
-    "message": "There is nothing on this device to upload"
-  },
   "vault_locked": {
     "message": "The vault is locked"
   },
@@ -1782,7 +1779,7 @@
     "message": "Stop pinning the column count; wrap with the window width again (groups wrap along, they don't break up)"
   },
   "options_grid_sync_hint": {
-    "message": "Groups (tags) and pinned column counts from the full-page view sync to your other devices through Firefox (the order already syncs with the bookmarks). They always use 20 KB of the sync space; the rest is left for the private space."
+    "message": "Groups (tags) and pinned column counts from the full-page view sync to your other devices through Firefox (the order already syncs with the bookmarks). They use at most 20 KB of the sync space; whatever they don't use is left for the private space."
   },
   "options_grid_sync_checkbox": {
     "message": "Sync bookmark layout and groups"
