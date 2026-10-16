@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>SVG demo</title>
+<link rel="stylesheet" href="../../../src/ui/tokens.css">
+<style>
+  body { margin: 0; padding: 32px; background: var(--bg); font-family: var(--font); color: var(--text); }
+  .card { width: 640px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); }
+  .label { font-size: var(--fs-lg); font-weight: 600; margin: 0 0 4px; }
+  .desc { font-size: var(--fs-md); color: var(--text-2); margin: 0 0 12px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { font-family: var(--font); }
+  .mono { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="card">
+  <p class="label">改用書籤同步</p>
+  <p class="desc">打開後，Firefox 的書籤管理員會多出這個資料夾（其他書籤底下）：</p>
+  <svg viewBox="0 0 608 246" role="img" aria-label="範例：書籤管理員裡的同步資料夾">
+    <!-- window -->
+    <rect x="0.5" y="0.5" width="607" height="199" rx="8" fill="var(--surface)" stroke="var(--border-strong)" />
+    <!-- title bar -->
+    <path d="M0.5 8.5a8 8 0 0 1 8-8h591a8 8 0 0 1 8 8v19.5h-607z" fill="var(--surface-2)" />
+    <line x1="0.5" y1="28" x2="607.5" y2="28" stroke="var(--border)" />
+    <circle cx="16" cy="14" r="4" fill="var(--border-strong)" />
+    <circle cx="30" cy="14" r="4" fill="var(--border-strong)" />
+    <circle cx="44" cy="14" r="4" fill="var(--border-strong)" />
+    <text x="304" y="18" text-anchor="middle" font-size="11" fill="var(--text-2)">書籤管理員</text>
+
+    <!-- left pane -->
+    <rect x="1" y="28.5" width="186" height="170.5" fill="var(--bg)" />
+    <line x1="187.5" y1="28" x2="187.5" y2="199.5" stroke="var(--border)" />
+    <g font-size="12" fill="var(--text)">
+      <g transform="translate(12 46)"><use href="#folder" /><text x="22" y="9">書籤選單</text></g>
+      <g transform="translate(12 70)"><use href="#folder" /><text x="22" y="9">書籤工具列</text></g>
+      <g transform="translate(12 94)"><use href="#folder" /><text x="22" y="9">其他書籤</text></g>
+    </g>
+    <!-- selected: the sync folder -->
+    <rect x="20" y="112" width="160" height="24" rx="4" fill="var(--accent-tint)" />
+    <g transform="translate(28 118)" font-size="12" fill="var(--text)">
+      <use href="#folder" /><text x="22" y="9">書籤預覽：隱私空間…</text>
+    </g>
+
+    <!-- right pane: header -->
+    <text x="204" y="50" font-size="12" font-weight="600" fill="var(--text)">書籤預覽：隱私空間的同步資料（請勿修改）</text>
+    <line x1="188" y1="62.5" x2="607" y2="62.5" stroke="var(--border)" />
+    <text x="228" y="80" font-size="11" fill="var(--text-2)">名稱</text>
+    <line x1="188" y1="88.5" x2="607" y2="88.5" stroke="var(--border)" />
+    <!-- rows: empty titles, Firefox shows the data: URL -->
+    <g font-size="11" fill="var(--text-2)" class="mono">
+      <g transform="translate(204 98)"><use href="#globe" /><text x="22" y="10">data:,6endoe7s66pnq3xkz2m4fa7tq…</text></g>
+      <g transform="translate(204 122)"><use href="#globe" /><text x="22" y="10">data:,h2vqa5ri4zx7mnc3ple6dwo…</text></g>
+      <g transform="translate(204 146)"><use href="#globe" /><text x="22" y="10">data:,p7kd4lu2f6sxa3qe5ymvhtn…</text></g>
+    </g>
+    <!-- brace + callout -->
+    <path d="M468 100v58" stroke="var(--accent)" stroke-width="1.5" fill="none" />
+    <path d="M468 100h-6M468 158h-6M468 129h8" stroke="var(--accent)" stroke-width="1.5" fill="none" />
+    <text x="482" y="125" font-size="11" fill="var(--accent)" font-weight="600">加密過的隱私空間</text>
+    <text x="482" y="140" font-size="11" fill="var(--accent)">每筆約 60 KB</text>
+
+    <!-- footnote under the window -->
+    <text x="0" y="222" font-size="12" fill="var(--text-2)">書籤預覽會自動更新這個資料夾，請不要修改、移動或刪除它。</text>
+    <text x="0" y="240" font-size="12" fill="var(--text-2)">它只出現在 Firefox 自己的書籤選單與書籤管理員，書籤預覽的側邊欄裡看不到。</text>
+
+    <defs>
+      <g id="folder">
+        <path d="M1 3.5a1.5 1.5 0 0 1 1.5-1.5h4l1.5 1.8h5.5a1.5 1.5 0 0 1 1.5 1.5v6.7a1.5 1.5 0 0 1-1.5 1.5h-11a1.5 1.5 0 0 1-1.5-1.5z" fill="none" stroke="var(--text-2)" stroke-width="1.2" />
+      </g>
+      <g id="globe">
+        <circle cx="7" cy="7" r="5.5" fill="none" stroke="var(--text-3)" stroke-width="1.1" />
+        <path d="M1.5 7h11M7 1.5c-2 2-2 9 0 11M7 1.5c2 2 2 9 0 11" fill="none" stroke="var(--text-3)" stroke-width="1.1" />
+      </g>
+    </defs>
+  </svg>
+</div>
+</body>
+</html>

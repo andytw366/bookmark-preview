@@ -33,6 +33,13 @@
 結論：**網址用 `data:,` + 只有英數字的編碼**（base32 小寫 `a-z2-7`，不補 `=`）。base64url 的 `-` `_` 是單字分界，
 會讓密文裡處處是「單字開頭」，網址列打什麼都可能跳出這些書籤。書籤這邊沒有配額，base32 大 60% 沒關係。
 
+### 從哪裡開始
+
+**這些工作都在分支 `worktree-compact-sync` 上**（worktree：`/workspaces/firefox_plugin/.claude/worktrees/compact-sync`），
+還沒合進 main —— 方案 4 建立在這個分支的精簡格式（`src/storage/pack-sync.ts`、`src/shared/sync-pack.ts`）上。
+新 session 要在那個 worktree 裡開，或先把分支合進 main（合併時版號改 1.4.0）。worktree 的 `node_modules` 是指向主目錄的 symlink，
+**不要 `git add -A`**（會把它加進去）。
+
 ### 第 0 期：先確認 Firefox 同步會不會帶 60 KB 的 data: 書籤（**這一期不過，方案 4 就不做**）
 
 **2026-10-16 已通過**：使用者在兩台電腦上照下面的步驟測，B 收到資料夾 `RXShM34RM8mj`、1 筆書籤、網址長度 60,006（完整）、
@@ -75,8 +82,11 @@ A 按「立即同步」，幾分鐘後在 B 的書籤管理（Ctrl+Shift+O）→
   - `src/background/bookmark-index.ts`、`bookmark-grid.ts`、`bookmark-order.ts`：跳過
   - 移入隱私空間、搜尋：排除
 - **提示**：設定頁同步區塊在用量 ≥ 80% 時顯示提示與「改用書籤同步」按鈕；因為超額而停止同步時，錯誤訊息也帶同一顆按鈕。
-- **範例圖**：建議做成 **SVG 示意圖**（書籤選單展開到那個資料夾、裡面幾筆空白標題的書籤），字用 i18n 帶入 ——
-  容器的 Firefox 只有中文，截不到英文版；SVG 也跟得上深色主題。放在開關的 `below`。（若使用者堅持要真的截圖，用 `ff.sh crop` 截書籤選單。）
+- **範例圖：使用者已看過並同意（2026-10-16）**，照 `bookmark-preview-ui/design/sync-bookmarks/example.html` 做成元件
+  （淺色／深色截圖 `example-light.png`、`example-dark.png` 在同一個目錄）。畫的是 Firefox「書籤管理員」視窗：左邊樹展開到
+  「其他書籤 › 書籤預覽：隱私空間…」（選中），右邊三筆空白標題、顯示成 `data:,…` 的書籤，藍色括號標「加密過的隱私空間 / 每筆約 60 KB」，
+  圖下兩行說明。顏色全用 `tokens.css` 的變數（深色自動跟上）；**圖上的字要改成 i18n**（目前寫死中文），英文較長，
+  樹裡的資料夾名稱要截斷、右側註解要確認不超出 608 寬的 viewBox。放在開關的 `below`。
 - **文件**：隱私政策（多一種離開裝置的方式：密文放在書籤裡、經 Firefox 書籤同步）、`amo/permissions.md`（`bookmarks` 權限多一個用途）、
   `docs/sync-and-backup.md`、listing。
 
