@@ -101,7 +101,15 @@ let payload: VaultPayload | null = null;
 /** 版面（排列順序）。與 payload 同生同死：解鎖時一起讀進來、上鎖時一起丟掉 */
 let layout: VaultLayout | null = null;
 
-const EMPTY: VaultPayload = { version: 1, bookmarks: [], folders: [] };
+/**
+ * 空的 payload。**每次都要新的陣列**，不能是共用的常數再淺拷貝：淺拷貝共用同一個
+ * `bookmarks` 陣列，建立隱私空間後的第一次移入會 push 進那個常數，之後在同一個背景頁裡
+ * 「刪除整個隱私空間 → 重新建立」時，新的隱私空間一開始就帶著舊的那些書籤
+ * （2026-10-16 D 期實機抓到：刪掉重建後多出 300 筆）。
+ */
+function emptyPayload(): VaultPayload {
+  return { version: 1, bookmarks: [], folders: [] };
+}
 
 function alive<T extends { deleted?: true }>(items: readonly T[]): T[] {
   return items.filter((item) => item.deleted !== true);
@@ -362,7 +370,7 @@ export async function createVault(password: string): Promise<string> {
       };
       await writeMeta(meta);
       key = dataKey;
-      payload = { ...EMPTY };
+      payload = emptyPayload();
       layout = emptyLayout();
       await persist();
     } finally {
@@ -512,7 +520,7 @@ async function unlockWith(opener: Opener): Promise<void> {
       const source = remote?.blob ?? stored;
       opened =
         source === null
-          ? { ...EMPTY }
+          ? emptyPayload()
           : sanitizeVaultPayload(await decodePayload<unknown>(dataKey, [source]));
     }
 
