@@ -44,7 +44,7 @@ npm run build
 `vite build` runs twice (the pages, then `vite.config.background.ts`) because an MV3
 background script must be one IIFE. The `.zip` is `npm run package`.
 
-Verified for 1.3.0: those commands reproduce the submitted `dist/`, all 25 files identical.
+Verified for 1.4.0: those commands reproduce the submitted `dist/`, all 25 files identical.
 
 ## No remote code
 
