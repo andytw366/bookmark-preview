@@ -4,7 +4,7 @@ Permissions are requested when they become useful, not all at once up front.
 
 | Permission | Purpose | Requested |
 |---|---|---|
-| `bookmarks` | Read the bookmark tree; remove the original when moving into the vault | At install |
+| `bookmarks` | Read the bookmark tree; remove the original when moving into the vault; with "Sync through bookmarks" on, create, update and delete the bookmarks in its own sync folder | At install |
 | `storage`, `unlimitedStorage` | Settings, encrypted vault, IndexedDB thumbnails | At install |
 | `idle` | Auto-lock the vault once the user is away from the machine (one of two triggers; the other is time since the vault was last used, which needs no permission) | At install |
 | `scripting` | Inject a small function into a tab: read its cover image, fetch that image's bytes with the page's own credentials, and resolve where a bookmark's URL redirects (needs the host permission below to actually run) | At install |

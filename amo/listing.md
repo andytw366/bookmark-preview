@@ -52,7 +52,7 @@
 
 入口預設是隱藏的：側邊欄上沒有任何相關痕跡，要在搜尋框輸入一段自訂的觸發字串才會跳出密碼畫面。沒碰隱私空間滿一段時間（分鐘數可設定）、離開電腦、或關掉側邊欄，都會自動上鎖。
 
-忘記主密碼是救不回來的，所以建立時會給一組救援金鑰，並可匯出加密的備份檔。也可以選擇把加密副本放進 Firefox 同步，在自己的其他裝置上使用 —— 送出去的是密文，同步伺服器讀不到內容。
+忘記主密碼是救不回來的，所以建立時會給一組救援金鑰，並可匯出加密的備份檔。也可以選擇把加密副本放進 Firefox 同步，在自己的其他裝置上使用 —— 送出去的是密文，同步伺服器讀不到內容。隱私空間大到放不進附加元件同步空間（100 KB）時，可以改用書籤同步：密文放在「其他書籤」底下的一個資料夾裡，沒有這個上限。
 
 ■ 隱私
 
@@ -129,7 +129,7 @@ Create an encrypted bookmark space behind a master password. Bookmarks moved int
 
 The entrance is hidden by default: the sidebar shows no trace of it. You type a trigger string of your choosing into the search box to bring up the password screen. It re-locks automatically a configurable number of minutes after you last touched the vault, when you walk away from the machine, or when you close the sidebar.
 
-A forgotten master password cannot be recovered, so you get a recovery key when you create the vault, and you can export an encrypted backup file. You can also opt in to putting an encrypted copy in Firefox Sync to use it on your own other devices — what leaves the device is ciphertext, unreadable to the sync server.
+A forgotten master password cannot be recovered, so you get a recovery key when you create the vault, and you can export an encrypted backup file. You can also opt in to putting an encrypted copy in Firefox Sync to use it on your own other devices — what leaves the device is ciphertext, unreadable to the sync server. If the vault outgrows the 100 KB add-on sync space, you can sync it through bookmarks instead: the ciphertext goes into one folder under Other Bookmarks, with no such limit.
 
 ■ Privacy
 
@@ -155,6 +155,31 @@ The whole flow works without a mouse: arrow keys to move between bookmarks, Ente
 
 ```
 bookmarks, thumbnails, preview, privacy, encryption
+```
+
+---
+
+## 版本說明（1.4.0）
+
+送審表單的「版本說明」欄，中英各一份。沒有新權限。
+
+```
+・隱私空間的雲端副本改成一份精簡格式，同樣的書籤只佔原本約一半的同步空間。
+・新增「改用書籤同步」（預設關閉）：密文改放在「其他書籤」底下的一個資料夾，
+　由 Firefox 的書籤同步帶到其他裝置，沒有 100 KB 的上限。同步空間用到八成時，
+　設定頁會提示可以打開它。
+・同步的每台裝置都要更新到這一版：舊版讀不到新格式，更新前收不到其他裝置的變更
+　（不會遺失資料，更新後會合併）。
+```
+
+```
+・The vault's cloud copy now uses one compact format, taking about half the sync space
+  for the same bookmarks.
+・New, off by default: "Sync through bookmarks". The ciphertext goes into a folder under
+  Other Bookmarks and travels with Firefox's bookmark sync, with no 100 KB limit.
+  Settings suggest it once the sync space is 80% full.
+・Update every syncing device to this version: older ones cannot read the new format and
+  miss other devices' changes until updated (nothing is lost; they merge once updated).
 ```
 
 ---

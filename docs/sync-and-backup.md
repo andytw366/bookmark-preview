@@ -43,7 +43,8 @@ Off by default, and it must be turned on deliberately: enabling it means handing
 encrypted bookmarks to Mozilla's sync servers for safekeeping.
 
 The primary store is always `storage.local`. `storage.sync` holds only an encrypted copy,
-so the 100 KB quota limits **how much can sync**, not how much can be stored.
+so the 100 KB quota limits **how much can sync**, not how much can be stored — and with
+[syncing through bookmarks](#syncing-through-bookmarks-opt-in-off-by-default) not even that.
 
 Four rules, each corresponding to a real way data gets lost:
 
@@ -142,6 +143,86 @@ The upload checks that the copy fits in 100 KB minus a 1 KB reserve for the meta
 minus what bookmark layout (below) currently uses plus 4 KB of headroom, and stops with the
 usual over-quota warning if not.
 
+### Syncing through bookmarks (opt-in, off by default)
+
+`storage.sync` caps everything at 100 KB; at roughly 115 bytes per bookmark that is around
+800 vault bookmarks. Options → *Sync through bookmarks* moves the chunks somewhere without
+that cap: a bookmark folder, carried between devices by Firefox's own **bookmark sync**.
+Only the metadata (about 1 KB) stays in `storage.sync`.
+
+**Where the chunks live is a property of the cloud copy, not a per-device setting.** The
+`vaultPack` metadata says so: `version: 3`, `store: 'bookmarks'` and the folder's id
+(Firefox Sync keeps bookmark GUIDs, so the id is the same on every device). Every push
+writes back to wherever the cloud metadata says; the local setting `vaultSyncBookmarks`
+only decides where the *first* copy goes when the cloud has none. Otherwise two devices
+could each believe the copy lives somewhere else and overwrite each other or never read
+it. A copy kept in `storage.sync` is still written as `version: 2`, so people who never
+turn this on do not need every device updated at once; a build that only knows version 2
+sees version 3 as "written by a newer version" and waits.
+
+The folder sits under Other Bookmarks: "書籤預覽：隱私空間的同步資料（請勿修改）" /
+"Bookmark Preview: vault sync data (do not edit)", in the language of the device that
+created it. Inside, one bookmark per chunk (`src/storage/bookmark-store.ts`):
+
+- **Empty title.** Titles are matched by the address bar, and Firefox truncates them to
+  4,096 characters anyway, so data goes only in the URL.
+- **URL `data:,` + base32** (lowercase `a-z2-7`, no padding; `src/crypto/base32.ts`). Each
+  chunk is a 1-byte chunk number plus up to 37,499 bytes of ciphertext: exactly 60,000
+  characters, under Places' 65,536-character URL limit. base91 is not used here because
+  Firefox rewrites some of its characters inside a `data:` URL. Not base64url either: `-`
+  and `_` are word boundaries for the address bar, which matches only at word starts; with
+  a letters-and-digits-only body, typing text from the middle of a chunk never brings these
+  bookmarks up. **They do still come up** when the user types `data` (the scheme is a word
+  start) or the first letters of a chunk (`aa…`, right after `data:,`) — verified on
+  Firefox 153, see NEXT.md. A `javascript://` URL would be filtered out of the address bar
+  entirely; that trade-off is an open decision.
+- **Order comes from the chunk number, not the bookmark position** — a sync merge can
+  reorder bookmarks. At most 256 chunks (about 9.6 MB of ciphertext).
+- Reading checks chunk numbers 0..n−1 are all present, exactly as many as the metadata
+  says, then the same digest as for `storage.sync` (over the reassembled base32).
+- Writing updates the existing bookmarks' URLs in place (`bookmarks.update`, less sync
+  traffic and no new GUIDs), creates any missing ones and removes extras. Chunks first,
+  metadata last, as always.
+
+Bookmark sync and `storage.sync` are two independent channels, so **metadata arriving
+before the bookmarks is normal**. Until the chunks match the digest the copy is "still
+arriving", and the usual rule applies: do nothing. Bookmark events do not fire
+`storage.onChanged`, so the background also listens for bookmark events inside the folder
+and schedules a sync with the same debounce.
+
+Switching (`setSyncStore` in `src/background/vault-sync.ts`) requires the vault to be
+unlocked and sync to be on, and first runs a normal sync; anything other than a completed
+merge stops the switch with the reason (rewriting an unmerged cloud copy would overwrite
+what another device added).
+
+- **On**: write the bookmarks → write the metadata (version 3) → delete `vaultPackC*`.
+- **Off**: first check the copy fits in `storage.sync`; if it does not, refuse with the
+  size and leave the cloud copy alone. Otherwise write `vaultPackC*` → metadata → delete the
+  folder last, so a failure half-way still leaves the metadata pointing at intact data.
+- Ordinary pushes never delete the folder — only switching back, "Remove the cloud copy"
+  and deleting the vault do. Deleting it on every push would let a device that has not yet
+  received the new metadata delete the folder another device just wrote.
+
+If the user edits the folder — deletes a chunk, changes a URL, moves the folder — the
+digest no longer matches and sync reports the copy as still arriving. If the folder's id no
+longer matches (cut and paste, export and re-import), it is found again by title under
+Other Bookmarks. *Overwrite the cloud with this device* rebuilds it: missing chunks are
+recreated, changed ones rewritten, extras (including subfolders someone put there)
+removed.
+
+The add-on hides the folder from its own views: the sidebar, the full-page view, search,
+the Other Bookmarks count, the "Move to…" folder list, preview capture, the bookmark index
+and grid layout (`src/background/sync-folder-guard.ts`). Reordering, grouping and
+moving into the vault refuse it. Events inside it do not refresh the sidebar.
+It does still appear in Firefox's own Bookmarks menu and Library; the options page shows
+an example of what it looks like.
+
+Not verified: two real devices with this switch on (only the bookmark-sync transport
+itself was checked on two machines: a 60,006-character `data:` bookmark arrived intact,
+same folder id). **Firefox for Android was not tested** for whether it syncs this folder;
+even if it does, the metadata is in `storage.sync`, which Android does not sync, so a
+phone cannot use it either way.
+
 ### Bookmark layout and groups sync too (on by default)
 
 The native bookmarks' groups and pinned column counts (`grid:<folder guid>`, see
@@ -178,7 +259,8 @@ from a remote source should not have the authority to destroy local data.
 ## Limits, stated plainly
 
 - Firefox for Android does not sync `storage.sync` at all
-  ([bug 1625257](https://bugzil.la/1625257)).
+  ([bug 1625257](https://bugzil.la/1625257)). That includes syncing through bookmarks:
+  the metadata stays in `storage.sync`.
 - The sync cycle is roughly 10 minutes.
 - The master password is never synced.
 - **An extension cannot tell whether the user is signed in to a Firefox Account.** There is

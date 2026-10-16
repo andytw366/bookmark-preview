@@ -21,18 +21,16 @@ limited to 3000 characters**, so this is deliberately terse — run
 
 ---
 
-## New in 1.3.0
+## New in 1.4.0
 
-Site icons as previews, a redesigned UI, settings in a tab. No new permissions or deps.
+Vault sync only; no new permissions or deps. All synced data is still ciphertext.
 
-- A bookmark pointing to a whole site (path depth ≤ 1, no query) gets the site's icon. New
-  requests, all to that site: icon URLs its HTML declares (`<link rel=icon>`,
-  `apple-touch-icon`), its Web App manifest, `/apple-touch-icon.png` and `/favicon.ico`
-  (`site-icon.ts`). With no tab open, `credentials: 'omit'`; with the page open the
-  manifest is fetched like the page does (some, e.g. Google Maps, need its cookies).
-- Per-bookmark "Use site icon / page preview" is kept in `storage.local` keyed by a SHA-256
-  of the URL; for vault bookmarks inside the vault ciphertext. In the privacy policy.
-- `options_ui.open_in_tab` is now `true` (the new layout needs the width).
+- `storage.sync` holds the vault as one compact copy (`pack-sync.ts`), about half the size.
+- Opt-in "Sync through bookmarks": the ciphertext goes into one folder under Other
+  Bookmarks, one bookmark per piece (empty title, `data:,` + base32 URL;
+  `bookmark-store.ts`), so Firefox's bookmark sync carries vaults over 100 KB. Only ~1 KB
+  of metadata stays in `storage.sync`. The add-on writes only inside that folder and hides
+  it from its own views. In the privacy policy.
 
 ## Source and build
 

@@ -1,9 +1,61 @@
 # 接手指南 / 待辦
 
-最後更新：2026-10-16（1.3.0 已上架。**同步瘦身已實作並實機驗過，已合進 main，版號 1.4.0，還沒送審。**
-**下一個 session 從「隱私空間改用書籤同步（方案 4）」開始**，第 0 期已通過；1.4.0 要不要等方案 4 一起送審，問使用者）
+最後更新：2026-10-16（1.3.0 已上架。**同步瘦身與方案 4「隱私空間改用書籤同步」都已實作（A～D 期），版號 1.4.0，還沒 commit、還沒送審。**
+容器裡能驗的都驗了（驗收 1～8，見下）。**使用者已在兩台電腦上驗過（1～6 ✅，手機沒測）**，
+網址列那條使用者選了**維持 `data:,`**（2026-10-16）；之後 1.4.0 一起送審。）
 
-## 下一個 session 從這裡開始：隱私空間改用書籤同步（方案 4，2026-10-15 規劃）
+## 下一個 session 從這裡開始：方案 4 等使用者兩台實機驗，之後 1.4.0 送審（2026-10-16 D 期完成）
+
+### 已決定：網址列打 `data` 會跳出同步書籤 —— **維持 `data:,`（使用者 2026-10-16 選 A，不要再改）**
+
+D 期實機驗收第 3 條沒過：網址列打 `data`（`data:,` 的 scheme 本身就是單字開頭）或打塊的開頭（`aa…`，每塊 base32 的
+第一個字一定是 `a`，因為塊號的第 1 byte 很小）都會跳出那幾筆 `data:,…` 書籤；打常見字、打密文中間的字串都不會。
+第 0 期的表只測了後者，所以設計時以為 `data` 不會比對到。
+
+實測（同一個 Firefox 153）：網址改成 `javascript://` + base32 時，**網址列完全不會列出它**（Firefox 預設
+`browser.urlbar.filter.javascript = true`，除非輸入本身以 `javascript:` 開頭）；打 `java`、`javascript`、塊的開頭、
+中間都不出現。`//` 之後整串是 JS 註解，點下去什麼都不做；Places 收 60,013 字元、讀回一致。截圖
+`3-urlbar-javascript-scheme-experiment.png`。
+
+| 選項 | 代價 |
+|---|---|
+| A. 維持 `data:,`（現狀） | 打 `data`、`dat`、`aa` 開頭的字會在建議清單看到一筆奇怪的 `data:,aaaq…`（不洩漏內容，只是礙眼、透露「有這東西」—— 資料夾本來就在書籤選單看得到） |
+| B. 改 `javascript://` | 網址列完全看不到；但要重做第 0 期（兩台電腦確認書籤同步帶得過 60 KB 的 `javascript:` 書籤）、改範例圖與文件；AMO 審查員看到「擴充套件建立 `javascript:` 書籤」可能會問（要在審查備註先說明是註解、不會執行任何東西）；Firefox 若哪天不再過濾 `javascript:`，也就回到 A |
+
+格式沒發布過（version 3 只在這個建置裡），所以現在改不需要相容處理：`bookmark-store.ts` 的 `DATA_PREFIX` 一處，
+讀的那邊兩種前綴都認即可。**使用者選了 A，不改。** 驗收第 3 條視為已知限制，`docs/sync-and-backup.md` 已照實寫。
+
+### 要使用者在兩台電腦上做的驗證（容器做不到：沒有 Firefox 帳號）
+
+**2026-10-16 使用者回報：1～6 全部 ✅**（開關會自己跟著換、資料夾 id 兩台相同、雙向改動都到、`updatedAt` 不會每次同步都變、關回去兩台的資料夾都消失）。
+**7（手機版）沒有確認到**，維持「沒測」。下一步：commit、1.4.0 送審。
+
+A、B 是兩台電腦。前提：兩台都換上這次的建置（`npm run build` 之後的 `dist/`，照平常裝的方式）、登入同一個 Firefox 帳號、
+`about:preferences#sync` 裡**「書籤」與「附加元件」都有勾**、兩台都已經在用隱私空間同步（目前雲端是 storage.sync 那份）。
+下面的「主控台」指 `about:debugging` → 這個 Firefox → 書籤預覽 →「檢測」的主控台（先跑 `location.pathname` 確認是背景頁）。
+
+1. **起點**：兩台都解鎖，設定頁 → 同步：「雲端副本」是「完整」，兩台側邊欄隱私分頁的筆數一樣。記下筆數。
+2. **A 打開「改用書籤同步」**：開關下出現「已改用書籤同步…」。A 的書籤管理員（Ctrl+Shift+O）→ 其他書籤 → 多一個
+   「書籤預覽：隱私空間的同步資料（請勿修改）」，裡面 1～幾筆「（無標題）」、網址 `data:,…`。A 的側邊欄看不到它。
+   A 主控台：`(await browser.storage.sync.get('vaultPack')).vaultPack` → 記下 `folderId`、`chunks`、`updatedAt`。
+3. **A 按「立即同步」**（`about:preferences#sync`），等一分鐘，**B 按「立即同步」**；B 可能要再按一次（meta 與書籤是兩條同步，
+   先到一邊時 B 會顯示「傳輸中」，這是正常的）。
+4. **B 檢查**：設定頁「改用書籤同步」的開關**自己變成打開**、雲端副本「完整」；B 的書籤管理員有同一個資料夾、筆數同 A 的
+   `chunks`；B 主控台 `(await browser.storage.sync.get('vaultPack')).vaultPack.folderId` 與 A 記下的**相同**；B 的側邊欄看不到那個資料夾、
+   隱私空間筆數沒變。
+5. **雙向改動**：B 新增或改名一筆隱私書籤 → B 立即同步 → A 立即同步（必要時兩次）→ A 看得到那筆。再從 A 改一筆、反向做一次。
+   兩台的 `vaultPack.updatedAt` 應該停在同一個值，**不會**每次同步都變（會一直變就是互相覆蓋，回報）。
+6. **關回去**（隱私空間小於約 95 KB 才能關；太大時會拒絕並說明，這也是要看的）：A 關掉開關 → A、B 依序立即同步 → B 的開關自己變關、
+   兩台的那個資料夾都消失、B 的隱私空間筆數不變。
+7. （順便看）手機版 Firefox 登入同一個帳號後，書籤裡有沒有出現那個資料夾。手機本來就用不到（中介資料在 storage.sync，Android 不同步它），
+   只是補一個「沒測」。
+8. 有任何一步卡住（例如「傳輸中」超過 10 分鐘）：回報兩台主控台的 `vaultPack`（去掉 `vault` 欄位）、
+   `(await browser.bookmarks.getChildren('<folderId>')).map(n => [n.title, n.url.length])`，以及設定頁的截圖。
+
+做完把結果寫回這裡（每一步 ✅／❌），沒問題就照「1.2.0 送審」那節的流程送 1.4.0（審查備註、權限說明、隱私政策、listing 都已更新，
+`python3 scripts/amo-paste.py` 產生貼上用的文字；送審前重跑一次「重建結果逐檔相同」並改審查備註裡那句的版號）。
+
+## （規劃）隱私空間改用書籤同步（方案 4，2026-10-15 規劃）
 
 ### 使用者要的是什麼
 
@@ -27,7 +79,7 @@
 | base91 字元放進 `data:` | **被改寫**（部分字元被跳脫）—— 書籤這邊不能用 base91 |
 | `bookmarks.create` 不給 parentId | 落在「其他書籤」（`unfiled_____`） |
 | `bookmarks.search` | 找得到這些書籤（自己的搜尋要濾掉） |
-| 網址列自動完成 | **只比對單字開頭**：打密文中間的字串不會跳出來；打 `data:,` 後面的開頭、或 `-` `_` 之後的字串**會**跳出來 |
+| 網址列自動完成 | **只比對單字開頭**：打密文中間的字串不會跳出來；打 `data:,` 後面的開頭、或 `-` `_` 之後的字串**會**跳出來；**打 `data` 也會**（D 期才發現，見最上面） |
 | `place:` 網址 | 不會出現在網址列，但會被當成智慧資料夾顯示、同步可能改寫它 —— **不用** |
 
 結論：**網址用 `data:,` + 只有英數字的編碼**（base32 小寫 `a-z2-7`，不補 `=`）。base64url 的 `-` `_` 是單字分界，
@@ -66,7 +118,7 @@ A 按「立即同步」，幾分鐘後在 B 的書籤管理（Ctrl+Shift+O）→
   指紋判斷要不要上傳）。書籤同步與 `storage.sync` 是兩條獨立的同步，**meta 先到、書籤後到是常態**，digest 對不上就是傳輸中。
 - **`PACK_META_VERSION` 升到 3**（只在 `store: 'bookmarks'` 時寫 3；存在 `storage.sync` 時照寫 2，讓沒打開這個功能的人不必一起更新）。
   第 2 版的建置看到 3 會停下來並提示更新（已經做好的保護）。
-- **資料夾**：「其他書籤」底下，名稱「書籤預覽：隱私空間的同步資料（請勿修改）」/「Bookmark Preview: private space sync data (do not edit)」。
+- **資料夾**：「其他書籤」底下，名稱「書籤預覽：隱私空間的同步資料（請勿修改）」/「Bookmark Preview: vault sync data (do not edit)」。
   每塊一筆書籤，**標題留空**（標題也會被網址列比對），網址 `data:,` + base32，每塊 ≤ 60,000 字元。
   **順序不靠書籤位置**（同步合併可能重排）：每塊明文開頭放 1 byte 的塊號。
 - **寫入**：用 `bookmarks.update` 改既有那幾筆的網址（少一點同步流量），多的刪掉、不夠的新增；寫完再寫 meta。
@@ -90,14 +142,221 @@ A 按「立即同步」，幾分鐘後在 B 的書籤管理（Ctrl+Shift+O）→
 
 ### 驗收
 
-1. 打開開關 → 書籤選單出現那個資料夾、裡面 N 筆空白標題書籤；`storage.sync` 只剩 `vaultPack`（version 3、store bookmarks）。
-2. 側邊欄、全頁瀏覽、搜尋都看不到那個資料夾；「其他書籤」筆數不含它；推送時側邊欄不閃。
-3. 網址列打常見字、打 `data`、打密文中間的幾個字都不會跳出那些書籤。
-4. 放棄本機 → 從雲端解鎖，內容回來、雲端沒有被重寫（指紋相同）。
-5. 關掉開關 → 回到 `storage.sync`、資料夾被刪；塞不進時拒絕並說明。
-6. 手動刪掉其中一筆 → 同步顯示傳輸中，「以這台裝置覆蓋雲端」能重建。
-7. 用量 ≥ 80% 時設定頁出現提示。
-8. 1,500 筆的隱私空間能同步（`SEED_BULK=1500`）。
+2026-10-16 D 期在容器的 Firefox 153 跑（Xvfb；設定頁用真的點擊，背景狀態用 WebDriver BiDi 在設定頁裡呼叫
+`browser.*` 與送訊息讀出來，雲端與書籤另外直接讀 `storage-sync-v2.sqlite`、`places.sqlite`）。容器沒有 Firefox 帳號，
+**兩台裝置之間的傳輸全部沒驗**。截圖在 `/tmp/claude-1000/-workspaces-firefox-plugin/f0dcc446-ee79-4852-8a0a-48e63ae8b289/scratchpad/`
+（檔名開頭是條號；暫存目錄，之後會消失）。
+
+1. ✅ 300 筆、同步打開、解鎖 → 按開關：書籤管理員「其他書籤」底下出現「書籤預覽：隱私空間的同步資料（請勿修改）」，
+   裡面 1 筆**標題是空的**（`places.sqlite` 的 title 是 NULL）`data:,aaaq…` 書籤；`storage.sync` 只剩 `vaultPack`
+   （`version: 3`、`store: 'bookmarks'`、`folderId`），`vaultPackC*` 已刪。截圖 `1-options-toggle-on.png`、`1-library-folder.png`。
+2. ✅ 側邊欄與全頁瀏覽都看不到那個資料夾；「其他書籤」裡另放 1 筆一般書籤時顯示「1 個書籤」、點進去只有那一筆；
+   側邊欄與全頁瀏覽搜 `data`、搜塊的開頭 `aaaqd` 都是 0 筆。推送（改一筆隱私書籤的標題 → 2 秒後改寫那筆書籤的網址）
+   期間在設定頁收廣播：只有 `vault/changed`、`vault/sync-changed` ×2，**沒有 `bookmarks/invalidated`**，所以側邊欄不會重整。
+   截圖 `2-sidebar-other-and-search.png`、`2-gallery-other-and-search.png`。
+3. ⬜ **沒過，等使用者決定**（見本節最上面）。打 `mozilla`、`google`、`abc`、`ad`、密文中間 8 個字（`crrndhqe`）都**不會**跳出；
+   打 `data`、`data:,`、`aa`、塊的開頭 `aaaqdk` **會**跳出。截圖 `3-urlbar-*.png`（`-SHOWS` 是會跳出的、`-hidden` 是不會的）。
+4. ✅ 上鎖 →「放棄這台裝置上的隱私空間」（`vault/forget`）→ 用主密碼解鎖：300 筆回來，改過名的那筆也在；雲端 meta 的
+   `tag`、`layoutTag`、`digest`、`updatedAt` 與書籤的 `lastModified` 全部不變（沒有被重寫）；狀態 `synced`。
+5. ✅ 關開關（1,500 筆以內）→ `storage.sync` 是 `vaultPack`（`version: 2`、不帶 store）＋ `vaultPackC0..`，資料夾刪掉，
+   開關下顯示「已改回 storage.sync，書籤裡的同步資料夾已刪除」。3,000 筆（約 172 KB）時關 → 拒絕並說明大小，雲端那份與資料夾都沒動。
+   拒絕的訊息原本寫「約 101 KB，放不進 100 KB 額度」，**改了**（見下面 D 期的修正 3）。截圖 `5-toggle-off-ok.png`、
+   `5-toggle-off-refused-172KB.png`（修之前的字）、`5-toggle-off-refused-new-wording.png`。
+6. ✅ 4 塊時手動刪掉第 3 塊 → 2 秒後自動同步結果 `waiting`、設定頁「傳輸中（塊還沒到齊…）」；按「以這台裝置覆蓋雲端」→
+   4 塊補齊、`synced`。另外整個資料夾刪掉 → 一樣 `waiting`，覆蓋雲端 → 新資料夾、4 塊、`synced`。
+   截圖 `6-chunk-deleted-partial.png`、`6-overwrite-rebuilt.png`。
+7. ✅（修過才過）用量 81% → 黃框「同步空間已用掉 81%…」＋「改用書籤同步」，按下去成功。超額時的黃框也有同一顆按鈕，
+   **但修之前按了一定失敗**（見 D 期的修正 2）；修完實機按下去成功、3 塊寫進書籤。截圖 `7-nearly-full-81pct.png`、
+   `7-hint-button-switched.png`、`7-over-quota-button.png`（修之前）、`7-over-quota-button-new-wording.png`、
+   `7-over-quota-button-works-after-fix.png`。
+8. ✅ `SEED_BULK=1500` 全部移入（加上前面的 300）→ storage.sync 46.6 KB；按開關改去書籤（含開頭那次同步）**94 ms**，1 塊 59,538 字元。
+   再加 1,500 筆隨機長網址與標題（較接近真實，共 3,000 筆）→ 4 塊、約 172 KB，自動推送正常；3 塊時「以這台裝置覆蓋雲端」196 ms，
+   之後自己寫書籤觸發的那一輪讀到指紋相同、沒有再寫（A 期擔心的 (1) 不成立）。
+
+### 分期（2026-10-16 定，使用者說 1.4.0 等方案 4 做完一起送審）
+
+A、B 可以同時做（B 只靠 A 的一個函式，介面先定好）；C 等 A；D 最後。每期結束 `npm run typecheck && npm test` 要過，
+並把狀態寫回這一節（✅ / 沒驗的）。
+
+**介面約定（A 提供、B/C 使用，不要改名）** —— 新檔 `src/storage/bookmark-store.ts`：
+
+```ts
+export const SYNC_FOLDER_LOCAL_KEY = 'vaultSyncFolderId';     // storage.local：本機記住的資料夾 id
+export async function syncFolderId(): Promise<string | null>; // 先看 meta（store bookmarks 的 folderId），再看本機記住的
+export function isSyncFolderIdSync(id: string): boolean;      // 同步版：背景啟動時載入、變動時更新的快取，給過濾用
+```
+
+**A 期：儲存層與同步核心（背景，不碰 UI）** —— ✅ 2026-10-16 完成（typecheck、單元測試過；沒有實機跑過）
+
+- `src/crypto/base32.ts`：小寫 `a-z2-7`、不補 `=`，`toBase32(bytes)` / `fromBase32(text)`（遇到字母表外的字元丟錯）。單元測試。
+- `packedSnapshot()` 改回傳**位元組**（`sealPayload` 的結果）加兩個指紋，編碼交給存放位置：`storage.sync` 照舊 base91，書籤用 base32。
+  `openPack` 依 meta 的 version／store 選解碼方式（3 = 書籤、base32）。
+- `src/storage/bookmark-store.ts`：
+  - 切塊：密文位元組每 37,499 bytes 一塊，前面加 1 byte 塊號 → base32（≤ 60,000 字元）→ 網址 `data:,` + base32，標題 `''`。塊數上限 256（約 9.6 MB 密文）。
+  - 讀：`getChildren(folderId)` → 解每筆網址、依塊號排序、檢查 0..n-1 齊全且數量等於 meta.chunks → 接回位元組；digest 用接回後位元組的
+    base32 字串算 `textDigest`，對不上回 partial。資料夾不在：先用 meta.folderId，找不到再用兩種語言的標題在「其他書籤」底下找。
+  - 寫：資料夾不在就在 `unfiled_____` 建；既有書籤用 `bookmarks.update` 換網址，多的 `remove`，不夠的 `create`。
+  - 刪：`removeTree`。
+  - 同時把 folderId 存進 `SYNC_FOLDER_LOCAL_KEY` 並更新同步快取。
+- `src/storage/pack-sync.ts`：`PackSyncMeta` 加 `store?: 'bookmarks'`、`folderId?: string`；`PACK_META_VERSION` 升 3，但 `isPackMeta` 接受
+  1、2、3（3 必須有 `store: 'bookmarks'` 與 folderId）；`newerMetaPresent` 改成 `> 3`。`readPackEnvelope` 依 store 從書籤讀塊。
+  寫 `storage.sync` 時 meta 寫 `version: 2`、不帶 store；寫書籤時寫 `version: 3`。**先塊後 meta 的順序不變**。
+- `src/background/vault-sync.ts`：
+  - `push`／`overwriteRemote` 依「雲端 meta 的 store」選寫哪裡（雲端沒有 meta 時依本機設定 `vaultSyncBookmarks`，見下）。書籤那邊不檢查 `fits`。
+  - 寫書籤時要刪 `vaultPackC*`；寫回 `storage.sync` 時要 `removeTree` 舊資料夾。
+  - `clearRemote` 也要刪資料夾。
+  - 新函式 `setSyncStore(store: 'sync' | 'bookmarks')`：要解鎖、先跑一次 `syncVault` 確認合併過（結果不是 `synced` 就丟錯說明原因）；
+    改回 sync 時先檢查 `fits`，塞不下丟 `sync_bookmarks_cannot_fit`（帶 KB 數）。拿同一個 `running` 旗標。
+  - `syncStatus` 多回 `store: 'sync' | 'bookmarks'` 與 `usageRatio`（`syncBytesInUse / SYNC_TOTAL_BUDGET`）；書籤模式下 `wouldFit` 一律 true。
+  - 書籤事件不會觸發 `storage.onChanged`：在 `startVaultSync` 加 `bookmarks.onCreated/onChanged/onRemoved` 監聽，parentId 或 id 是同步資料夾時
+    `scheduleVaultSync()`（同一個 debounce，避免書籤同步逐筆到時連跑）。
+- 設定 `vaultSyncBookmarks: boolean`（`src/storage/settings.ts`，預設 false）只當「雲端還沒有 meta 時」的初值；真正的狀態看 meta。
+- 訊息（`src/shared/messages.ts`）：`vault/set-sync-store`。i18n 新字串放 `public/_locales/{zh_TW,en}/messages.json`。
+- 測試：base32 往返；切塊／接回（含亂序、缺一塊、多一塊、塊號重複）；meta 版本判斷（2 與 3 都認、4 回 newer）。
+
+A 期實作筆記（2026-10-16）：
+
+- **與規格不同的地方**
+  - `readPackEnvelope` 的 `ok.blob` 仍是字串：書籤那邊是「接回後位元組的 base32」（digest 也是用這串算，與規格一致），
+    `openPack` 看 version 3 就 `fromBase32`。這樣 `syncedVault`／`mergeEncryptedPack` 的介面完全不用改。
+  - `writePackEnvelope(identity, target)` 第二個參數改成 `{ store: 'sync', chunks }` 或 `{ store: 'bookmarks', bytes }`；
+    寫書籤時在寫完 meta 後刪 `vaultPackC*`（在 `writePackEnvelope` 裡，不在 vault-sync）。
+  - **寫回 storage.sync 時不是每次都刪資料夾**：只在 `setSyncStore('sync')`、`overwriteRemote`（雲端是 sync 時）、
+    `clearRemote`／`deleteEverything`（`clearPackEnvelope()` 預設連資料夾一起刪）時刪。每次推送都刪的話，A 剛切到書籤、
+    meta 還沒傳到 B 的空檔裡，B 推一次 sync 就會把 A 剛寫好的資料夾刪掉。
+  - `overwriteRemote` 在雲端是 bookmarks 時不刪資料夾（`clearPackEnvelope(false)`），由 `writeBookmarkChunks` 沿用、
+    `update` 換網址、補齊缺的、刪多的（也刪使用者塞進去的子資料夾）——「重建」就是這樣做的。
+  - `isSyncFolderIdSync` 有三個來源：meta 的 folderId、`vaultSyncFolderId`、**「其他書籤」底下標題等於兩種語言資料夾名稱的資料夾**
+    （協調者要求：書籤比 meta 先到時也藏得住）。啟動時 `initSyncFolderCache()`（`background/index.ts` 已接）掃一次，
+    `bookmarks.onCreated/onChanged/onMoved/onRemoved` 與 `storage.onChanged` 維護。
+  - 資料夾名稱的兩種語言寫死在 `bookmark-store.ts` 的 `FOLDER_TITLES`（找資料夾用），建立時用 i18n 的
+    `sync_bookmarks_folder_title`。**改文案要兩處一起改。**
+  - `setSyncStore` 在雲端已經是目標位置時只更新本機設定 `vaultSyncBookmarks`，不重寫。
+- **沒驗的事**：全部只有單元測試（假的 `browser.bookmarks`），沒有在 Firefox 上跑過；驗收 1～8 都留給 D 期。
+  特別要看：(1) 自己寫書籤會觸發 `bookmarks.on*` → 2 秒後多跑一輪 `syncVault`（讀到指紋相同不會寫，但會多讀一次所有塊）；
+  (2) 1,500 筆、幾十塊時 `bookmarks.update` 逐筆寫的耗時；(3) 背景啟動時快取載入前那一瞬間的事件不會被過濾。
+- **C 期要用的**
+  - 訊息 `vault/set-sync-store`：request `{ store: 'sync' | 'bookmarks' }`，response `VaultSyncStatus`；失敗丟錯，訊息可直接顯示
+    （`sync_bookmarks_need_unlock`、`sync_bookmarks_not_merged`（帶原因）、`sync_bookmarks_cannot_fit`（帶 KB 數與額度）、
+    `sync_bookmarks_too_large`、`sync_in_progress` 等）。
+  - `VaultSyncStatus` 新欄位：`store: 'sync' | 'bookmarks'`（看雲端 meta，沒有時是本機設定）、`usageRatio`（`bytes / quota`）；
+    `store === 'bookmarks'` 時 `wouldFit` 一律 true。
+  - 設定 `vaultSyncBookmarks`（預設 false）只是雲端沒有 meta 時的初值，開關的顯示要看 `status.store`。
+  - 切換的前提是同步打開（`vaultSyncEnabled`）且解鎖；`syncVault` 不是 `synced` 會丟 `sync_bookmarks_not_merged`。
+
+**B 期：自己的介面把同步資料夾藏起來**（只用 `isSyncFolderIdSync` / `syncFolderId`）
+
+`src/background/bookmark-tree.ts` 的 `collectRoots`（含「其他書籤」筆數）、`bookmark-watcher.ts`（資料夾內的事件不重整）、
+`capture.ts`（不擷取）、`bookmark-index.ts`、`bookmark-grid.ts`、`bookmark-order.ts`、搜尋、移入隱私空間的來源。
+過濾要擋**資料夾本身與它底下的書籤**（事件給的是 parentId，`onRemoved` 給 `removeInfo.parentId`）。`data:` 網址本來會不會被擷取也確認一下。
+
+✅ **2026-10-16 完成**（typecheck 過；`npm test` 只剩 A 期還沒補進 `_locales` 的兩個鍵 `sync_bookmarks_folder_title`、`sync_bookmarks_too_large`）：
+
+- 新檔 `src/background/sync-folder-guard.ts`：`isSyncFolderNode(node)`（id 或 parentId 是同步資料夾）、`isSyncFolderEvent(id, parentId?)`
+  （沒給 parentId 時讀一次 `bookmarks.get`，給 `onChanged` 用）、`assertNotSyncFolder(...ids)`（寫入路徑用，丟 `bookmark_not_found`）。
+  只用 `isSyncFolderIdSync`。
+- `bookmark-tree.ts`：`toNode` 遇到資料夾整棵剪掉（側邊欄、全頁瀏覽、搜尋都吃這棵樹，「其他書籤」筆數也跟著對）；
+  `collectFolderChoices`（「移動到…」）不列它。
+- `bookmark-watcher.ts`：`onCreated` 看 node、`onRemoved` 看 `info.parentId`、`onChanged` 讀一次 parentId、`onMoved` 只有新舊 parent
+  **都**是資料夾（或搬資料夾本身）才跳過 —— 搬進或搬出都會改變畫面。
+- `capture.ts`：`data:` 本來就被 `isPreviewableUrl` 擋（`EXCLUDED_PROTOCOLS` 有 `data:`），不會擷取；仍在**計數前**跳過，
+  否則一次推送建好幾筆，會讓同時加的真書籤被當成匯入而漏抓。
+- `bookmark-index.ts`：建索引時整棵略過（不讓 60 KB 的 `data:` 進記憶體）。
+- `bookmark-grid.ts`：`visibleChildren` 濾掉它（否則「其他書籤」的格子多一格隱形的、`syncNativeOrder` 可能去搬它）；
+  `applyBookmarkGrid` 的 place、`groupToFolder`、`flattenFolder`、`moveGroup` 碰到就拒絕；`startGridWatcher` 略過它的事件。
+- `bookmark-order.ts`：`reorderBookmarks`、`mergeIntoNewFolder` 碰到就拒絕。
+- `vault.ts`（移入隱私空間）：單筆是它或它底下的書籤 → 拒絕；整個資料夾移入時子樹裡含它（使用者手動搬過去）→ 拒絕，
+  否則最後的 `removeTree` 會把同步資料一起刪掉。
+- 搜尋：沒有 `bookmarks.search` 的呼叫，側邊欄／全頁的搜尋都是在 `collectRoots` 的樹上做，剪在那裡就夠了。
+- 測試 `tests/sync-folder-guard.test.ts`（mock `@/storage/bookmark-store`）：`collectRoots`、「移動到…」、索引、guard、watcher 各事件。
+
+沒做／沒驗的：
+
+- 沒實機驗（側邊欄不閃、「其他書籤」筆數）—— 留給 D 期驗收第 2 條。
+- `index.ts` 的 `bookmarks/move`、`move-many`、`rename`、`delete`、`folder-create` 沒加保護：介面上看不到資料夾，傳不出它的 id。
+- 拒絕時的訊息借用「找不到該書籤」（B 期不動 `_locales`）；資料夾移入時「子樹裡含同步資料夾」這種情況訊息不太貼切，C/D 期可補專用字串。
+- 快取時序：資料夾剛建好、`isSyncFolderIdSync` 還沒更新的那一刻，`onCreated` 會觸發一次重整；另一台裝置的書籤同步比 meta 先到時，
+  在快取知道 id 之前資料夾會以空資料夾出現（裡面的 `data:` 本來就被濾掉）。若要更穩，可在 `isSyncFolderNode` 加「`unfiled_____` 底下、
+  標題是那兩種語言的名稱」的後備判斷（要 A 匯出標題）。
+- 索引（`bookmark-index`）是快取：id 進快取前就建好的索引會含那幾筆 `data:`，等下一次重整才會掉；不影響畫面。
+
+**C 期：設定頁**（`src/options/Options.tsx`、`Setting.tsx`、`options.css`）✅
+
+- 同步區塊加開關「改用書籤同步」，`below` 放範例圖元件（照 `bookmark-preview-ui/design/sync-bookmarks/example.html` 轉成 React + inline SVG，
+  顏色全用 `tokens.css` 變數，圖上文字全部 i18n，英文資料夾名稱截斷，右側註解不超出 608 寬）。上鎖時開關 disabled 並說明要解鎖。
+- 用量 ≥ 80% 且目前是 sync 時顯示提示＋「改用書籤同步」按鈕；超額錯誤訊息下也放同一顆按鈕。
+- 按下後顯示進行中，錯誤照實顯示（`setSyncStore` 丟的訊息）。
+
+✅ **2026-10-16 完成**（typecheck、`npm test`、`npm run build` 過；設定頁淺色／深色、中文／英文的範例圖實機截圖看過）：
+
+- 開關是同步區塊裡、「把加密副本放進 Firefox 同步」下面的另一列 `SettingItem`（隱藏模式上鎖時跟著整個藏起來）。
+  狀態看 `sync.store`；上鎖、同步沒開、`storage.sync` 不可用時 disabled，`below` 第一行寫原因。
+- 範例圖是 `src/options/SyncBookmarksExample.tsx`，樣式在 `options.css` 的 `.sync-example`（最寬 608px，不放大）。
+  **與設計稿唯一的差別**：圖下兩行說明改成 `<figcaption>` 段落（同樣 12px、`--text-2`），viewBox 因此是 `0 0 608 200`
+  —— 英文那兩行比 608 寬，SVG 文字不會換行。圖上的字用 `FitText`（量 `getComputedTextLength`，超過就截斷加 `…`），
+  樹裡的資料夾名稱上限 126、右側註解上限到 x=600。資料夾名稱直接用 A 期的 `sync_bookmarks_folder_title`。
+- 提示：`store` 是 sync 時，`!wouldFit` → 超額的黃框裡多一顆「改用書籤同步」；否則 `lastError` 是 `sync_quota_exceeded` 那句
+  （`isQuotaError`：用記號代入參數切出頭尾比對，背景頁沒有錯誤代碼）→ 錯誤下面放同一顆；否則 `usageRatio ≥ 0.8` → 新的黃框
+  `options_sync_nearly_full` 加那顆按鈕。三者只會出現一個。
+- 進度／結果：`storeStatus` 記住是從開關還是提示按的，訊息顯示在那裡；提示裡按成功後提示消失，訊息改顯示在開關底下。
+  失敗照背景丟的訊息顯示，之後重讀狀態。
+- 新字串：`options_sync_bookmarks_*`、`options_sync_nearly_full`、`sync_example_*`（圖上的字）、`sync_folder_protected`。
+  `options_sync_over_quota`、`sync_quota_exceeded` 的結尾改成先建議書籤同步、再建議備份檔。英文一律用 Vault（介面既有用語），
+  資料夾名稱 D 期也改成 Vault 了（`FOLDER_TITLES` 與 `sync_bookmarks_folder_title` 兩處一起改）。
+- B 期借用的 `bookmark_not_found` 換成 `sync_folder_protected`：`sync-folder-guard.ts` 的 `assertNotSyncFolder`、
+  `vault.ts` 的單筆移入與整個資料夾移入。`tests/sync-folder-guard.test.ts` 改成比對這個鍵。
+- 順手補回 `vault.ts` 的 `packedSnapshot` 文件註解（A 期改型別時被整段刪掉了，內容仍然成立）。
+
+沒驗的：
+
+- **解鎖狀態下真的切換**沒有實機做過（容器裡沒有隱私空間、也沒有 Firefox 帳號）：開關翻過去、進行中的字、成功後狀態更新、
+  改回 sync 塞不下時顯示 `sync_bookmarks_cannot_fit` —— 只有 typecheck，沒有元件測試。留給 D 期驗收 1、5。
+- 用量 ≥ 80% 的提示與超額時的按鈕沒看過畫面（要塞到 80 KB 以上，D 期驗收 7 用 `SEED_BULK` 一起看）。
+- 本機根本沒有隱私空間時，開關的原因也寫「要先解鎖」（`!unlocked` 一起算），沒有另外分「還沒建立」。
+- 英文截圖是把 `dist/_locales/zh_TW/messages.json` 暫時換成英文版拍的（容器的 Firefox 只有 zh-TW）。容器字型的拉丁字沒有 600 粗體，
+  英文圖上的標題與註解看起來是一般粗細，真機應該是粗的。
+
+**D 期：文件與實機驗收** ✅ 2026-10-16（`npm run verify` 全綠：typecheck、455 項測試、build、web-ext lint 0 錯誤／3 個已知警告）
+
+- 文件：隱私政策、`amo/permissions.md`、`docs/sync-and-backup.md`、`amo/listing.md`、AMO 審查備註（storage.sync 格式改了＋書籤同步）。
+- 用 `firefox-e2e` skill 跑上面「驗收」1～8（第 3 條網址列要截圖）。兩台真裝置的部分列給使用者做。
+
+做了什麼：
+
+- **資料夾英文名稱**改成 `Bookmark Preview: vault sync data (do not edit)`（`FOLDER_TITLES` 與 `sync_bookmarks_folder_title`
+  一起改，測試裡的兩處也改）。英文 `_locales` 裡剩下三處「private space」也換成 vault。
+- **文件**：
+  - `amo/privacy-policy.{zh-TW,en}.md`：第 1 種離開裝置的方式下加一段「改用書籤同步」（資料夾位置與名稱、空白標題、
+    `data:,` 網址、只有密文、預設關閉、關掉時刪資料夾），刪除資料那段補「連書籤資料夾一起刪」；最後更新日改 2026-10-16。
+  - `amo/permissions.md`：`bookmarks` 多一個用途；`storage` 那列補「書籤同步時 storage.sync 只放約 1 KB 的中介資料」；
+    結尾「沒有後端」那句補書籤同步。`docs/permissions.md` 的 `bookmarks` 列也補。
+  - `amo/reviewer-notes.md`：「New in 1.4.0」整節換掉（精簡的一份、可選的書籤同步、都只有密文）。貼上用的長度 2,688 / 3,000。
+  - `amo/listing.md`：完整描述（中英）的同步那句補「放不進 100 KB 時可以改用書籤同步」；新增「版本說明（1.4.0）」中英各一份。
+    原本沒有提容量上限的句子，不必對。
+  - `docs/sync-and-backup.md`：新增「Syncing through bookmarks」一節（存放位置是雲端 meta 的屬性、version 3、data:+base32、
+    塊號、資料夾名稱、切換規則、被動過時、自己的介面怎麼藏、Android **沒測**而且就算帶到也用不到）；Limits 的 Android 那條補一句。
+  - `_locales` 的「同步的已知限制」額度那條補「改用書籤同步就沒有這個上限」。
+- **修了三個缺陷**（都有測試；實機修完再驗過）：
+  1. **刪除整個隱私空間後重新建立，新的隱私空間帶著舊的書籤**（1.0.0 就有，不是方案 4 引入的）。`vault.ts` 的
+     `const EMPTY` 被淺拷貝當成新 payload，第一次移入 push 進那個常數的陣列；同一個背景頁裡刪掉重建就帶著那些書籤
+     （實機：刪掉重建後多出 300 筆）。改成每次產生新物件的 `emptyPayload()`。測試 `tests/vault-empty-payload.test.ts`（靜態檢查）。
+     **影響已上架版本**：使用者若在同一段時間內刪除再重建，舊書籤會回到新的隱私空間（仍是加密的，只是「刪不掉」）。
+  2. **超額時「改用書籤同步」永遠按不成**。`setSyncStore` 先跑 `syncVault`，而那次照雲端 meta 推回 storage.sync，超額必定
+     `failed` → 切換丟出超額訊息。改成 `runSync(pushTo)`：改去書籤時合併完直接推到書籤（解鎖、傳輸中就停、salt 不同就停這些
+     規則都沒動，`syncVault()` 的行為也沒變）。測試 `tests/sync-store-switch.test.ts`（把修正拿掉會紅，試過）。
+  3. **超額訊息自相矛盾**：「加密副本約 98 KB，超過 storage.sync 的 100 KB 額度」——實際能用的是 100 KB 扣掉中介資料與書籤排列的
+     保留（約 95 KB）。`sync_quota_exceeded`、`sync_bookmarks_cannot_fit` 改傳這個數字並寫明是扣掉保留之後的；後者另外說明
+     「刪掉的書籤會在副本裡留 30 天」（墓碑保留網址與標題，所以刪書籤不會讓副本馬上變小 —— 實機：移出 1,040 筆後反而 172 → 177 KB）。
+- 測試環境：`scripts/test-headless.sh` 加 `FF_REMOTE_PORT`（開 WebDriver BiDi），見「測試環境的注意事項」20。
+
+發現、沒修的（給之後參考）：
+
+- **網址列會跳出同步書籤**（驗收第 3 條）—— 要使用者決定，見本節最上面。
+- 刪掉的隱私書籤（墓碑）在 30 天內仍帶著網址與標題，占同步空間。要省空間可以讓墓碑只留 id 與時間，但會動到合併與內容指紋
+  （兩邊算法要一起改，否則指紋永遠對不上而互相覆蓋），不是小改。
+- 剛改完隱私空間（2 秒的推送排程還在跑）就按切換，會得到「同步正在進行中，請稍後再試」。照實說而已，沒修。
+- 「移出隱私空間」1,040 筆花 252 秒（每筆各自建一個原生書籤並 persist 一次）；移入 1,500 筆 128 秒。與方案 4 無關。
+- 設定頁「改用書籤同步」成功後，同頁「同步書籤的排列與群組」的上限數字（例如 4.8 KB）要重新整理頁面才會更新回 20 KB。
 
 ## 同步瘦身：隱私空間在雲端改成一份精簡格式（2026-10-15）
 
@@ -2755,6 +3014,15 @@ IndexedDB 讀取**一秒內就全部跑完**，而光是把 3000 張卡片畫出
 19. **驗證「快取／訂閱」這類東西時，要讓目標那幾列真的卸載。** 虛擬滾動只掛載看得到的
     幾列，所以「捲到底再捲回來」與「離開搜尋」是兩件不同的事：前者仍留在同一份清單裡。
     最乾淨的做法是清掉搜尋回到**最上層**——那裡只有兩個資料夾，一列書籤都沒有。
+
+20. **要讀寫擴充套件的狀態，用 WebDriver BiDi 比在 DevTools 主控台打字快得多**（2026-10-16 D 期）：
+    `FF_REMOTE_PORT=9222 ./scripts/ff.sh start` 開遠端協定，然後用網址列打開設定頁
+    （`moz-extension://<UUID>/options/index.html`；**BiDi 自己不准導覽到 moz-extension:**，所以要用 `ff.sh key ctrl+t type … key Return`），
+    再連 `ws://127.0.0.1:9222/session` → `session.new` → `browsingContext.getTree` 找那個分頁 → `script.evaluate`（`awaitPromise: true`）。
+    在設定頁裡 `browser.storage.*`、`browser.bookmarks.*` 都能用，送訊息給背景頁是
+    `browser.runtime.sendMessage({ channel: 'request', kind, payload })`（回 `{ ok, data | error }`），收廣播就掛 `runtime.onMessage`。
+    **每次都要 `session.end`**，否則下一次 `session.new` 會得到「Maximum number of active sessions」，只能重開 Firefox。
+    D 期用的腳本（約 60 行 node，Node 22 內建 WebSocket）沒有放進版本庫。
 
 **驗證封面排序不必載入擴充套件。** 要改 `cover.ts` 的評分時，走擴充套件那條路很貴（得先在 `about:addons` 授予 `<all_urls>`，而權限彈出面板點不到）。改用這個方式快得多：
 

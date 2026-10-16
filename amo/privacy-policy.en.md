@@ -2,7 +2,7 @@
 
 **Bookmark Preview**
 
-Last updated: 2026-10-08
+Last updated: 2026-10-16
 
 ## Short version
 
@@ -54,6 +54,16 @@ so you can use it on your own other devices. On this path:
 - Decryption requires your master password or recovery key. Neither is ever synced.
 - It is off by default and can be turned off at any time in the settings page.
 
+The sync section has a second switch, "**Sync through bookmarks**", also off by default.
+When it is on, the ciphertext lives in a folder under "Other Bookmarks" named "Bookmark
+Preview: vault sync data (do not edit)" instead: each bookmark has an empty title and a
+`data:,` URL holding a piece of encoded ciphertext, and Firefox's **bookmark sync** carries
+it to your other devices (only about 1 KB of metadata stays in `storage.sync`). It is
+still ciphertext only, and the master password and recovery key are still never synced;
+the difference is that this ciphertext shows up in Firefox's own Bookmarks menu and
+Library like your other bookmarks. Turning the switch off moves the ciphertext back into
+`storage.sync` and deletes the folder.
+
 **2. Bookmark groups sync through Firefox Sync — on by default.**
 The groups you make in the full-page view (their names and colours, which bookmarks belong
 to each, identified by Firefox's own bookmark IDs) and the column counts you pin are kept
@@ -97,7 +107,8 @@ transmits your browsing history.
 
 - **Preview images**: Settings → "Clear all previews".
 - **The vault**: once unlocked, the `⋯` menu on the sidebar's vault tab → "Delete the whole vault…", or "Danger zone" in settings (irreversible).
-- **The synced copy of the vault**: Settings → "Remove the cloud copy and turn off sync".
+- **The synced copy of the vault**: Settings → "Remove the cloud copy and turn off sync"
+  (when syncing through bookmarks, this deletes that bookmark folder too).
 - **Synced bookmark groups**: Settings → untick "Sync bookmark layout and groups" (removes
   them from sync; this device keeps its own copy).
 - **Everything**: Uninstall the add-on; Firefox deletes all of its local storage with it.
