@@ -1,7 +1,7 @@
 # 接手指南 / 待辦
 
-最後更新：2026-10-15（1.3.0 已上架。**同步瘦身已實作並實機驗過**，在分支 `worktree-compact-sync`，還沒合進 main、版號還沒改。
-**下一個 session 從「隱私空間改用書籤同步（方案 4）」開始**，第 0 期已通過）
+最後更新：2026-10-16（1.3.0 已上架。**同步瘦身已實作並實機驗過，已合進 main，版號 1.4.0，還沒送審。**
+**下一個 session 從「隱私空間改用書籤同步（方案 4）」開始**，第 0 期已通過；1.4.0 要不要等方案 4 一起送審，問使用者）
 
 ## 下一個 session 從這裡開始：隱私空間改用書籤同步（方案 4，2026-10-15 規劃）
 
@@ -35,10 +35,8 @@
 
 ### 從哪裡開始
 
-**這些工作都在分支 `worktree-compact-sync` 上**（worktree：`/workspaces/firefox_plugin/.claude/worktrees/compact-sync`），
-還沒合進 main —— 方案 4 建立在這個分支的精簡格式（`src/storage/pack-sync.ts`、`src/shared/sync-pack.ts`）上。
-新 session 要在那個 worktree 裡開，或先把分支合進 main（合併時版號改 1.4.0）。worktree 的 `node_modules` 是指向主目錄的 symlink，
-**不要 `git add -A`**（會把它加進去）。
+同步瘦身（精簡格式、base91、新裝置的修正）已經在 main（2026-10-16 從 `worktree-compact-sync` 快轉合併），版號 1.4.0。
+方案 4 建立在 `src/storage/pack-sync.ts`、`src/shared/sync-pack.ts` 之上。使用者兩台電腦現在跑的是這個分支的建置。
 
 ### 第 0 期：先確認 Firefox 同步會不會帶 60 KB 的 data: 書籤（**這一期不過，方案 4 就不做**）
 
