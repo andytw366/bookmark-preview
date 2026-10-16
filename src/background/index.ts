@@ -1,4 +1,5 @@
 import { broadcast, serve } from '@/shared/messages';
+import { initSyncFolderCache } from '@/storage/bookmark-store';
 import { getSettings, patchSettings } from '@/storage/settings';
 import { clearSiteImageStats } from '@/storage/site-image-stats';
 import { getThumb, pruneOlderThan, usage } from '@/storage/thumbs-db';
@@ -71,6 +72,7 @@ import {
   overwriteRemote,
   resumeAfterRemoteDelete,
   scheduleVaultSync,
+  setSyncStore,
   startVaultSync,
   syncStatus,
   syncVault,
@@ -353,8 +355,14 @@ serve({
     await resumeAfterRemoteDelete();
     return syncStatus();
   },
+  'vault/set-sync-store': async ({ store }) => {
+    await setSyncStore(store);
+    return syncStatus();
+  },
 });
 
+// 同步資料夾的 id 快取要先開始載入：底下幾個監聽器與側邊欄的樹都靠它把那個資料夾藏起來
+void initSyncFolderCache();
 startBookmarkWatcher();
 startGridWatcher();
 startCapturePipeline();

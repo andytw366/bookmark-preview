@@ -19,6 +19,7 @@ import { Icon, type IconName } from '@/ui/Icon';
 import { SegmentedControl } from '@/ui/SegmentedControl';
 import { Switch } from '@/ui/Toggles';
 import { SettingItem, SettingSection } from './Setting';
+import { SyncBookmarksExample } from './SyncBookmarksExample';
 import { t, tn } from '@/shared/i18n';
 import { Rich } from '@/sidebar/lib/rich';
 
@@ -90,6 +91,27 @@ const OUTCOME_TEXT: Record<SyncOutcome, string> = {
   'deleted-elsewhere': t('outcome_deleted_elsewhere'),
   failed: t('outcome_failed'),
 };
+
+/** 用量到這個比例（而且還放在 `storage.sync`）就提示改用書籤同步 */
+const NEARLY_FULL_RATIO = 0.8;
+
+const QUOTA_MARK = '\u2063';
+
+/**
+ * `lastError` 是不是「超過 storage.sync 額度」那一句。
+ *
+ * 背景頁只給翻好的字串，沒有錯誤代碼；用同一條訊息、以記號代入參數後切出頭尾來比對。
+ * 只用來決定要不要在錯誤下面多放「改用書籤同步」的按鈕，認錯了也只是少一顆按鈕。
+ */
+function isQuotaError(text: string | null): boolean {
+  if (text === null) {
+    return false;
+  }
+  const parts = t('sync_quota_exceeded', QUOTA_MARK, QUOTA_MARK).split(QUOTA_MARK);
+  const head = parts[0] ?? '';
+  const tail = parts[parts.length - 1] ?? '';
+  return parts.length > 1 && head !== '' && text.startsWith(head) && text.endsWith(tail);
+}
 
 function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
@@ -163,6 +185,11 @@ export function Options() {
   const [syncLoadError, setSyncLoadError] = useState<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncStatusText, setSyncStatusText] = useState<string | null>(null);
+  /**
+   * 「改用書籤同步」的進度與結果。記住是從哪裡按的（開關或用量提示裡的按鈕），訊息就顯示在那裡；
+   * 提示裡的按鈕成功後提示本身會消失，那時改顯示在開關底下。
+   */
+  const [storeStatus, setStoreStatus] = useState<{ origin: 'switch' | 'offer'; text: string } | null>(null);
 
   const refreshSync = useCallback(async () => {
     try {
@@ -254,6 +281,36 @@ export function Options() {
     }
   }, [refreshSync]);
 
+  /**
+   * 換雲端那份的存放位置（整個帳號一起換）。背景頁會先同步一次確認合併過，失敗時丟的訊息
+   * 可以直接顯示（例如改回 storage.sync 塞不下的 `sync_bookmarks_cannot_fit`）。
+   */
+  const changeStore = useCallback(
+    async (store: 'sync' | 'bookmarks', origin: 'switch' | 'offer'): Promise<void> => {
+      setSyncBusy(true);
+      setSyncStatusText(null);
+      setStoreStatus({
+        origin,
+        text: store === 'bookmarks' ? t('options_sync_bookmarks_moving_in') : t('options_sync_bookmarks_moving_out'),
+      });
+      try {
+        const next = await request('vault/set-sync-store', { store });
+        setSync(next);
+        setSyncLoadError(null);
+        setStoreStatus({
+          origin,
+          text: store === 'bookmarks' ? t('options_sync_bookmarks_on') : t('options_sync_bookmarks_off'),
+        });
+      } catch (error) {
+        setStoreStatus({ origin, text: error instanceof Error ? error.message : String(error) });
+        await refreshSync();
+      } finally {
+        setSyncBusy(false);
+      }
+    },
+    [refreshSync],
+  );
+
   // 主密碼：按「更改主密碼」才展開那三個欄位
   const [changingPassword, setChangingPassword] = useState(false);
   // 危險操作：每一項按下去先展開確認，不會一按就做
@@ -287,6 +344,7 @@ export function Options() {
     setRestorePassword('');
     setRestoreRecoveryKey('');
     setSyncStatusText(null);
+    setStoreStatus(null);
   }, [concealedNow]);
 
   useEffect(() => {
@@ -362,6 +420,42 @@ export function Options() {
         {text}
       </p>
     );
+
+  /*
+   * 「改用書籤同步」。開關的狀態看 `sync.store`（雲端 meta），不看本機設定 `vaultSyncBookmarks` ——
+   * 那只是雲端還沒有副本時的初值，另一台裝置一切換就不準了。
+   * 切換要解鎖（得先合併過才能重寫雲端那份）而且同步要開著；不行時說明原因，而不是只把開關變灰。
+   */
+  const storeBlocker = !unlocked
+    ? t('options_sync_bookmarks_needs_unlock')
+    : !settings.vaultSyncEnabled
+      ? t('options_sync_bookmarks_needs_sync', t('options_sync_checkbox'))
+      : sync !== null && !sync.available
+        ? t('outcome_unavailable')
+        : null;
+  const onSyncStore = sync !== null && sync.available && sync.store === 'sync';
+  // 超額的兩種樣子：本機這份放不進去（解鎖時量得到），或上一次推送因為額度失敗（上鎖後仍留著）
+  const offerInOverQuota = onSyncStore && !sync.wouldFit;
+  const offerAfterError = onSyncStore && sync.wouldFit && isQuotaError(sync.lastError);
+  const offerNearlyFull =
+    onSyncStore && !offerInOverQuota && !offerAfterError && sync.usageRatio >= NEARLY_FULL_RATIO;
+  const offerShown = offerInOverQuota || offerAfterError || offerNearlyFull;
+  const storeOffer = (
+    <div className="note__body">
+      <Button
+        variant="outline"
+        size="lg"
+        disabled={syncBusy || storeBlocker !== null}
+        title={storeBlocker ?? undefined}
+        onClick={() => {
+          void changeStore('bookmarks', 'offer');
+        }}
+      >
+        {t('options_sync_bookmarks_label')}
+      </Button>
+      {storeStatus?.origin === 'offer' ? statusLine(storeStatus.text) : null}
+    </div>
+  );
 
   /** 危險操作的確認：說明＋取消＋紅色的確定 */
   const confirmPanel = (message: ReactNode, confirmLabel: string, onConfirm: () => void, disabled = false) => (
@@ -570,213 +664,252 @@ export function Options() {
               }
             />
             {concealed ? null : (
-              <SettingItem
-                label={t('options_sync_checkbox')}
-                description={<Rich text={t('options_sync_hint')} />}
-                control={
-                  <Switch
-                    label={t('options_sync_checkbox')}
-                    checked={settings.vaultSyncEnabled}
-                    onChange={(enabled) => {
-                      update({ vaultSyncEnabled: enabled });
-                      setSyncStatusText(enabled ? t('options_sync_on') : t('options_sync_off'));
-                      void refreshSync();
-                    }}
-                  />
-                }
-                below={
-                  <div className="panel">
-                    {syncLoadError !== null && sync === null ? (
-                      <div className="panel__row">
-                        <p className="item__status">{t('options_sync_unreadable', syncLoadError)}</p>
-                        <Button
-                          variant="outline"
-                          size="lg"
-                          onClick={() => {
-                            void refreshSync();
-                          }}
-                        >
-                          {t('action_retry')}
-                        </Button>
-                      </div>
-                    ) : sync === null ? (
-                      <p className="item__desc">{t('options_sync_loading')}</p>
-                    ) : !sync.available ? (
-                      <p className="item__status">{t('outcome_unavailable')}</p>
-                    ) : (
-                      <>
+              <>
+                <SettingItem
+                  label={t('options_sync_checkbox')}
+                  description={<Rich text={t('options_sync_hint')} />}
+                  control={
+                    <Switch
+                      label={t('options_sync_checkbox')}
+                      checked={settings.vaultSyncEnabled}
+                      onChange={(enabled) => {
+                        update({ vaultSyncEnabled: enabled });
+                        setSyncStatusText(enabled ? t('options_sync_on') : t('options_sync_off'));
+                        void refreshSync();
+                      }}
+                    />
+                  }
+                  below={
+                    <div className="panel">
+                      {syncLoadError !== null && sync === null ? (
                         <div className="panel__row">
-                          <dl className="kv">
-                            <dt>{t('options_sync_remote')}</dt>
-                            <dd>
-                              {sync.remote === 'absent' ? (
-                                <span className="badge badge--mute">{t('options_sync_remote_absent')}</span>
-                              ) : sync.remote === 'partial' ? (
-                                <span className="badge badge--warn">{t('options_sync_remote_partial')}</span>
-                              ) : (
-                                <span className="badge badge--ok">
-                                  {t('options_sync_remote_ok', formatTime(sync.remoteUpdatedAt ?? 0))}
+                          <p className="item__status">{t('options_sync_unreadable', syncLoadError)}</p>
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            onClick={() => {
+                              void refreshSync();
+                            }}
+                          >
+                            {t('action_retry')}
+                          </Button>
+                        </div>
+                      ) : sync === null ? (
+                        <p className="item__desc">{t('options_sync_loading')}</p>
+                      ) : !sync.available ? (
+                        <p className="item__status">{t('outcome_unavailable')}</p>
+                      ) : (
+                        <>
+                          <div className="panel__row">
+                            <dl className="kv">
+                              <dt>{t('options_sync_remote')}</dt>
+                              <dd>
+                                {sync.remote === 'absent' ? (
+                                  <span className="badge badge--mute">{t('options_sync_remote_absent')}</span>
+                                ) : sync.remote === 'partial' ? (
+                                  <span className="badge badge--warn">{t('options_sync_remote_partial')}</span>
+                                ) : (
+                                  <span className="badge badge--ok">
+                                    {t('options_sync_remote_ok', formatTime(sync.remoteUpdatedAt ?? 0))}
+                                  </span>
+                                )}
+                              </dd>
+                              <dt>{t('options_sync_quota')}</dt>
+                              <dd className="kv__meter">
+                                <span className="meter" aria-hidden="true">
+                                  <i
+                                    className={sync.wouldFit ? undefined : 'meter--over'}
+                                    style={{ width: `${String(Math.min(100, (sync.bytes / Math.max(1, sync.quota)) * 100))}%` }}
+                                  />
                                 </span>
-                              )}
-                            </dd>
-                            <dt>{t('options_sync_quota')}</dt>
-                            <dd className="kv__meter">
-                              <span className="meter" aria-hidden="true">
-                                <i
-                                  className={sync.wouldFit ? undefined : 'meter--over'}
-                                  style={{ width: `${String(Math.min(100, (sync.bytes / Math.max(1, sync.quota)) * 100))}%` }}
-                                />
-                              </span>
-                              {formatBytes(sync.bytes)} / {formatBytes(sync.quota)}
-                              {sync.wouldFit ? '' : t('options_sync_does_not_fit')}
-                            </dd>
-                            <dt>{t('options_sync_last')}</dt>
-                            <dd>
-                              {sync.lastSyncedAt === null ? t('options_sync_never') : formatTime(sync.lastSyncedAt)}
-                              {sync.lastOutcome !== null && sync.lastOutcome !== 'synced' ? (
-                                <span className="item__small">
-                                  {t('options_sync_last_attempt', OUTCOME_TEXT[sync.lastOutcome])}
-                                </span>
-                              ) : null}
-                            </dd>
-                          </dl>
-                          <div className="panel__actions">
-                            <Button
-                              variant="outline"
-                              size="lg"
-                              disabled={syncBusy || !settings.vaultSyncEnabled}
-                              title={t('options_sync_now_hint')}
-                              onClick={() => {
-                                void runSyncNow();
-                              }}
-                            >
-                              {t('options_sync_now')}
-                            </Button>
-                            {!sync.hasLocalVault && sync.remote === 'ok' ? (
+                                {formatBytes(sync.bytes)} / {formatBytes(sync.quota)}
+                                {sync.wouldFit ? '' : t('options_sync_does_not_fit')}
+                              </dd>
+                              <dt>{t('options_sync_last')}</dt>
+                              <dd>
+                                {sync.lastSyncedAt === null ? t('options_sync_never') : formatTime(sync.lastSyncedAt)}
+                                {sync.lastOutcome !== null && sync.lastOutcome !== 'synced' ? (
+                                  <span className="item__small">
+                                    {t('options_sync_last_attempt', OUTCOME_TEXT[sync.lastOutcome])}
+                                  </span>
+                                ) : null}
+                              </dd>
+                            </dl>
+                            <div className="panel__actions">
                               <Button
                                 variant="outline"
                                 size="lg"
                                 disabled={syncBusy || !settings.vaultSyncEnabled}
-                                title={settings.vaultSyncEnabled ? undefined : t('options_sync_needs_checkbox')}
+                                title={t('options_sync_now_hint')}
                                 onClick={() => {
-                                  void runSync(async () => {
-                                    await request('vault/sync-adopt', undefined);
-                                  }, t('options_sync_adopted'));
+                                  void runSyncNow();
                                 }}
                               >
-                                {t('options_sync_adopt')}
+                                {t('options_sync_now')}
                               </Button>
-                            ) : null}
-                            {sync.deletedElsewhere ? (
-                              <Button
-                                variant="outline"
-                                size="lg"
-                                disabled={syncBusy}
-                                onClick={() => {
-                                  void runSync(async () => request('vault/sync-resume', undefined), t('options_sync_resumed'));
-                                }}
-                              >
-                                {t('options_sync_resume')}
-                              </Button>
-                            ) : null}
-                            {sync.remote !== 'absent' && sync.hasLocalVault ? (
-                              <Button
-                                variant="outline"
-                                size="lg"
-                                disabled={syncBusy || !sync.wouldFit}
-                                title={sync.wouldFit ? t('options_sync_overwrite_hint') : t('options_sync_overwrite_disabled')}
-                                onClick={() => {
-                                  void runSync(
-                                    async () => request('vault/sync-overwrite', undefined),
-                                    t('options_sync_overwritten'),
-                                  );
-                                }}
-                              >
-                                {t('options_sync_overwrite')}
-                              </Button>
-                            ) : null}
-                            {sync.remote !== 'absent' ? (
-                              <Button
-                                variant="outline"
-                                size="lg"
-                                disabled={syncBusy}
-                                onClick={() => {
-                                  void runSync(async () => request('vault/sync-clear', undefined), t('options_sync_cleared'));
-                                }}
-                              >
-                                {t('options_sync_clear')}
-                              </Button>
-                            ) : null}
+                              {!sync.hasLocalVault && sync.remote === 'ok' ? (
+                                <Button
+                                  variant="outline"
+                                  size="lg"
+                                  disabled={syncBusy || !settings.vaultSyncEnabled}
+                                  title={settings.vaultSyncEnabled ? undefined : t('options_sync_needs_checkbox')}
+                                  onClick={() => {
+                                    void runSync(async () => {
+                                      await request('vault/sync-adopt', undefined);
+                                    }, t('options_sync_adopted'));
+                                  }}
+                                >
+                                  {t('options_sync_adopt')}
+                                </Button>
+                              ) : null}
+                              {sync.deletedElsewhere ? (
+                                <Button
+                                  variant="outline"
+                                  size="lg"
+                                  disabled={syncBusy}
+                                  onClick={() => {
+                                    void runSync(async () => request('vault/sync-resume', undefined), t('options_sync_resumed'));
+                                  }}
+                                >
+                                  {t('options_sync_resume')}
+                                </Button>
+                              ) : null}
+                              {sync.remote !== 'absent' && sync.hasLocalVault ? (
+                                <Button
+                                  variant="outline"
+                                  size="lg"
+                                  disabled={syncBusy || !sync.wouldFit}
+                                  title={sync.wouldFit ? t('options_sync_overwrite_hint') : t('options_sync_overwrite_disabled')}
+                                  onClick={() => {
+                                    void runSync(
+                                      async () => request('vault/sync-overwrite', undefined),
+                                      t('options_sync_overwritten'),
+                                    );
+                                  }}
+                                >
+                                  {t('options_sync_overwrite')}
+                                </Button>
+                              ) : null}
+                              {sync.remote !== 'absent' ? (
+                                <Button
+                                  variant="outline"
+                                  size="lg"
+                                  disabled={syncBusy}
+                                  onClick={() => {
+                                    void runSync(async () => request('vault/sync-clear', undefined), t('options_sync_cleared'));
+                                  }}
+                                >
+                                  {t('options_sync_clear')}
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                        {sync.deletedElsewhere ? (
-                          <div className="note note--warn">
-                            <Icon name="warning" />
-                            <p>
-                              <Rich text={t('options_sync_deleted_elsewhere')} />
-                            </p>
-                          </div>
-                        ) : null}
-                        {!sync.wouldFit ? (
-                          <div className="note note--warn">
-                            <Icon name="warning" />
-                            <p>{t('options_sync_over_quota')}</p>
-                          </div>
-                        ) : null}
-                        {sync.sameVault === false ? (
-                          <div className="note note--warn">
-                            <Icon name="warning" />
-                            <p>
-                              <Rich text={t('options_sync_different_vault')} />
-                            </p>
-                          </div>
-                        ) : null}
-                        {sync.lastError !== null ? (
-                          <p className="item__status">{t('options_sync_last_error', sync.lastError)}</p>
-                        ) : null}
-                      </>
-                    )}
-                    {/* 訊息放在 available 分支外面：同步不可用或狀態讀不到時，開關的回饋也還是要看得到 */}
-                    {statusLine(syncStatusText)}
-                    {/*
-                      折起來而不是刪掉：這兩件事都實際造成過誤解（按了好幾次卻發現另一台沒資料、
-                      在新裝置上按了「建立」導致兩份金鑰不同）。但它們是「出問題時才需要讀」的內容。
-                    */}
-                    <details className="details">
-                      <summary>{t('options_sync_not_seen')}</summary>
-                      <p>
-                        <Rich text={t('options_sync_not_seen_1')} />
-                      </p>
-                      <p>
-                        <Rich text={t('options_sync_not_seen_2')} />
-                      </p>
-                    </details>
-                    <details className="details">
-                      <summary>{t('options_sync_limits')}</summary>
-                      <ul className="item__list">
-                        <li>
-                          <Rich text={t('options_sync_limit_android')} />
-                        </li>
-                        <li>
-                          <Rich text={t('options_sync_limit_schedule')} />
-                        </li>
-                        <li>
-                          <Rich text={t('options_sync_limit_account')} />
-                        </li>
-                        <li>{t('options_sync_limit_stale')}</li>
-                        <li>
-                          <Rich text={t('options_sync_limit_unlocked')} />
-                        </li>
-                        <li>
-                          <Rich text={t('options_sync_limit_salt')} />
-                        </li>
-                        <li>{t('options_sync_limit_quota')}</li>
-                        <li>{t('options_sync_limit_previews')}</li>
-                      </ul>
-                    </details>
-                  </div>
-                }
-              />
+                          {sync.deletedElsewhere ? (
+                            <div className="note note--warn">
+                              <Icon name="warning" />
+                              <p>
+                                <Rich text={t('options_sync_deleted_elsewhere')} />
+                              </p>
+                            </div>
+                          ) : null}
+                          {!sync.wouldFit ? (
+                            <div className="note note--warn">
+                              <Icon name="warning" />
+                              <div className="note__body">
+                                <p>{t('options_sync_over_quota')}</p>
+                                {offerInOverQuota ? storeOffer : null}
+                              </div>
+                            </div>
+                          ) : null}
+                          {offerNearlyFull ? (
+                            <div className="note note--warn">
+                              <Icon name="warning" />
+                              <div className="note__body">
+                                <p>{t('options_sync_nearly_full', Math.round(sync.usageRatio * 100))}</p>
+                                {storeOffer}
+                              </div>
+                            </div>
+                          ) : null}
+                          {sync.sameVault === false ? (
+                            <div className="note note--warn">
+                              <Icon name="warning" />
+                              <p>
+                                <Rich text={t('options_sync_different_vault')} />
+                              </p>
+                            </div>
+                          ) : null}
+                          {sync.lastError !== null ? (
+                            <p className="item__status">{t('options_sync_last_error', sync.lastError)}</p>
+                          ) : null}
+                          {offerAfterError ? storeOffer : null}
+                        </>
+                      )}
+                      {/* 訊息放在 available 分支外面：同步不可用或狀態讀不到時，開關的回饋也還是要看得到 */}
+                      {statusLine(syncStatusText)}
+                      {/*
+                        折起來而不是刪掉：這兩件事都實際造成過誤解（按了好幾次卻發現另一台沒資料、
+                        在新裝置上按了「建立」導致兩份金鑰不同）。但它們是「出問題時才需要讀」的內容。
+                      */}
+                      <details className="details">
+                        <summary>{t('options_sync_not_seen')}</summary>
+                        <p>
+                          <Rich text={t('options_sync_not_seen_1')} />
+                        </p>
+                        <p>
+                          <Rich text={t('options_sync_not_seen_2')} />
+                        </p>
+                      </details>
+                      <details className="details">
+                        <summary>{t('options_sync_limits')}</summary>
+                        <ul className="item__list">
+                          <li>
+                            <Rich text={t('options_sync_limit_android')} />
+                          </li>
+                          <li>
+                            <Rich text={t('options_sync_limit_schedule')} />
+                          </li>
+                          <li>
+                            <Rich text={t('options_sync_limit_account')} />
+                          </li>
+                          <li>{t('options_sync_limit_stale')}</li>
+                          <li>
+                            <Rich text={t('options_sync_limit_unlocked')} />
+                          </li>
+                          <li>
+                            <Rich text={t('options_sync_limit_salt')} />
+                          </li>
+                          <li>{t('options_sync_limit_quota')}</li>
+                          <li>{t('options_sync_limit_previews')}</li>
+                        </ul>
+                      </details>
+                    </div>
+                  }
+                />
+                <SettingItem
+                  label={t('options_sync_bookmarks_label')}
+                  description={<Rich text={t('options_sync_bookmarks_hint')} />}
+                  control={
+                    <Switch
+                      label={t('options_sync_bookmarks_label')}
+                      checked={sync?.store === 'bookmarks'}
+                      disabled={syncBusy || sync === null || storeBlocker !== null}
+                      onChange={(on) => {
+                        void changeStore(on ? 'bookmarks' : 'sync', 'switch');
+                      }}
+                    />
+                  }
+                  below={
+                    <>
+                      {storeBlocker === null ? null : <p className="item__desc">{storeBlocker}</p>}
+                      {storeStatus !== null && (storeStatus.origin === 'switch' || !offerShown)
+                        ? statusLine(storeStatus.text)
+                        : null}
+                      <p className="item__desc">{t('options_sync_bookmarks_example_intro')}</p>
+                      <SyncBookmarksExample />
+                    </>
+                  }
+                />
+              </>
             )}
           </SettingSection>
 

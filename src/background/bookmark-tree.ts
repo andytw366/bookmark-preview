@@ -2,6 +2,7 @@ import type { FolderChoice } from '@/shared/messages';
 import type { BookmarkFolder, BookmarkNode } from '@/shared/types';
 import { isPreviewableUrl } from '@/shared/url';
 import { t } from '@/shared/i18n';
+import { isSyncFolderNode } from './sync-folder-guard';
 
 /**
  * 讀取 Firefox 書籤樹，轉成側邊欄使用的統一型別。
@@ -9,6 +10,9 @@ import { t } from '@/shared/i18n';
  * 回傳的是頂層根資料夾（書籤工具列／書籤選單／其他書籤／行動書籤），
  * 並過濾掉沒有任何連結的根 —— 「行動書籤」對多數人是空的，
  * 列出來只是噪音。
+ *
+ * 隱私空間的同步資料夾（「其他書籤」底下）整棵剪掉：側邊欄、全頁瀏覽與搜尋都從這裡拿樹，
+ * 剪在這裡就一次擋住全部，「其他書籤」的筆數也不會算到它。
  */
 export async function collectRoots(): Promise<BookmarkFolder[]> {
   const tree = await browser.bookmarks.getTree();
@@ -23,7 +27,7 @@ export async function collectRoots(): Promise<BookmarkFolder[]> {
 }
 
 function toNode(raw: browser.bookmarks.BookmarkTreeNode): BookmarkNode | null {
-  if (raw.type === 'separator') {
+  if (raw.type === 'separator' || isSyncFolderNode(raw)) {
     return null;
   }
 
@@ -67,7 +71,8 @@ export async function collectFolderChoices(): Promise<FolderChoice[]> {
   const walk = (node: browser.bookmarks.BookmarkTreeNode, depth: number): void => {
     for (const child of node.children ?? []) {
       const isFolder = child.type === 'folder' || child.url === undefined;
-      if (!isFolder) {
+      // 同步資料夾不能當「移動到…」的目標：搬進去的書籤會被藏起來，還會打亂同步資料
+      if (!isFolder || isSyncFolderNode(child)) {
         continue;
       }
       choices.push({ id: child.id, title: child.title || t('folder_untitled'), depth });

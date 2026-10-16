@@ -224,7 +224,7 @@
     "message": "No tab has this page open, and the preview could not be fetched from the server. Open the page in a tab and try again."
   },
   "sync_quota_exceeded": {
-    "message": "The encrypted copy is about $SIZE$ KB, over storage.sync's $QUOTA$ KB budget, so it was not uploaded. Nothing on this device is affected, but cross-device sync is stuck on the previous copy — use an encrypted backup file instead.",
+    "message": "The encrypted copy is about $SIZE$ KB, over the roughly $QUOTA$ KB storage.sync can give the vault (100 KB minus the metadata and bookmark layout reserves), so it was not uploaded. Nothing on this device is affected, but cross-device sync is stuck on the previous copy — switch to syncing through bookmarks in Settings, or use an encrypted backup file.",
     "placeholders": {
       "size": {
         "content": "$1",
@@ -1596,7 +1596,7 @@
     "message": "*Another device deleted the whole vault, so sync is paused.* The data on this device is still here and untouched — a flag from elsewhere should not be able to destroy local data. To keep syncing with this device's data, press “Ignore the deletion and sync again” below. If you want it gone here too, unlock in the sidebar and delete the vault."
   },
   "options_sync_over_quota": {
-    "message": "This device's encrypted copy is over the 100 KB sync budget, so sync stays on the previous copy. Nothing on this device is affected. With this many bookmarks, use the encrypted backup above instead."
+    "message": "This device's encrypted copy is over the 100 KB sync budget, so sync stays on the previous copy. Nothing on this device is affected. Switch to syncing through bookmarks (no such limit), or use the encrypted backup above."
   },
   "options_sync_different_vault": {
     "message": "The cloud holds a *separately created* vault (a different salt). The keys do not match, so they cannot be merged automatically. Pick one: use “Overwrite the cloud with this device” below, or export a backup on the other device and restore it here."
@@ -1662,7 +1662,7 @@
     "message": "*The salt, the KDF iteration count and the wrapped data key sit in the synced data in the clear*, because a new device needs them to derive the same key from your master password and to tell that it derived the right one. The cost, stated plainly: anyone with access to your Firefox account can take them and guess the password offline. The bookmarks themselves stay encrypted. So make the master password long — and this is why sync is off by default."
   },
   "options_sync_limit_quota": {
-    "message": "The budget is 100 KB. If the encrypted copy exceeds it, sync stops and warns above; nothing on this device is affected."
+    "message": "The budget is 100 KB. If the encrypted copy exceeds it, sync stops and warns above; nothing on this device is affected. Syncing through bookmarks has no such limit (the metadata, about 1 KB, stays in `storage.sync`)."
   },
   "options_sync_limit_previews": {
     "message": "Preview images are not synced — too large. Press “Fetch missing previews” once on the new device."
@@ -1779,7 +1779,7 @@
     "message": "Stop pinning the column count; wrap with the window width again (groups wrap along, they don't break up)"
   },
   "options_grid_sync_hint": {
-    "message": "Groups (tags) and pinned column counts from the full-page view sync to your other devices through Firefox (the order already syncs with the bookmarks). They use at most 20 KB of the sync space; whatever they don't use is left for the private space."
+    "message": "Groups (tags) and pinned column counts from the full-page view sync to your other devices through Firefox (the order already syncs with the bookmarks). They use at most 20 KB of the sync space; whatever they don't use is left for the vault."
   },
   "options_grid_sync_checkbox": {
     "message": "Sync bookmark layout and groups"
@@ -2139,5 +2139,121 @@
   },
   "sync_newer_format": {
     "message": "The cloud copy was written by a newer version of the extension that this device cannot read, so it is left untouched. Update the extension on this device."
+  },
+  "sync_bookmarks_folder_title": {
+    "message": "Bookmark Preview: vault sync data (do not edit)"
+  },
+  "sync_bookmarks_too_large": {
+    "message": "The encrypted copy is about $SIZE$ MB, more than bookmark sync can hold (about 9 MB), so it was not uploaded. Nothing on this device is affected.",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "10"
+      }
+    }
+  },
+  "sync_bookmarks_need_unlock": {
+    "message": "Unlock the vault before changing where sync stores its copy."
+  },
+  "sync_bookmarks_not_merged": {
+    "message": "The cloud copy has to be merged before switching, but this sync did not finish: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "the cloud copy is still arriving"
+      }
+    }
+  },
+  "sync_bookmarks_cannot_fit": {
+    "message": "The encrypted copy is about $SIZE$ KB, which does not fit in the roughly $QUOTA$ KB storage.sync can give the vault (100 KB minus the metadata and bookmark layout reserves), so it stays in bookmarks. To switch back, remove some bookmarks from the vault first (deleted bookmarks stay in the copy for 30 days, so it will not shrink right away).",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "112"
+      },
+      "quota": {
+        "content": "$2",
+        "example": "100"
+      }
+    }
+  },
+  "sync_bookmarks_reason_disabled": {
+    "message": "Sync is not turned on."
+  },
+  "sync_bookmarks_reason_waiting": {
+    "message": "The cloud copy is still arriving. Try again in a few minutes."
+  },
+  "sync_folder_protected": {
+    "message": "This is the vault's sync data. It can't be moved or changed."
+  },
+  "options_sync_bookmarks_label": {
+    "message": "Sync through bookmarks"
+  },
+  "options_sync_bookmarks_hint": {
+    "message": "Keep the encrypted copy in a bookmark folder and let Firefox's *bookmark sync* carry it to your other devices — no more 100 KB `storage.sync` limit. It switches for the whole account: turn it on here and your other devices follow on their next sync."
+  },
+  "options_sync_bookmarks_needs_unlock": {
+    "message": "Unlock the vault to change this."
+  },
+  "options_sync_bookmarks_needs_sync": {
+    "message": "Turn on “$NAME$” above first.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_sync_bookmarks_example_intro": {
+    "message": "Once it's on, Firefox's Library shows this extra folder (under Other Bookmarks):"
+  },
+  "options_sync_bookmarks_moving_in": {
+    "message": "Moving to bookmarks…"
+  },
+  "options_sync_bookmarks_moving_out": {
+    "message": "Moving back to storage.sync…"
+  },
+  "options_sync_bookmarks_on": {
+    "message": "Now syncing through bookmarks. Your other devices will follow on their next sync."
+  },
+  "options_sync_bookmarks_off": {
+    "message": "Back on storage.sync. The sync folder in your bookmarks has been removed."
+  },
+  "options_sync_nearly_full": {
+    "message": "Sync storage is $PERCENT$% full. A little more and the vault won't fit in 100 KB and sync will stop at the previous copy. Syncing through bookmarks has no such limit.",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "sync_example_label": {
+    "message": "Example: the sync folder in Firefox's Library"
+  },
+  "sync_example_window": {
+    "message": "Library"
+  },
+  "sync_example_menu": {
+    "message": "Bookmarks Menu"
+  },
+  "sync_example_toolbar": {
+    "message": "Bookmarks Toolbar"
+  },
+  "sync_example_other": {
+    "message": "Other Bookmarks"
+  },
+  "sync_example_name": {
+    "message": "Name"
+  },
+  "sync_example_callout": {
+    "message": "Encrypted vault"
+  },
+  "sync_example_size": {
+    "message": "About 60 KB each"
+  },
+  "sync_example_footnote_1": {
+    "message": "Bookmark Preview updates this folder automatically. Please don't edit, move or delete it."
+  },
+  "sync_example_footnote_2": {
+    "message": "It only shows up in Firefox's own Bookmarks menu and Library, never in Bookmark Preview's sidebar."
   }
 }

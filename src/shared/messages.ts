@@ -141,7 +141,13 @@ export interface VaultSyncStatus {
   sameVault: boolean | null;
   bytes: number;
   quota: number;
-  /** 本機這份塞得進配額嗎。false 時同步會停在上一份副本 */
+  /** `bytes / quota`。設定頁在 ≥ 0.8 而且 `store` 是 sync 時提示改用書籤同步 */
+  usageRatio: number;
+  /**
+   * 雲端那份放在哪裡：看雲端 meta；雲端沒有（或看不懂）時是本機設定 `vaultSyncBookmarks` 決定的初值
+   */
+  store: 'sync' | 'bookmarks';
+  /** 本機這份塞得進配額嗎。false 時同步會停在上一份副本。放書籤時一律 true（書籤沒有配額） */
   wouldFit: boolean;
   hasLocalVault: boolean;
   /** 另一台裝置刪除了整個隱私空間，同步已暫停等使用者決定 */
@@ -330,6 +336,11 @@ export type Protocol = {
   'vault/sync-clear': { request: void; response: VaultSyncStatus };
   /** 清掉「另一台裝置刪除了隱私空間」的標記，重新開始同步 */
   'vault/sync-resume': { request: void; response: VaultSyncStatus };
+  /**
+   * 切換雲端那份的存放位置（整個帳號一起換）。要解鎖；會先同步一次確認合併過。
+   * 失敗時丟錯，訊息可以直接顯示（例如改回 sync 塞不下）
+   */
+  'vault/set-sync-store': { request: { store: 'sync' | 'bookmarks' }; response: VaultSyncStatus };
 };
 
 export type EventMap = {

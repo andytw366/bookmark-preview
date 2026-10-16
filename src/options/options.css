@@ -483,3 +483,43 @@ textarea.input--mono {
 .recovery__code {
   font-size: var(--fs-lg);
 }
+
+/* 「改用書籤同步」的範例圖（SyncBookmarksExample.tsx）。608 是設計稿的寬度，不放大，免得字比旁邊的說明大 */
+.sync-example {
+  max-width: 608px;
+  margin: 0;
+}
+
+.sync-example svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sync-example text {
+  font-family: var(--font);
+}
+
+.sync-example .sync-example__mono text {
+  font-family: var(--mono);
+}
+
+.sync-example figcaption {
+  margin-top: 10px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 18px;
+}
+
+.sync-example figcaption p {
+  margin: 0;
+}
+
+/* 提醒裡的說明＋按鈕（同步快滿、超額時的「改用書籤同步」） */
+.note__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}

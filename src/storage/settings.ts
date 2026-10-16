@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   vaultTrigger: DEFAULT_VAULT_TRIGGER,
   vaultExportFolderId: null,
   vaultSyncEnabled: false,
+  vaultSyncBookmarks: false,
   syncGrid: true,
 };
 

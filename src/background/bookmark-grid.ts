@@ -19,6 +19,7 @@ import { getSettings } from '@/storage/settings';
 import { GRID_ITEM_LIMIT, GRID_PREFIX, GRID_SYNC_BUDGET, gridBytes, gridKey, gridSyncBudget } from '@/storage/grid-sync';
 import { deviceId, syncAvailable } from '@/storage/vault-sync';
 import { placeBefore } from './bookmark-order';
+import { assertNotSyncFolder, isSyncFolderNode } from './sync-folder-guard';
 
 /**
  * 原生書籤的版面（欄數）與群組。
@@ -107,10 +108,14 @@ export async function getBookmarkGrid(folderId: string): Promise<BookmarkGrid | 
   return doc === null ? null : { columns: doc.columns, groups: doc.groups };
 }
 
-/** 畫面上看得到的子項目（與 `bookmark-tree` 的過濾一致：沒有分隔線、沒有 `place:`） */
+/**
+ * 畫面上看得到的子項目（與 `bookmark-tree` 的過濾一致：沒有分隔線、沒有 `place:`、
+ * 沒有隱私空間的同步資料夾）。同步資料夾要擋在這裡：「其他書籤」的格子若把它算進去，
+ * 它會佔一格看不見的位置，`syncNativeOrder` 還可能去搬它。
+ */
 async function visibleChildren(folderId: string): Promise<browser.bookmarks.BookmarkTreeNode[]> {
   return (await browser.bookmarks.getChildren(folderId)).filter((node) => {
-    if (node.type === 'separator') {
+    if (node.type === 'separator' || isSyncFolderNode(node)) {
       return false;
     }
     const isFolder = node.type === 'folder' || node.url === undefined;
@@ -202,6 +207,8 @@ async function save(folderId: string, loaded: Loaded, next: Board): Promise<void
 export async function applyBookmarkGrid(folderId: string, columns: number, op: GridOp): Promise<void> {
   return exclusive(async () => {
     if (op.kind === 'place') {
+      // 介面上看不到同步資料夾，照理不會有人把東西拖進去或拖出來；萬一有（舊畫面、競態）就拒絕
+      await assertNotSyncFolder(folderId, ...op.ids);
       // 多選可以跨資料夾：別處勾的先搬進來（放到最後），再照落點排
       const here = new Set((await browser.bookmarks.getChildren(folderId)).map((node) => node.id));
       for (const id of op.ids) {
@@ -230,6 +237,7 @@ function requireGroup(board: Board, groupId: string): GroupInfo {
 /** 轉成資料夾：在第一個成員的位置建子資料夾，成員照順序搬進去。回傳新資料夾 id */
 export async function groupToFolder(folderId: string, groupId: string, columns: number): Promise<string> {
   return exclusive(async () => {
+    await assertNotSyncFolder(folderId);
     const loaded = await load(folderId, columns);
     const group = requireGroup(loaded.board, groupId);
     const members = membersInOrder(loaded.board, groupId);
@@ -253,6 +261,8 @@ export async function groupToFolder(folderId: string, groupId: string, columns: 
  */
 export async function flattenFolder(subfolderId: string, columns: number): Promise<void> {
   return exclusive(async () => {
+    // 攤平同步資料夾等於把密文書籤搬到「其他書籤」再刪掉資料夾 —— 同步資料就沒了
+    await assertNotSyncFolder(subfolderId);
     const [sub] = await browser.bookmarks.get(subfolderId);
     if (sub?.parentId === undefined) {
       throw new Error(t('group_not_found'));
@@ -296,6 +306,7 @@ export async function moveGroup(
     if (fromFolderId === toFolderId) {
       return;
     }
+    await assertNotSyncFolder(fromFolderId, toFolderId);
     const source = await load(fromFolderId, columns);
     const group = requireGroup(source.board, groupId);
     const members = membersInOrder(source.board, groupId);
@@ -496,7 +507,11 @@ export async function gridSyncStatus(): Promise<GridSyncStatus> {
  * 遠端寫來的格子：較新就採用。啟動時刪掉第 3 期的舊鍵。
  */
 export function startGridWatcher(): void {
+  // 隱私空間的同步資料夾沒有格子，每次推送都會增刪裡面的書籤 —— 不必為它排隊做事
   browser.bookmarks.onRemoved.addListener((id, info) => {
+    if (isSyncFolderNode({ id, parentId: info.parentId })) {
+      return;
+    }
     void exclusive(async () => {
       const keys = [id, ...folderIdsIn(info.node)].map(gridKey);
       await browser.storage.local.remove(keys);
@@ -507,7 +522,7 @@ export function startGridWatcher(): void {
     });
   });
   browser.bookmarks.onMoved.addListener((id, info) => {
-    if (info.parentId === info.oldParentId) {
+    if (info.parentId === info.oldParentId || isSyncFolderNode({ id, parentId: info.oldParentId })) {
       return;
     }
     void exclusive(async () => {

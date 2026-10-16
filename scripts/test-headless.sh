@@ -205,8 +205,17 @@ sleep 2
 echo "Xvfb 已啟動於 $DISPLAY_NUM（$SCREEN）"
 echo "截圖：DISPLAY=$DISPLAY_NUM import -window root shot.png"
 
+# FF_REMOTE_PORT=9222：開 WebDriver BiDi，讓腳本能在擴充套件頁面裡直接執行程式
+# （讀寫 storage、呼叫 bookmarks API、送訊息給背景頁），不必透過 DevTools 主控台打字
+extra_args=()
+if [[ -n "${FF_REMOTE_PORT:-}" ]]; then
+  extra_args+=(--arg="--remote-debugging-port=${FF_REMOTE_PORT}")
+  echo 'user_pref("remote.active-protocols", 1);' >> "$PROFILE/user.js"
+fi
+
 cd "$ROOT"
 exec npx web-ext run \
+  "${extra_args[@]}" \
   --source-dir dist \
   --firefox "$FIREFOX" \
   --firefox-profile "$PROFILE" \

@@ -224,7 +224,7 @@
     "message": "沒有開啟中的分頁，且伺服器端抓不到預覽圖。請先在分頁中開啟該頁面再重試。"
   },
   "sync_quota_exceeded": {
-    "message": "加密副本約 $SIZE$ KB，超過 storage.sync 的 $QUOTA$ KB 額度，這次沒有上傳。本機資料完全不受影響，但跨裝置同步已停在上一份副本 —— 請改用加密檔備份。",
+    "message": "加密副本約 $SIZE$ KB，超過 storage.sync 能給隱私空間的約 $QUOTA$ KB（100 KB 扣掉中介資料與書籤排列的保留），這次沒有上傳。本機資料完全不受影響，但跨裝置同步已停在上一份副本 —— 可以在設定頁改用書籤同步，或改用加密檔備份。",
     "placeholders": {
       "size": {
         "content": "$1",
@@ -1596,7 +1596,7 @@
     "message": "*另一台裝置刪除了整個隱私空間，同步已暫停。*這台裝置上的資料還在，也沒有被動過 —— 遠端的一個旗標不該有權刪掉本機資料。要繼續用這台裝置的資料同步，請按下面的「忽略刪除、重新開始同步」；若你也想刪掉這台裝置上的，請在側邊欄解鎖後刪除隱私空間。"
   },
   "options_sync_over_quota": {
-    "message": "本機的加密副本已超過 100 KB 的同步額度，同步會停在上一份副本（本機資料完全不受影響）。書籤太多時請改用上面的加密備份檔。"
+    "message": "本機的加密副本已超過 100 KB 的同步額度，同步會停在上一份副本（本機資料完全不受影響）。可以改用書籤同步（沒有這個上限），或改用上面的加密備份檔。"
   },
   "options_sync_different_vault": {
     "message": "雲端那份是*另外建立*的隱私空間（salt 不同），金鑰互不相通，沒辦法自動合併。請選一邊：用下面的「以這台裝置覆蓋雲端」，或先在另一台裝置匯出備份檔再從這裡還原。"
@@ -1662,7 +1662,7 @@
     "message": "*salt、KDF 迭代次數與包裹著資料金鑰的那份密文，是明文放在同步資料裡的*，因為換裝置時得靠它們才能從主密碼派生出同一把金鑰、並確認派生對了。代價要講清楚：能存取你 Firefox 帳號的人可以拿它們離線暴力猜密碼（書籤本身仍然是加密的）。所以主密碼要夠長 —— 這也是同步預設關閉的原因。"
   },
   "options_sync_limit_quota": {
-    "message": "額度是 100 KB。加密副本超過時同步會停下並在上面警告，本機資料不受影響。"
+    "message": "額度是 100 KB。加密副本超過時同步會停下並在上面警告，本機資料不受影響。改用書籤同步就沒有這個上限（中介資料仍在 `storage.sync`，約 1 KB）。"
   },
   "options_sync_limit_previews": {
     "message": "預覽圖不同步（太大）。新裝置按一次「補抓預覽圖」即可。"
@@ -2139,5 +2139,121 @@
   },
   "sync_newer_format": {
     "message": "雲端那份是較新版本的擴充套件寫的，這台看不懂，所以先不動它。請把這台的擴充套件更新到最新版。"
+  },
+  "sync_bookmarks_folder_title": {
+    "message": "書籤預覽：隱私空間的同步資料（請勿修改）"
+  },
+  "sync_bookmarks_too_large": {
+    "message": "加密副本約 $SIZE$ MB，超過書籤同步能放的大小（約 9 MB），這次沒有上傳。本機資料完全不受影響。",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "10"
+      }
+    }
+  },
+  "sync_bookmarks_need_unlock": {
+    "message": "要先解鎖隱私空間才能切換同步的存放位置。"
+  },
+  "sync_bookmarks_not_merged": {
+    "message": "切換之前要先與雲端那份合併，但這次同步沒有完成：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "雲端那份還在傳輸中"
+      }
+    }
+  },
+  "sync_bookmarks_cannot_fit": {
+    "message": "加密副本約 $SIZE$ KB，放不進 storage.sync 能給隱私空間的約 $QUOTA$ KB（100 KB 扣掉中介資料與書籤排列的保留），所以繼續放在書籤裡。要改回去，請先減少隱私空間裡的書籤（刪掉的書籤會在副本裡留 30 天才清掉，所以不會馬上變小）。",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "112"
+      },
+      "quota": {
+        "content": "$2",
+        "example": "100"
+      }
+    }
+  },
+  "sync_bookmarks_reason_disabled": {
+    "message": "同步還沒有打開。"
+  },
+  "sync_bookmarks_reason_waiting": {
+    "message": "雲端那份還在傳輸中，請等幾分鐘再試。"
+  },
+  "sync_folder_protected": {
+    "message": "這是隱私空間的同步資料，不能移動或修改。"
+  },
+  "options_sync_bookmarks_label": {
+    "message": "改用書籤同步"
+  },
+  "options_sync_bookmarks_hint": {
+    "message": "把加密副本放進一個書籤資料夾，由 Firefox 的*書籤同步*帶到其他裝置，就沒有 `storage.sync` 100 KB 的上限。這是整個帳號一起換的：一台打開，其他裝置下次同步時會跟著改。"
+  },
+  "options_sync_bookmarks_needs_unlock": {
+    "message": "要先解鎖隱私空間才能切換。"
+  },
+  "options_sync_bookmarks_needs_sync": {
+    "message": "要先打開上面的「$NAME$」才能切換。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "options_sync_bookmarks_example_intro": {
+    "message": "打開後，Firefox 的書籤管理員會多出這個資料夾（其他書籤底下）："
+  },
+  "options_sync_bookmarks_moving_in": {
+    "message": "正在搬到書籤…"
+  },
+  "options_sync_bookmarks_moving_out": {
+    "message": "正在搬回 storage.sync…"
+  },
+  "options_sync_bookmarks_on": {
+    "message": "已改用書籤同步。其他裝置下次同步時會跟著改。"
+  },
+  "options_sync_bookmarks_off": {
+    "message": "已改回 storage.sync，書籤裡的同步資料夾已刪除。"
+  },
+  "options_sync_nearly_full": {
+    "message": "同步空間已用掉 $PERCENT$%。隱私空間再大一些就放不進 100 KB，同步會停在上一份副本；改用書籤同步就沒有這個上限。",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "sync_example_label": {
+    "message": "範例：書籤管理員裡的同步資料夾"
+  },
+  "sync_example_window": {
+    "message": "書籤管理員"
+  },
+  "sync_example_menu": {
+    "message": "書籤選單"
+  },
+  "sync_example_toolbar": {
+    "message": "書籤工具列"
+  },
+  "sync_example_other": {
+    "message": "其他書籤"
+  },
+  "sync_example_name": {
+    "message": "名稱"
+  },
+  "sync_example_callout": {
+    "message": "加密過的隱私空間"
+  },
+  "sync_example_size": {
+    "message": "每筆約 60 KB"
+  },
+  "sync_example_footnote_1": {
+    "message": "書籤預覽會自動更新這個資料夾，請不要修改、移動或刪除它。"
+  },
+  "sync_example_footnote_2": {
+    "message": "它只出現在 Firefox 自己的書籤選單與書籤管理員，書籤預覽的側邊欄裡看不到。"
   }
 }

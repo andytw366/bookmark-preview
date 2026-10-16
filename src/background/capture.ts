@@ -13,6 +13,7 @@ import { grabCoverThumbnail } from './cover-grab';
 import { makeThumbnail, type Thumbnail } from './image';
 import { iconThumbnailFromTab, wantsSiteIcon } from './site-icon';
 import { t } from '@/shared/i18n';
+import { isSyncFolderNode } from './sync-folder-guard';
 
 /**
  * 被動截圖管線：你正常瀏覽到已加入書籤的頁面時，在背景擷取縮圖。
@@ -55,6 +56,11 @@ const BULK_THRESHOLD = 5;
 let recentCreations: number[] = [];
 
 function handleBookmarkCreated(_id: string, node: browser.bookmarks.BookmarkTreeNode): void {
+  // 隱私空間的同步資料（`data:` 網址本來就被 `isPreviewableUrl` 擋掉，不會擷取）。
+  // 仍要在計數之前跳過：一次推送會建好幾筆，算進去的話同時加的真書籤會被誤判成匯入而漏抓
+  if (isSyncFolderNode(node)) {
+    return;
+  }
   const now = Date.now();
   recentCreations = recentCreations.filter((at) => now - at < BULK_WINDOW_MS);
   recentCreations.push(now);

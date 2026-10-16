@@ -1,6 +1,8 @@
+import type { Bytes } from '@/crypto/bytes';
 import { fromChunks } from '@/crypto/chunk';
 import type { VaultMeta } from '@/shared/types';
 import { textDigest } from '@/shared/vault-merge';
+import { readBookmarkChunks, removeSyncFolder, writeBookmarkChunks } from './bookmark-store';
 import { clearSyncGone, syncAvailable } from './vault-sync';
 
 /**
@@ -26,14 +28,25 @@ export const PACK_CHUNK_PREFIX = 'vaultPackC';
  *
  * - 1：base64 的密文，裡面是第 1 版的精簡編碼（只出現在沒有上架的建置裡）
  * - 2：base91 的密文（`crypto/base91`），裡面是第 2 版的精簡編碼
+ * - 3：塊放在書籤裡（`storage/bookmark-store`，base32），`store: 'bookmarks'` 與 `folderId` 必填。
+ *   **只有放書籤時才寫 3**；放 `storage.sync` 時照寫 2，讓沒打開書籤同步的人不必所有裝置一起更新
  *
  * **改格式就要升這個數字。** 看到比自己新的版本，舊版會停下來等（`isPackMeta` 不認得 → 當成傳輸中），
  * 而不是把解不開的東西當成「雲端壞了」拿本機那份蓋過去 —— 那會讓還沒更新的裝置每一輪都覆蓋雲端。
  */
-export const PACK_META_VERSION = 2;
+export const PACK_META_VERSION = 3;
+/** 塊放在 `storage.sync` 時寫的版本 */
+export const PACK_META_VERSION_SYNC = 2;
+
+/** 雲端那份的塊放在哪裡。這是**雲端那份**的屬性（寫在 meta 裡），不是每台裝置各自的設定 */
+export type PackStore = 'sync' | 'bookmarks';
 
 export interface PackSyncMeta {
-  version: 1 | typeof PACK_META_VERSION;
+  version: 1 | typeof PACK_META_VERSION_SYNC | typeof PACK_META_VERSION;
+  /** 只在 version 3 出現 */
+  store?: 'bookmarks';
+  /** 同步資料夾的 id（Firefox 同步保留 GUID，各裝置相同；對不上時用標題找） */
+  folderId?: string;
   vault: VaultMeta;
   chunks: number;
   digest: string;
@@ -52,20 +65,33 @@ export type PackSyncRead =
    * `newer`：meta 是更新版本的擴充套件寫的 —— 不會自己好，要更新這台
    */
   | { kind: 'partial'; meta: PackSyncMeta | null; newer?: true }
+  /**
+   * `blob` 是塊接回來的文字：`storage.sync` 是 base91（version 1 是 base64），書籤是 base32。
+   * 怎麼解看 `meta.version`（`background/vault` 的 `openPack`）
+   */
   | { kind: 'ok'; meta: PackSyncMeta; blob: string };
+
+export function packStoreOf(meta: Pick<PackSyncMeta, 'store'>): PackStore {
+  return meta.store === 'bookmarks' ? 'bookmarks' : 'sync';
+}
 
 function chunkKeys(count: number): string[] {
   return Array.from({ length: count }, (_, index) => `${PACK_CHUNK_PREFIX}${String(index)}`);
 }
 
-function isPackMeta(value: unknown): value is PackSyncMeta {
+export function isPackMeta(value: unknown): value is PackSyncMeta {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
   const meta = value as Partial<PackSyncMeta>;
   const vault = meta.vault as Partial<VaultMeta> | undefined;
+  // 第 3 版一定在書籤裡、一定有資料夾 id；第 1、2 版一定在 storage.sync。混搭的當成看不懂
+  const where =
+    meta.version === PACK_META_VERSION
+      ? meta.store === 'bookmarks' && typeof meta.folderId === 'string' && meta.folderId !== ''
+      : (meta.version === 1 || meta.version === PACK_META_VERSION_SYNC) && meta.store === undefined;
   return (
-    (meta.version === 1 || meta.version === PACK_META_VERSION) &&
+    where &&
     typeof vault?.salt === 'string' &&
     vault.salt !== '' &&
     typeof vault.iterations === 'number' &&
@@ -117,6 +143,14 @@ export async function readPackEnvelope(): Promise<PackSyncRead> {
     }
     return (await packEnvelopePresent()) ? { kind: 'partial', meta: null } : { kind: 'absent' };
   }
+  if (meta.store === 'bookmarks') {
+    // 書籤同步比 storage.sync 慢或快都有可能：資料夾還沒到、塊沒到齊都是傳輸中
+    const blob = await readBookmarkChunks(meta.folderId ?? '', meta.chunks);
+    if (blob === null || (await textDigest(blob)) !== meta.digest) {
+      return { kind: 'partial', meta };
+    }
+    return { kind: 'ok', meta, blob };
+  }
   const keys = chunkKeys(meta.chunks);
   const stored = await browser.storage.sync.get(keys);
   const parts: string[] = [];
@@ -141,24 +175,51 @@ export interface PackIdentity {
   deviceId: string;
 }
 
-export async function writePackEnvelope(identity: PackIdentity, chunks: readonly string[]): Promise<void> {
-  const items: Record<string, string> = {};
-  chunks.forEach((chunk, index) => {
-    items[`${PACK_CHUNK_PREFIX}${String(index)}`] = chunk;
-  });
-  await browser.storage.sync.set(items);
-  const meta: PackSyncMeta = {
-    version: PACK_META_VERSION,
+/** 要寫的東西：放 `storage.sync` 的是已經切好的 base91 塊，放書籤的是密文位元組（切塊與編碼交給 `bookmark-store`） */
+export type PackTarget = { store: 'sync'; chunks: readonly string[] } | { store: 'bookmarks'; bytes: Bytes };
+
+/**
+ * 寫一份完整的副本。兩種存放位置都是**先塊後 meta**：meta 是「這份完整了」的認可標記。
+ *
+ * 寫進書籤之後順手刪掉 `vaultPackC*`（meta 已經改指書籤，它們只是在佔配額）。
+ * 反方向（寫回 `storage.sync` 之後刪書籤資料夾）**不在這裡做**：只有使用者切換存放位置、或移除
+ * 雲端副本時才刪（`background/vault-sync`）。每次推送都去刪的話，另一台剛切到書籤、meta 還沒傳到
+ * 這台的空檔裡，這台會把對方剛寫好的資料夾刪掉。
+ */
+export async function writePackEnvelope(identity: PackIdentity, target: PackTarget): Promise<void> {
+  const base = {
     vault: identity.vault,
-    chunks: chunks.length,
-    digest: await textDigest(fromChunks(chunks)),
     tag: identity.tag,
     layoutTag: identity.layoutTag,
     updatedAt: Date.now(),
     deviceId: identity.deviceId,
   };
+  let meta: PackSyncMeta;
+  if (target.store === 'bookmarks') {
+    const written = await writeBookmarkChunks(target.bytes);
+    meta = {
+      ...base,
+      version: PACK_META_VERSION,
+      store: 'bookmarks',
+      folderId: written.folderId,
+      chunks: written.chunks,
+      digest: await textDigest(written.text),
+    };
+  } else {
+    const items: Record<string, string> = {};
+    target.chunks.forEach((chunk, index) => {
+      items[`${PACK_CHUNK_PREFIX}${String(index)}`] = chunk;
+    });
+    await browser.storage.sync.set(items);
+    meta = {
+      ...base,
+      version: PACK_META_VERSION_SYNC,
+      chunks: target.chunks.length,
+      digest: await textDigest(fromChunks(target.chunks)),
+    };
+  }
   await browser.storage.sync.set({ [PACK_META_KEY]: meta });
-  await removeStalePackChunks(chunks.length);
+  await removeStalePackChunks(target.store === 'sync' ? target.chunks.length : 0);
   /*
    * 一份完整的新副本取代了刪除標記。
    *
@@ -183,11 +244,20 @@ async function removeStalePackChunks(keep: number): Promise<void> {
   }
 }
 
-export async function clearPackEnvelope(): Promise<void> {
+/**
+ * 清掉雲端副本。`withFolder`：連書籤資料夾一起刪（移除雲端副本時要；覆蓋雲端時若接著要寫回書籤就不必，
+ * 留著讓 `writeBookmarkChunks` 用 `update` 換網址）。
+ */
+export async function clearPackEnvelope(withFolder = true): Promise<void> {
   if (!syncAvailable()) {
     return;
   }
+  // 資料夾 id 要在 meta 移除之前讀出來
+  const folderId = (await readPackMeta())?.folderId ?? null;
   // meta 先移除：即使接著清塊時失敗，也不會留下一份指向殘塊的認可標記
   await browser.storage.sync.remove(PACK_META_KEY);
   await removeStalePackChunks(0);
+  if (withFolder) {
+    await removeSyncFolder(folderId);
+  }
 }

@@ -1,5 +1,8 @@
 import { gridSyncReserve } from '@/storage/grid-sync';
+import { toBase91 } from '@/crypto/base91';
+import type { Bytes } from '@/crypto/bytes';
 import { fitsInSync, SYNC_META_RESERVE, SYNC_TOTAL_BUDGET, toChunks } from '@/crypto/chunk';
+import { isSyncFolderIdSync, removeSyncFolder } from '@/storage/bookmark-store';
 import { broadcast } from '@/shared/messages';
 import type { SyncOutcome, VaultSyncStatus } from '@/shared/messages';
 import { getSettings, patchSettings } from '@/storage/settings';
@@ -26,8 +29,12 @@ import {
   PACK_CHUNK_PREFIX,
   PACK_META_KEY,
   PACK_META_VERSION,
+  PACK_META_VERSION_SYNC,
+  packStoreOf,
   readPackEnvelope,
+  readPackMeta,
   writePackEnvelope,
+  type PackStore,
   type PackSyncMeta,
 } from '@/storage/pack-sync';
 import { readMeta } from '@/storage/vault-store';
@@ -69,6 +76,10 @@ import { t } from '@/shared/i18n';
  * 推上新格式時刪掉 —— 兩種格式同時放會超過 100 KB。還沒更新的裝置看不懂新格式，會把
  * 自己那份用舊格式推回來；那也沒關係，下一輪合併後再刪一次，等它更新完就停了。
  * 精簡格式要有金鑰才編得出來，所以**上鎖時一律不推**（以前雲端沒有副本時上鎖也會推）。
+ *
+ * 雲端那份的塊可以放在 `storage.sync`（預設）或書籤裡（「改用書籤同步」，`storage/bookmark-store`）。
+ * 放哪裡是**雲端 meta 的屬性**：推送一律照雲端 meta 的 `store` 寫回同一個地方，雲端還沒有 meta 時
+ * 才看本機設定 `vaultSyncBookmarks`。換地方只有 `setSyncStore` 一條路。
  *
  * 已知限制（設定頁要照實說）：
  * - Firefox for Android 完全不同步 `storage.sync`（Mozilla bug 1625257）。
@@ -157,6 +168,46 @@ export function startVaultSync(): void {
       await syncVault();
     }, () => undefined);
   });
+
+  /*
+   * 塊放在書籤裡時，書籤同步帶來的塊不會觸發 `storage.onChanged`。meta 常常比塊先到 ——
+   * 那一輪讀到的是「傳輸中」，少了這組監聽器就要等到下一次本機寫入才會再看一次。
+   *
+   * 走同一個 debounce：書籤同步是逐筆到的，幾十塊會連續觸發幾十次。自己寫入也會觸發，
+   * 多出來的那一輪讀到指紋相同就不會再寫，不會互相觸發下去。
+   */
+  const inFolder = (...ids: (string | undefined)[]): boolean =>
+    ids.some((id) => id !== undefined && isSyncFolderIdSync(id));
+  browser.bookmarks.onCreated.addListener((id, node) => {
+    if (inFolder(id, node.parentId)) {
+      scheduleVaultSync();
+    }
+  });
+  browser.bookmarks.onRemoved.addListener((id, info) => {
+    if (inFolder(id, info.parentId)) {
+      scheduleVaultSync();
+    }
+  });
+  browser.bookmarks.onMoved.addListener((id, info) => {
+    if (inFolder(id, info.parentId, info.oldParentId)) {
+      scheduleVaultSync();
+    }
+  });
+  // onChanged 只給 id：塊被改了網址要讀一次才知道它在不在資料夾裡
+  browser.bookmarks.onChanged.addListener((id) => {
+    if (inFolder(id)) {
+      scheduleVaultSync();
+      return;
+    }
+    void browser.bookmarks.get(id).then(
+      ([node]) => {
+        if (inFolder(node?.parentId)) {
+          scheduleVaultSync();
+        }
+      },
+      () => undefined,
+    );
+  });
 }
 
 export function scheduleVaultSync(): void {
@@ -169,14 +220,21 @@ export function scheduleVaultSync(): void {
   }, DEBOUNCE_MS);
 }
 
-function quotaMessage(blob: string): string {
-  return (
-    t(
-      'sync_quota_exceeded',
-      Math.ceil(blob.length / 1024),
-      Math.floor(SYNC_TOTAL_BUDGET / 1024),
-    )
-  );
+/** 雲端還沒有（看得懂的）meta 時，新的一份放哪裡：本機設定決定的初值 */
+async function defaultStore(): Promise<PackStore> {
+  return (await getSettings()).vaultSyncBookmarks ? 'bookmarks' : 'sync';
+}
+
+/**
+ * 隱私空間在 `storage.sync` 實際能用的 KB 數：100 KB 扣掉 meta 的餘裕與書籤排列那份（與 `fits` 同一個算法）。
+ * 訊息裡寫這個數字而不是 100 —— 寫 100 會出現「約 98 KB，超過 100 KB 額度」這種讀起來自相矛盾的句子。
+ */
+async function vaultBudgetKb(): Promise<number> {
+  return Math.floor((SYNC_TOTAL_BUDGET - SYNC_META_RESERVE - (await gridSyncReserve())) / 1024);
+}
+
+async function quotaMessage(blob: string): Promise<string> {
+  return t('sync_quota_exceeded', Math.ceil(blob.length / 1024), await vaultBudgetKb());
 }
 
 /**
@@ -188,6 +246,20 @@ function quotaMessage(blob: string): string {
  * 使用者會以為資料已經上去了。
  */
 export async function syncVault(): Promise<SyncOutcome> {
+  return runSync();
+}
+
+/**
+ * `syncVault` 的本體。`pushTo`：合併完推到指定的存放位置，而不是雲端 meta 說的那裡 —— 只給
+ * `setSyncStore('bookmarks')` 用。
+ *
+ * 為什麼要有它：「改用書籤同步」最需要的時刻正是 `storage.sync` 塞不下的時候，而那時照雲端 meta
+ * 推回 `storage.sync` 一定因為超額而失敗，`syncVault` 回 `failed`，切換就永遠按不成
+ * （2026-10-16 D 期實機抓到：超額提示裡的「改用書籤同步」按了只會再顯示一次超額訊息）。
+ * 合併的規則一條都沒有放寬：一樣要解鎖、遠端傳輸中一樣停下、salt 不同一樣停下，
+ * 只是合併完的那份直接寫進書籤（先塊後 meta，寫完刪 `vaultPackC*`）。
+ */
+async function runSync(pushTo?: PackStore): Promise<SyncOutcome> {
   if (!syncAvailable()) {
     return finish('unavailable');
   }
@@ -282,8 +354,13 @@ export async function syncVault(): Promise<SyncOutcome> {
       await mergeLegacyLayout(local);
     }
 
-    // 重讀本機 meta：上面的協調可能剛換掉包裹，用一開始那份會把舊包裹又推回去
-    await push((await readMeta()) ?? local, pack.kind === 'ok' && !fellBack ? pack.meta : null);
+    // 重讀本機 meta：上面的協調可能剛換掉包裹，用一開始那份會把舊包裹又推回去。
+    // 存放位置照雲端 meta（哪怕那份解不開而要覆蓋，也覆蓋在同一個地方）
+    await push(
+      (await readMeta()) ?? local,
+      pack.kind === 'ok' && !fellBack ? pack.meta : null,
+      pushTo ?? (packMeta === null ? await defaultStore() : packStoreOf(packMeta)),
+    );
     lastSyncedAt = Date.now();
     if (!fellBack) {
       lastError = null;
@@ -392,16 +469,16 @@ async function fits(blob: string): Promise<boolean> {
  *
  * 先確認塞得進去才清舊格式：塞不進去的話舊格式那份至少還是一份能用的雲端副本。
  */
-async function push(local: VaultMeta, remote: PackSyncMeta | null): Promise<void> {
+async function push(local: VaultMeta, remote: PackSyncMeta | null, store: PackStore): Promise<void> {
   const snapshot = await packedSnapshot();
-  if (!(await fits(snapshot.blob))) {
-    throw new Error(quotaMessage(snapshot.blob));
-  }
+  // 放書籤時不檢查配額：書籤沒有 100 KB 的限制（塊數上限在 `toBookmarkChunks` 把關）
+  const target = await targetFor(store, snapshot.bytes);
   await clearLegacy();
   // 舊版本（1）的雲端副本內容一樣也要重寫：換成目前的格式才省得到空間
   const unchanged =
     remote !== null &&
-    remote.version === PACK_META_VERSION &&
+    remote.version === metaVersionFor(store) &&
+    packStoreOf(remote) === store &&
     remote.tag === snapshot.tag &&
     remote.layoutTag === snapshot.layoutTag &&
     sameMetaContent(remote.vault, local);
@@ -410,8 +487,27 @@ async function push(local: VaultMeta, remote: PackSyncMeta | null): Promise<void
   }
   await writePackEnvelope(
     { vault: local, tag: snapshot.tag, layoutTag: snapshot.layoutTag, deviceId: await deviceId() },
-    toChunks(snapshot.blob),
+    target,
   );
+}
+
+function metaVersionFor(store: PackStore): number {
+  return store === 'bookmarks' ? PACK_META_VERSION : PACK_META_VERSION_SYNC;
+}
+
+/** 依存放位置編碼。放 `storage.sync` 時先確認塞得進去，塞不進去丟配額的訊息 */
+async function targetFor(
+  store: PackStore,
+  bytes: Bytes,
+): Promise<Parameters<typeof writePackEnvelope>[1]> {
+  if (store === 'bookmarks') {
+    return { store, bytes };
+  }
+  const blob = toBase91(bytes);
+  if (!(await fits(blob))) {
+    throw new Error(await quotaMessage(blob));
+  }
+  return { store, chunks: toChunks(blob) };
 }
 
 /**
@@ -435,22 +531,24 @@ export async function overwriteRemote(): Promise<void> {
     }
     // 要解鎖：精簡格式要有金鑰才編得出來
     const snapshot = await packedSnapshot();
+    // 存放位置照雲端 meta；meta 看不懂（或不在）才用本機設定
+    const remoteMeta = await readPackMeta();
+    const store = remoteMeta === null ? await defaultStore() : packStoreOf(remoteMeta);
     /*
-     * 先確認塞得進配額才清空遠端。
+     * 先確認塞得進配額才清空遠端（`targetFor`）。
      *
      * 反過來的話（清空 → 上傳 → 因為超額而失敗）會變成兩邊都沒有那份副本，
      * 而使用者按這顆按鈕的處境往往正是「資料很多」。
      */
-    if (!(await fits(snapshot.blob))) {
-      throw new Error(quotaMessage(snapshot.blob));
-    }
-    await clearPackEnvelope();
+    const target = await targetFor(store, snapshot.bytes);
+    // 寫回書籤時留著資料夾：`writeBookmarkChunks` 會沿用它、補齊或刪掉多的塊（「重建」）
+    await clearPackEnvelope(store === 'sync');
     await clearSyncEnvelope();
     await clearLayoutEnvelope();
     await clearSyncGone();
     await writePackEnvelope(
       { vault: local, tag: snapshot.tag, layoutTag: snapshot.layoutTag, deviceId: await deviceId() },
-      toChunks(snapshot.blob),
+      target,
     );
     lastSyncedAt = Date.now();
     lastError = null;
@@ -486,6 +584,7 @@ export async function clearRemote(): Promise<void> {
       timer = null;
     }
     await patchSettings({ vaultSyncEnabled: false });
+    // 連書籤裡那個資料夾一起刪（`clearPackEnvelope` 預設就會）
     await clearPackEnvelope();
     await clearSyncEnvelope();
     // 版面也是隱私資訊（第 3 期起還有群組名稱），「移除雲端副本」要連它一起移除
@@ -497,6 +596,100 @@ export async function clearRemote(): Promise<void> {
   } finally {
     running = false;
     void announce();
+  }
+}
+
+/**
+ * 切換雲端那份的存放位置（`storage.sync` ↔ 書籤）。整個帳號一起換：寫進 meta，其他裝置照 meta 走。
+ *
+ * 先跑一次同步（改去書籤時合併完直接推到書籤），結果不是 `synced` 就停下來說明原因：換地方等於重寫雲端那份，
+ * 沒合併過就重寫會覆蓋掉別台裝置還沒合併進來的東西（「解鎖才推」那條規則的同一個理由）。
+ * 也因此要解鎖。
+ *
+ * - 改去書籤：寫書籤 → 寫 meta（version 3）→ 刪 `vaultPackC*`（都在 `writePackEnvelope` 裡）。
+ * - 改回 sync：先確認塞得進 100 KB，塞不下就拒絕（雲端那份不動）；寫回 `vaultPackC*` → meta → 刪資料夾。
+ *   資料夾最後才刪：中途失敗的話，meta 還指著書籤、資料都還在。
+ */
+export async function setSyncStore(store: PackStore): Promise<void> {
+  if (!syncAvailable()) {
+    throw new Error(t('sync_unavailable'));
+  }
+  if (!isUnlocked()) {
+    throw new Error(t('sync_bookmarks_need_unlock'));
+  }
+  if (running) {
+    throw new Error(t('sync_in_progress'));
+  }
+  // 改去書籤時合併完就直接寫進書籤：照雲端 meta 推回 storage.sync 在超額時一定失敗（見 `runSync`）
+  const outcome = await runSync(store === 'bookmarks' ? 'bookmarks' : undefined);
+  if (outcome !== 'synced') {
+    throw new Error(lastError ?? t('sync_bookmarks_not_merged', outcomeText(outcome)));
+  }
+  // syncVault 結束到這裡之間，排程中的那一次可能已經開始了
+  if (running) {
+    throw new Error(t('sync_in_progress'));
+  }
+  running = true;
+  try {
+    const local = await readMeta();
+    if (local === null) {
+      throw new Error(t('sync_no_local_vault'));
+    }
+    const remote = await readPackMeta();
+    const current = remote === null ? await defaultStore() : packStoreOf(remote);
+    if (remote !== null && current === store) {
+      await patchSettings({ vaultSyncBookmarks: store === 'bookmarks' });
+      return;
+    }
+    const snapshot = await packedSnapshot();
+    let target: Parameters<typeof writePackEnvelope>[1];
+    if (store === 'sync') {
+      const blob = toBase91(snapshot.bytes);
+      if (!(await fits(blob))) {
+        throw new Error(
+          t('sync_bookmarks_cannot_fit', Math.ceil(blob.length / 1024), await vaultBudgetKb()),
+        );
+      }
+      target = { store, chunks: toChunks(blob) };
+    } else {
+      target = { store, bytes: snapshot.bytes };
+    }
+    await writePackEnvelope(
+      { vault: local, tag: snapshot.tag, layoutTag: snapshot.layoutTag, deviceId: await deviceId() },
+      target,
+    );
+    if (store === 'sync') {
+      await removeSyncFolder(remote?.folderId ?? null);
+    }
+    await patchSettings({ vaultSyncBookmarks: store === 'bookmarks' });
+    lastSyncedAt = Date.now();
+    lastError = null;
+    lastOutcome = 'synced';
+  } finally {
+    running = false;
+    void announce();
+  }
+}
+
+/** `syncVault` 沒有同步成功時，給錯誤訊息用的原因 */
+function outcomeText(outcome: SyncOutcome): string {
+  switch (outcome) {
+    case 'disabled':
+      return t('sync_bookmarks_reason_disabled');
+    case 'locked':
+      return t('sync_bookmarks_need_unlock');
+    case 'waiting':
+      return t('sync_bookmarks_reason_waiting');
+    case 'busy':
+      return t('sync_in_progress');
+    case 'deleted-elsewhere':
+      return t('sync_deleted_elsewhere');
+    case 'unavailable':
+      return t('sync_unavailable');
+    case 'no-vault':
+      return t('sync_no_local_vault');
+    default:
+      return outcome;
   }
 }
 
@@ -515,6 +708,7 @@ export async function syncStatus(): Promise<VaultSyncStatus> {
 
   const base = {
     enabled: settings.vaultSyncEnabled,
+    store: (settings.vaultSyncBookmarks ? 'bookmarks' : 'sync') as PackStore,
     hasLocalVault: local !== null,
     quota: SYNC_TOTAL_BUDGET,
     lastError,
@@ -530,6 +724,7 @@ export async function syncStatus(): Promise<VaultSyncStatus> {
       remoteUpdatedAt: null,
       sameVault: null,
       bytes: 0,
+      usageRatio: 0,
       wouldFit: true,
       deletedElsewhere: false,
     };
@@ -540,15 +735,21 @@ export async function syncStatus(): Promise<VaultSyncStatus> {
   const remote = pack.kind === 'absent' ? await readSyncEnvelope() : pack;
   const remoteMeta = remote.kind === 'absent' ? null : remote.meta;
   const gone = await readSyncGone();
+  const bytes = await syncBytesInUse();
+  // 存放位置看雲端 meta（舊格式那份一定在 storage.sync）；雲端沒有時是本機設定的初值
+  const store = pack.kind === 'absent' || pack.meta === null ? base.store : packStoreOf(pack.meta);
 
   return {
     ...base,
+    store,
     available: true,
     remote: remote.kind,
     remoteUpdatedAt: remoteMeta?.updatedAt ?? null,
     sameVault: remoteMeta === null || local === null ? null : sameVault(remoteMeta, local),
-    bytes: await syncBytesInUse(),
-    wouldFit: await wouldFit(),
+    bytes,
+    usageRatio: bytes / SYNC_TOTAL_BUDGET,
+    // 放書籤時沒有配額可超
+    wouldFit: store === 'bookmarks' ? true : await wouldFit(),
     deletedElsewhere: gone !== null && gone.deviceId !== (await deviceId()),
   };
 }
@@ -559,7 +760,7 @@ async function wouldFit(): Promise<boolean> {
     return true;
   }
   try {
-    return await fits((await packedSnapshot()).blob);
+    return await fits(toBase91((await packedSnapshot()).bytes));
   } catch {
     return true;
   }

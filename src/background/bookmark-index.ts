@@ -8,6 +8,7 @@ import {
 } from '@/shared/url-match';
 import { loadRedirects, rememberRedirect } from '@/storage/redirect-map';
 import { resolveFinalUrlViaTab } from './redirect-resolve';
+import { isSyncFolderNode } from './sync-folder-guard';
 
 /**
  * 已加入書籤的網址索引。
@@ -117,6 +118,11 @@ async function build(): Promise<BookmarkIndex> {
 }
 
 function collect(node: browser.bookmarks.BookmarkTreeNode, into: Set<string>): void {
+  // 隱私空間的同步資料夾整棵略過：裡面是每筆約 60 KB 的 `data:` 密文，放進索引只是白佔記憶體，
+  // 而且那些不是使用者的書籤，不該被當成「已加入書籤」比對
+  if (isSyncFolderNode(node)) {
+    return;
+  }
   if (node.url !== undefined) {
     into.add(normalizeUrl(node.url));
   }

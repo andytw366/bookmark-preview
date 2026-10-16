@@ -1,3 +1,5 @@
+import { assertNotSyncFolder } from './sync-folder-guard';
+
 /**
  * 原生書籤的拖拽排序與「兩張疊在一起 → 建立資料夾」。
  *
@@ -10,6 +12,9 @@
  *
  * 所以第一次照 Firefox 的語意算；讀回來若不在錨點正前方（日後語意變了、或期間有別的
  * 變動）就再搬一次 —— 第二次一定是往前移，往前移時兩種語意沒有差別。
+ *
+ * 隱私空間的同步資料夾（與它底下的書籤）在介面上看不到，這裡的兩個入口都拒絕碰它：
+ * 排序或合併進去就等於改動同步資料。
  */
 
 /** 不在這一批裡、而且在錨點（含）之後的第一個兄弟；找不到就是 null（放到最後） */
@@ -66,6 +71,7 @@ export async function reorderBookmarks(
   parentId: string,
   beforeId: string | null,
 ): Promise<{ moved: number; failed: number }> {
+  await assertNotSyncFolder(parentId, ...ids);
   const anchor = await resolveAnchor(parentId, beforeId, new Set(ids));
   let moved = 0;
   let failed = 0;
@@ -88,6 +94,7 @@ export async function mergeIntoNewFolder(
   ids: readonly string[],
   title: string,
 ): Promise<string> {
+  await assertNotSyncFolder(targetId, ...ids);
   const [target] = await browser.bookmarks.get(targetId);
   if (target?.parentId === undefined) {
     throw new Error(`bookmark ${targetId} not found`);

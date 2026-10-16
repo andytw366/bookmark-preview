@@ -13,7 +13,8 @@ import {
   wrapDek,
   zero,
 } from '@/crypto/keyring';
-import { fromBase91, toBase91 } from '@/crypto/base91';
+import { fromBase32 } from '@/crypto/base32';
+import { fromBase91 } from '@/crypto/base91';
 import { decodePayload, encodePayload, openPayload, sealPayload } from '@/crypto/vault-codec';
 import type { VaultThumbPayload } from '@/shared/messages';
 import type {
@@ -85,6 +86,7 @@ import {
   writeMeta,
 } from '@/storage/vault-store';
 import { forgetPlaintextTraces } from './vault-traces';
+import { isSyncFolderNode } from './sync-folder-guard';
 import { t } from '@/shared/i18n';
 
 /**
@@ -1023,20 +1025,28 @@ export async function mergeEncryptedPack(blob: string, version: number): Promise
 }
 
 /**
- * 解開雲端的精簡格式。`version` 是中介資料的版本（`PACK_META_VERSION` 的說明）：1 是 base64，
- * 之後是 base91。呼叫端已經用中介資料把關過版本，這裡不認得的一律當 base91 —— 解不開會丟錯。
+ * 解開雲端的精簡格式。`version` 是中介資料的版本（`PACK_META_VERSION` 的說明），決定塊接回來的文字
+ * 怎麼解：1 是 base64，2 是 base91（`storage.sync`），3 是 base32（書籤）。呼叫端已經用中介資料把關過
+ * 版本與存放位置（`isPackMeta` 不讓 3 配 `storage.sync`），這裡只看版本號；解不開會丟錯。
  */
 async function openPack(dataKey: CryptoKey, blob: string, version: number): Promise<Unpacked> {
-  const body =
-    version === 1
-      ? await decodePayload<unknown>(dataKey, [blob])
-      : await openPayload<unknown>(dataKey, fromBase91(blob));
+  let body: unknown;
+  if (version === 1) {
+    body = await decodePayload<unknown>(dataKey, [blob]);
+  } else if (version === 3) {
+    body = await openPayload<unknown>(dataKey, fromBase32(blob));
+  } else {
+    body = await openPayload<unknown>(dataKey, fromBase91(blob));
+  }
   return unpackSync(body);
 }
 
 export interface PackedSnapshot {
-  /** 已加密的 base91（`PACK_META_VERSION` 2） */
-  blob: string;
+  /**
+   * 已加密的信封位元組（`sealPayload` 的結果）。文字編碼交給存放位置：`storage.sync` 用 base91
+   * （配額按字元算，越密越好），書籤用 base32（`data:` 網址裡只能放英數字，`crypto/base32` 檔頭）
+   */
+  bytes: Bytes;
   /** 書籤的內容指紋 */
   tag: string;
   /** 版面的內容指紋 */
@@ -1067,7 +1077,7 @@ export async function packedSnapshot(): Promise<PackedSnapshot> {
     if (!exact) {
       body = { v: 0, payload: current, layout: currentLayout };
     }
-    return { blob: toBase91(await sealPayload(k, body)), tag, layoutTag: lTag };
+    return { bytes: await sealPayload(k, body), tag, layoutTag: lTag };
   });
 }
 
@@ -1358,6 +1368,10 @@ async function importOneLocked(bookmarkId: string, purgeHistory: boolean): Promi
     if (node === undefined) {
       throw new Error(t('bookmark_not_found'));
     }
+    // 隱私空間自己的同步資料夾與裡面的密文書籤不能「移入」：移入會刪掉原生書籤，同步資料就沒了
+    if (isSyncFolderNode(node)) {
+      throw new Error(t('sync_folder_protected'));
+    }
     // 資料夾走遞迴那條路：整棵子樹一起搬，結構保留
     if (node.url === undefined) {
       return importFolderLocked(bookmarkId, purgeHistory);
@@ -1410,6 +1424,10 @@ async function assertImportableFolder(id: string): Promise<void> {
   }
 }
 
+function containsSyncFolder(node: browser.bookmarks.BookmarkTreeNode): boolean {
+  return isSyncFolderNode(node) || (node.children ?? []).some(containsSyncFolder);
+}
+
 /**
  * 整個資料夾移入隱私空間。
  *
@@ -1427,6 +1445,11 @@ async function importFolderLocked(folderId: string, purgeHistory: boolean): Prom
   const subtree = (await browser.bookmarks.getSubTree(folderId))[0];
   if (subtree === undefined) {
     throw new Error(t('vault_folder_not_found'));
+  }
+  // 使用者在 Firefox 的書籤管理員把同步資料夾搬進了這個資料夾：整棵移入最後會 `removeTree`，
+  // 連同步資料一起刪掉，所以整個拒絕（照理它在「其他書籤」底下，而根資料夾本來就不能移入）
+  if (containsSyncFolder(subtree)) {
+    throw new Error(t('sync_folder_protected'));
   }
 
   const plan = planFolderImport(subtree, null, () => crypto.randomUUID());
