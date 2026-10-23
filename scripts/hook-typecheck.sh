@@ -20,6 +20,12 @@ if grep -q '"stop_hook_active"[[:space:]]*:[[:space:]]*true' <<< "$payload"; the
 fi
 
 cd "$ROOT" || exit 0
+
+# 這回合沒動到任何 .ts/.tsx（包括未追蹤的新檔）就不用跑：純文件、i18n、聊天的回合省掉 3 秒
+if [[ -z "$(git status --porcelain -- '*.ts' '*.tsx' 2>/dev/null)" ]]; then
+  exit 0
+fi
+
 if ! output="$(npx tsc --noEmit 2>&1)"; then
   {
     echo "typecheck 失敗（scripts/hook-typecheck.sh）："
